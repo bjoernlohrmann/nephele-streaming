@@ -29,6 +29,10 @@ public class InputChannelChooser {
 		this.currentChannel = -1;
 	}
 
+  public boolean hasChannelAvailable() {
+    return !this.channelSchedule.isEmpty();
+  }
+
 	/**
 	 * @return index of the next available channel, or -1 if no channel is
 	 *         currently available and blocking is switched off

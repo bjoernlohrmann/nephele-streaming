@@ -72,6 +72,12 @@ public final class StreamInputGate<T extends Record> extends
 		return this.qosCallback;
 	}
 
+
+  @Override
+  public boolean hasInputAvailable() throws InterruptedException {
+    return this.channelChooser.hasChannelAvailable();
+  }
+
 	/**
 	 * {@inheritDoc}
 	 */

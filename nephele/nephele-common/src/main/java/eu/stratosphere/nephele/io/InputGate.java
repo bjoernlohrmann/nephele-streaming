@@ -47,6 +47,12 @@ public interface InputGate<T extends Record> extends Gate<T> {
 	 */
 	InputChannelResult readRecord(T target) throws IOException, InterruptedException;
 
+  /**
+   *
+   * @return
+   */
+  boolean hasInputAvailable() throws InterruptedException;
+
 	/**
 	 * Returns the number of input channels associated with this input gate.
 	 * 

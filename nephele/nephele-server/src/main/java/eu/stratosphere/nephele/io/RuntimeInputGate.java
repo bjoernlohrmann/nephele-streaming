@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.logging.Log;
@@ -174,6 +175,11 @@ public class RuntimeInputGate<T extends Record> extends AbstractGate<T> implemen
 	}
 
 
+  @Override
+  public boolean hasInputAvailable() {
+    return !this.availableChannels.isEmpty();
+  }
+
 	@Override
 	public InputChannelResult readRecord(T target) throws IOException, InterruptedException {
 
@@ -185,10 +191,10 @@ public class RuntimeInputGate<T extends Record> extends AbstractGate<T> implemen
 			if (Thread.interrupted()) {
 				throw new InterruptedException();
 			}
-				
+
 			this.channelToReadFrom = waitForAnyChannelToBecomeAvailable();
 		}
-			
+
 		InputChannelResult result = this.getInputChannel(this.channelToReadFrom).readRecord(target);
 		switch (result) {
 			case INTERMEDIATE_RECORD_FROM_BUFFER: // full record and we can stay on the same channel

@@ -16,6 +16,10 @@
 package eu.stratosphere.nephele.io;
 
 import java.io.IOException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import eu.stratosphere.nephele.template.AbstractOutputTask;
 import eu.stratosphere.nephele.template.AbstractTask;
@@ -41,7 +45,10 @@ public class RecordReader<T extends Record> extends AbstractSingleGateRecordRead
 	 */
 	private boolean noMoreRecordsWillFollow;
 
-	// --------------------------------------------------------------------------------------------
+
+//  private ExecutorService executor = Executors.newSingleThreadExecutor();
+
+  // --------------------------------------------------------------------------------------------
 	
 	/**
 	 * Constructs a new record reader and registers a new input gate with the application's environment.
@@ -54,6 +61,7 @@ public class RecordReader<T extends Record> extends AbstractSingleGateRecordRead
 	public RecordReader(AbstractTask taskBase, Class<T> recordType) {
 		super(taskBase, MutableRecordDeserializerFactory.<T>get(), 0);
 		this.recordType = recordType;
+
 	}
 
 	/**
@@ -109,6 +117,48 @@ public class RecordReader<T extends Record> extends AbstractSingleGateRecordRead
 			}
 		}
 	}
+
+  /**
+   * Checks if at least one more record can be read from the associated input gate. This method won't block.
+   *
+   * @return <code>RECORD_AVAILABLE</code> if at least one more record can be read from the associated input gate,
+   *         <code>END_OF_STREAM</code> if the end of the input stream is reached and no more records will follow,
+   *         <code>NONE</code> if there is no input at the moment but may be available later
+   */
+  public RecordReaderResult hasNextNonBlocking() throws IOException, InterruptedException {
+    if (this.lookahead != null) {
+      return RecordReaderResult.RECORD_AVAILABLE;
+    }
+
+    if (this.noMoreRecordsWillFollow) {
+      return RecordReaderResult.END_OF_STREAM;
+    }
+
+    T record = instantiateRecordType();
+
+
+    while (true) {
+      if (!this.inputGate.hasInputAvailable()) {
+        return RecordReaderResult.NONE;
+      }
+
+      InputChannelResult result = this.inputGate.readRecord(record);
+      switch (result) {
+        case INTERMEDIATE_RECORD_FROM_BUFFER:
+        case LAST_RECORD_FROM_BUFFER:
+          this.lookahead = record;
+          return RecordReaderResult.RECORD_AVAILABLE;
+        case EVENT:
+          handleEvent(this.inputGate.getCurrentEvent());
+          break;
+        case END_OF_STREAM:
+          this.noMoreRecordsWillFollow = true;
+          return RecordReaderResult.END_OF_STREAM;
+        default:
+          ; // fall through the loop
+      }
+    }
+  }
 
 	/**
 	 * Reads the current record from the associated input gate.

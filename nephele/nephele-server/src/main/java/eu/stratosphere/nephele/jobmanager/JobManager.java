@@ -426,7 +426,7 @@ public class JobManager implements DeploymentManager, ExtendedManagementProtocol
 		logVersionInformation();
 		
 		final Option configDirOpt = OptionBuilder.withArgName("config directory").hasArg()
-			.withDescription("Specify configuration directory.").create("configDir");
+			.withDescription("Specify <configuration directory.").create("configDir");
 
 		final Option executionModeOpt = OptionBuilder.withArgName("execution mode").hasArg()
 			.withDescription("Specify execution mode.").create("executionMode");
