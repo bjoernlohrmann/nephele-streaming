@@ -8,7 +8,7 @@ import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
-public @interface ReadFromWriteTo {
+public @interface LastRecordReadFromWriteTo {
   int readerIndex();
   int writerIndex();
 }

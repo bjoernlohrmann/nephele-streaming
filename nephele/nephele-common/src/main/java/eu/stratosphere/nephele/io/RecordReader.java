@@ -16,10 +16,6 @@
 package eu.stratosphere.nephele.io;
 
 import java.io.IOException;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 import eu.stratosphere.nephele.template.AbstractOutputTask;
 import eu.stratosphere.nephele.template.AbstractTask;
@@ -49,7 +45,7 @@ public class RecordReader<T extends Record> extends AbstractSingleGateRecordRead
 //  private ExecutorService executor = Executors.newSingleThreadExecutor();
 
   // --------------------------------------------------------------------------------------------
-	
+
 	/**
 	 * Constructs a new record reader and registers a new input gate with the application's environment.
 	 * 
@@ -138,9 +134,10 @@ public class RecordReader<T extends Record> extends AbstractSingleGateRecordRead
 
 
     while (true) {
+
       if (!this.inputGate.hasInputAvailable()) {
         return RecordReaderResult.NONE;
-      }
+      } // else implies that InputGate.readRecord won't block
 
       InputChannelResult result = this.inputGate.readRecord(record);
       switch (result) {

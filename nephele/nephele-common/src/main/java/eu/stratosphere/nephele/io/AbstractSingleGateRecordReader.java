@@ -34,7 +34,6 @@ public abstract class AbstractSingleGateRecordReader<T extends Record> extends A
 	 */
 	protected final InputGate<T> inputGate;
 	
-	// --------------------------------------------------------------------------------------------
 
 	protected AbstractSingleGateRecordReader(AbstractInvokable invokable, RecordDeserializerFactory<T> deserializerFactory, int inputGateID) {
 		Environment environment = invokable.getEnvironment();
@@ -90,7 +89,7 @@ public abstract class AbstractSingleGateRecordReader<T extends Record> extends A
 	}
 	
 	
-	InputGate<T> getInputGate() {
+	public InputGate<T> getInputGate() {
 		return this.inputGate;
 	}
 }
