@@ -27,7 +27,7 @@ public abstract class IoCTask extends AbstractTask {
   private List<int[]> mappings = new ArrayList<int[]>();
   private List<Method> finishMethods = new ArrayList<Method>();
   private List<int[]> finishMappings = new ArrayList<int[]>();
-  private Set<Integer> availableReaders = new LinkedHashSet<Integer>();
+  private final Set<Integer> availableReaders = new LinkedHashSet<Integer>();
   private Set<Integer> finishedReaders = new LinkedHashSet<Integer>();
 
 
@@ -134,7 +134,7 @@ public abstract class IoCTask extends AbstractTask {
   /**
    * Initializes a RecordReader associated with an index.
    *
-   * @param index the index associated with the Reader.
+   * @param index the index associated with the reader.
    * @param recordType the class of records that can be read from the record reader.
    */
   protected <T extends Record> void initReader(final int index, Class<T> recordType) {
@@ -156,12 +156,12 @@ public abstract class IoCTask extends AbstractTask {
   /**
    * Initializes a RecordWriter associated with an index.
    *
-   * @param index
+   * @param index the index associated with the writer.
    * @param recordType the class of records that can be emitted with this record writer.
    */
   protected <T extends Record> void initWriter(int index, Class<T> recordType) {
     if (index != collectors.size()) {
-      throw new IllegalConfigurationException("You have to initialize the writers with the indices in order!");
+      throw new IllegalConfigurationException("You have to initialize the writers with the indices in order.");
     }
     collectors.add(new Collector<T>(new RecordWriter<T>(this, recordType)));
   }
