@@ -42,7 +42,7 @@ public class Grep {
 		input.setFileInputClass(FileLineReader.class);
 		input.setFilePath(new Path("file:///home/ec2-user/test.txt"));
 		input.setInstanceType("t1.micro");
-		
+
 		JobTaskVertex task1 = new JobTaskVertex("Task 1", jobGraph);
 		task1.setTaskClass(GrepTask.class);
 		task1.setInstanceType("t1.micro");
