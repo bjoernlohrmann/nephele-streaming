@@ -98,7 +98,13 @@ public class QosModel {
 	 * A dummy Qos report that buffers vertex/edge announcements for later
 	 * processing.
 	 */
-	private QosReport announcementBuffer;
+	private final QosReport announcementBuffer;
+
+	/**
+	 * A dummy object containing chain updates that need to be buffered, because
+	 * the edges affected by the update are not yet in the QoS graph.
+	 */
+	private final ChainUpdates chainUpdatesBuffer;
 
 	/**
 	 * All gates of the Qos graph mapped by their ID.
@@ -120,6 +126,7 @@ public class QosModel {
 	public QosModel(JobID jobID) {
 		this.state = State.EMPTY;
 		this.announcementBuffer = new QosReport(jobID);
+		this.chainUpdatesBuffer = new ChainUpdates(jobID);
 		this.gatesByGateId = new HashMap<GateID, QosGate>();
 		this.vertexByID = new HashMap<ExecutionVertexID, QosVertex>();
 		this.edgeBySourceChannelID = new HashMap<ChannelID, QosEdge>();
@@ -167,26 +174,56 @@ public class QosModel {
 	}
 
 	public void processChainUpdates(ChainUpdates announce) {
-		for (QosReporterID.Edge edgeReporterID : announce.getUnchainedEdges()) {
-			
+		this.bufferChainUpdates(announce);
+		this.tryToProcessBufferedChainUpdates();
+	}
+
+	private void tryToProcessBufferedChainUpdates() {
+		Iterator<QosReporterID.Edge> unchainedIter = this.chainUpdatesBuffer
+				.getUnchainedEdges().iterator();
+		while (unchainedIter.hasNext()) {
+
+			QosReporterID.Edge edgeReporterID = unchainedIter.next();
 			QosEdge edge = this.edgeBySourceChannelID.get(edgeReporterID
 					.getSourceChannelID());
+
+			if (edge == null) {
+				continue;
+			}
+
 			edge.getQosData().setIsInChain(false);
-			
+
+			unchainedIter.remove();
 			Logger.getLogger(this.getClass()).info(
 					"Edge " + edge + " has been unchained.");
 		}
 
-		for (QosReporterID.Edge edgeReporterID : announce
-				.getNewlyChainedEdges()) {
-			
+		Iterator<QosReporterID.Edge> newlyChainedIter = this.chainUpdatesBuffer
+				.getNewlyChainedEdges().iterator();
+		while (newlyChainedIter.hasNext()) {
+
+			QosReporterID.Edge edgeReporterID = newlyChainedIter.next();
+
 			QosEdge edge = this.edgeBySourceChannelID.get(edgeReporterID
 					.getSourceChannelID());
+
+			if (edge == null) {
+				continue;
+			}
+
 			edge.getQosData().setIsInChain(true);
-			
+
+			newlyChainedIter.remove();
 			Logger.getLogger(this.getClass()).info(
 					"Edge " + edge + " has been chained.");
 		}
+	}
+
+	private void bufferChainUpdates(ChainUpdates announce) {
+		this.chainUpdatesBuffer.getUnchainedEdges().addAll(
+				announce.getUnchainedEdges());
+		this.chainUpdatesBuffer.getNewlyChainedEdges().addAll(
+				announce.getNewlyChainedEdges());
 	}
 
 	private void processQosRecords(QosReport report) {
@@ -248,6 +285,7 @@ public class QosModel {
 	private void bufferAndTryToProcessAnnouncements(QosReport report) {
 		this.bufferAnnouncements(report);
 		this.tryToProcessBufferedAnnouncements();
+		this.tryToProcessBufferedChainUpdates();
 	}
 
 	private void tryToProcessBufferedAnnouncements() {
