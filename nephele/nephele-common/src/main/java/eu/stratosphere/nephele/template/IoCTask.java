@@ -1,5 +1,6 @@
 package eu.stratosphere.nephele.template;
 
+import eu.stratosphere.nephele.io.ChannelSelector;
 import eu.stratosphere.nephele.io.InputGate;
 import eu.stratosphere.nephele.io.RecordAvailabilityListener;
 import eu.stratosphere.nephele.io.RecordReader;
@@ -166,6 +167,22 @@ public abstract class IoCTask extends AbstractTask {
     collectors.add(new Collector<T>(new RecordWriter<T>(this, recordType)));
   }
 
+  protected <T extends Record> void initWriter(int index, Class<T> recordType, ChannelSelector<T> channelSelector) {
+    if (index != collectors.size()) {
+      throw new IllegalConfigurationException("You have to initialize the writers with the indices in order.");
+    }
+    collectors.add(new Collector<T>(new RecordWriter<T>(this, recordType, channelSelector)));
+  }
+
+  protected RecordReader<? extends Record> getReader(int index) {
+    return readers.get(index);
+  }
+
+  protected RecordWriter<? extends Record> getWriter(int index) {
+    return collectors.get(index).getRecordWriter();
+  }
+
+
   private void notifyEndOfStream(int readerIndex) throws IOException, InterruptedException, InvocationTargetException, IllegalAccessException {
     finishedReaders.add(readerIndex);
     Method method = finishMethods.get(readerIndex);
@@ -258,6 +275,11 @@ public abstract class IoCTask extends AbstractTask {
 
     }
 
+    shutdown();
+
+  }
+
+  protected void shutdown() {
   }
 
 

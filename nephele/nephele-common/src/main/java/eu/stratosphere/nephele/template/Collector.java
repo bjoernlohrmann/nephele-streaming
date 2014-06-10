@@ -35,4 +35,8 @@ public class Collector<T extends Record> {
       flush = false;
     }
   }
+
+  public RecordWriter<T> getRecordWriter() {
+    return writer;
+  }
 }
