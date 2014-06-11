@@ -50,12 +50,15 @@ public class IncomingConnectionThread extends Thread {
 
 		private final Queue<SelectionKey> pendingReadEventSubscribeRequests;
 
+		private final Selector selector;
+
 		private final SelectionKey key;
 
 		private IncomingConnectionBufferAvailListener(final Queue<SelectionKey> pendingReadEventSubscribeRequests,
-				final SelectionKey key) {
+				final Selector selector, final SelectionKey key) {
 
 			this.pendingReadEventSubscribeRequests = pendingReadEventSubscribeRequests;
+			this.selector = selector;
 			this.key = key;
 		}
 
@@ -68,6 +71,8 @@ public class IncomingConnectionThread extends Thread {
 			synchronized (this.pendingReadEventSubscribeRequests) {
 				this.pendingReadEventSubscribeRequests.add(this.key);
 			}
+
+			this.selector.wakeup();
 		}
 	}
 
@@ -110,7 +115,7 @@ public class IncomingConnectionThread extends Thread {
 			}
 
 			try {
-				this.selector.select(500);
+				this.selector.select(500); // don't forget: wake up if necessary!
 			} catch (IOException e) {
 				LOG.error(e);
 			}
@@ -209,7 +214,7 @@ public class IncomingConnectionThread extends Thread {
 			}
 
 			final BufferAvailabilityListener bal = new IncomingConnectionBufferAvailListener(
-				this.pendingReadEventSubscribeRequests, key);
+				this.pendingReadEventSubscribeRequests, this.selector, key);
 			if (!e.getBufferProvider().registerBufferAvailabilityListener(bal)) {
 				// In the meantime, a buffer has become available again, subscribe to read event again
 

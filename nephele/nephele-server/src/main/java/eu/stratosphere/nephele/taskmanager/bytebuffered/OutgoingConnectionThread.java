@@ -144,7 +144,7 @@ public class OutgoingConnectionThread extends Thread {
 			}
 
 			try {
-				this.selector.select(10);
+				this.selector.select(10); // don't forget: wake up if necessary!
 			} catch (IOException e) {
 				LOG.error(e);
 			}
@@ -245,6 +245,8 @@ public class OutgoingConnectionThread extends Thread {
 		synchronized (this.pendingConnectionRequests) {
 			this.pendingConnectionRequests.add(outgoingConnection);
 		}
+
+		this.selector.wakeup();
 	}
 
 	public void unsubscribeFromWriteEvent(SelectionKey selectionKey) throws IOException {
@@ -259,6 +261,8 @@ public class OutgoingConnectionThread extends Thread {
 		synchronized (this.connectionsToClose) {
 			this.connectionsToClose.put(outgoingConnection, Long.valueOf(System.currentTimeMillis()));
 		}
+
+		this.selector.wakeup();
 	}
 
 	public void subscribeToWriteEvent(SelectionKey selectionKey) {
@@ -270,5 +274,6 @@ public class OutgoingConnectionThread extends Thread {
 			this.connectionsToClose.remove((OutgoingConnection) selectionKey.attachment());
 		}
 
+		this.selector.wakeup();
 	}
 }
