@@ -70,8 +70,9 @@ public final class DefaultDeserializer extends AbstractDeserializer {
 
 			setBuffer(buf);
 
-		} else {
+		}
 
+		if (getBuffer() != null) {
 			final Buffer buffer = getBuffer();
 
 			final int bytesWritten = buffer.write(readableByteChannel);

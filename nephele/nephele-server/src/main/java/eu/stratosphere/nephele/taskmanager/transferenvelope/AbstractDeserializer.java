@@ -260,10 +260,8 @@ public abstract class AbstractDeserializer {
 						+ this.tempBuffer.remaining() + " more bytes to follow");
 				}
 			} else if (bytesRead == 0) {
-				try {
-					Thread.sleep(50);
-				} catch (InterruptedException e) {
-				}
+				// Wait for more data
+				return true;
 			}
 
 			if (!this.tempBuffer.hasRemaining()) {
