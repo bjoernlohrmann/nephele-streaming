@@ -22,9 +22,9 @@ import eu.stratosphere.nephele.template.AbstractTask;
 /**
  * This class provides a wrapper for Nephele tasks of the type
  * {@link AbstractTask}.
- * <p>
+ * <p/>
  * This class is thread-safe.
- * 
+ *
  * @author warneke, Bjoern Lohrmann
  */
 public class StreamTaskWrapper extends AbstractTask {
@@ -61,5 +61,9 @@ public class StreamTaskWrapper extends AbstractTask {
 	@Override
 	public void invoke() throws Exception {
 		this.wrappedInvokable.invoke();
+	}
+
+	public AbstractInvokable getWrappedInvokable() {
+		return wrappedInvokable;
 	}
 }

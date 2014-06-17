@@ -15,11 +15,8 @@
 
 package eu.stratosphere.nephele.plugins.wrapper;
 
-import java.util.Set;
-
 import eu.stratosphere.nephele.configuration.Configuration;
 import eu.stratosphere.nephele.execution.Environment;
-import eu.stratosphere.nephele.execution.Mapper;
 import eu.stratosphere.nephele.io.ChannelSelector;
 import eu.stratosphere.nephele.io.GateID;
 import eu.stratosphere.nephele.io.InputGate;
@@ -32,13 +29,15 @@ import eu.stratosphere.nephele.services.memorymanager.MemoryManager;
 import eu.stratosphere.nephele.template.InputSplitProvider;
 import eu.stratosphere.nephele.types.Record;
 
+import java.util.Set;
+
 /**
  * This class provides an abstract base class for an environment wrapper. An environment wrapper can be used by a plugin
  * to wrap a task's environment and intercept particular method calls. The default implementation of this abstract base
  * class simply forwards every method call to the encapsulated environment.
- * <p>
+ * <p/>
  * This class is thread-safe.
- * 
+ *
  * @author warneke
  */
 public class EnvironmentWrapper implements Environment {
@@ -47,9 +46,8 @@ public class EnvironmentWrapper implements Environment {
 
 	/**
 	 * Constructs a new abstract environment wrapper.
-	 * 
-	 * @param wrappedEnvironment
-	 *        the environment to be wrapped
+	 *
+	 * @param wrappedEnvironment the environment to be wrapped
 	 */
 	public EnvironmentWrapper(final Environment wrappedEnvironment) {
 
@@ -62,7 +60,7 @@ public class EnvironmentWrapper implements Environment {
 
 	/**
 	 * Returns the wrapped environment.
-	 * 
+	 *
 	 * @return the wrapped environment
 	 */
 	protected Environment getWrappedEnvironment() {
@@ -209,8 +207,7 @@ public class EnvironmentWrapper implements Environment {
 	 */
 	@Override
 	public <T extends Record> OutputGate<T> createOutputGate(final GateID gateID,
-			final Class<T> outputClass, final ChannelSelector<T> selector, final boolean isBroadcast)
-	{
+			final Class<T> outputClass, final ChannelSelector<T> selector, final boolean isBroadcast) {
 		return this.wrappedEnvironment.createOutputGate(gateID, outputClass, selector, isBroadcast);
 	}
 
@@ -219,8 +216,7 @@ public class EnvironmentWrapper implements Environment {
 	 */
 	@Override
 	public <T extends Record> InputGate<T> createInputGate(final GateID gateID,
-													final RecordDeserializerFactory<T> deserializer)
-	{
+			final RecordDeserializerFactory<T> deserializer) {
 		return this.wrappedEnvironment.createInputGate(gateID, deserializer);
 	}
 
@@ -241,7 +237,7 @@ public class EnvironmentWrapper implements Environment {
 
 		this.wrappedEnvironment.registerInputGate(inputGate);
 	}
-	
+
 	/**
 	 * {@inheritDoc}
 	 */
@@ -304,13 +300,5 @@ public class EnvironmentWrapper implements Environment {
 	@Override
 	public Set<ChannelID> getInputChannelIDsOfGate(GateID gateID) {
 		return this.wrappedEnvironment.getInputChannelIDsOfGate(gateID);
-	}
-
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public  void registerMapper(Mapper<? extends Record, ? extends Record> mapper) {
-		this.wrappedEnvironment.registerMapper(mapper);
 	}
 }

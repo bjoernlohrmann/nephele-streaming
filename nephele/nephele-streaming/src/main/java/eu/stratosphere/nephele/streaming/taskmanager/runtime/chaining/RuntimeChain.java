@@ -15,17 +15,18 @@
 
 package eu.stratosphere.nephele.streaming.taskmanager.runtime.chaining;
 
+import eu.stratosphere.nephele.streaming.taskmanager.runtime.io.StreamInputGate;
+import eu.stratosphere.nephele.streaming.taskmanager.runtime.io.StreamOutputGate;
+import eu.stratosphere.nephele.template.ioc.IocTask;
+import eu.stratosphere.nephele.types.Record;
+import eu.stratosphere.nephele.util.StringUtils;
+
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import eu.stratosphere.nephele.execution.Mapper;
-import eu.stratosphere.nephele.streaming.taskmanager.runtime.io.StreamInputGate;
-import eu.stratosphere.nephele.streaming.taskmanager.runtime.io.StreamOutputGate;
-import eu.stratosphere.nephele.types.Record;
-import eu.stratosphere.nephele.util.StringUtils;
 
 public final class RuntimeChain {
 
@@ -46,36 +47,35 @@ public final class RuntimeChain {
 
 	public void writeRecord(final Record record) throws IOException {
 		try {
-			this.executeMappers(record, 1);
+			this.executeChainableTasks(record, 1);
 		} catch (Exception e) {
 			throw new IOException(StringUtils.stringifyException(e));
 		}
 	}
 
-	@SuppressWarnings({ "rawtypes", "unchecked" })
-	private void executeMappers(Record record, int indexInChain)
+	@SuppressWarnings({"rawtypes", "unchecked"})
+	private void executeChainableTasks(Record record, int indexInChain)
 			throws Exception {
-		// TODO this will be much nicer once we have an IOC interface to
-		// write Nephele tasks
 
 		RuntimeChainLink chainLink = this.chainLinks.get(indexInChain);
-		Mapper mapper = chainLink.getMapper();
 		StreamOutputGate outputGate = chainLink.getOutputGate();
 
 		chainLink.getInputGate().reportRecordReceived(record, 0);
-		mapper.map(record);
-		Queue outputCollector = mapper.getOutputCollector();
+
+		IocTask iocTask = chainLink.getIocTask();
 
 		boolean isLastInChain = indexInChain == this.chainLinks.size() - 1;
 		if (isLastInChain) {
-			while (!outputCollector.isEmpty()) {
-				outputGate.writeRecord((Record) outputCollector.poll());
-			}
+			iocTask.invokeChainableMethod(record);
 		} else {
-			while (!outputCollector.isEmpty()) {
-				Record outputRecord = (Record) outputCollector.poll();
+
+			Queue<Record> records = new ArrayDeque<Record>();
+			iocTask.invokeChainableMethod(record, records);
+
+			Record outputRecord;
+			while ((outputRecord = records.poll()) != null) {
 				outputGate.reportRecordEmitted(outputRecord);
-				this.executeMappers(RecordUtils.createCopy(outputRecord),
+				this.executeChainableTasks(RecordUtils.createCopy(outputRecord),
 						indexInChain + 1);
 			}
 		}
@@ -111,12 +111,12 @@ public final class RuntimeChain {
 	@Override
 	public String toString() {
 		StringBuilder builder = new StringBuilder(this.chainLinks.get(0).toString());
-		
-		for(int i=1; i< this.chainLinks.size(); i++) {
+
+		for (int i = 1; i < this.chainLinks.size(); i++) {
 			builder.append("->");
 			builder.append(this.chainLinks.get(i).toString());
 		}
-		
+
 		return builder.toString();
 	}
 }

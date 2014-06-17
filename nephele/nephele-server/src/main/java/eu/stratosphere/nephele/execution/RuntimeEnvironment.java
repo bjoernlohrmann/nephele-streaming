@@ -15,19 +15,6 @@
 
 package eu.stratosphere.nephele.execution;
 
-import java.io.IOException;
-import java.util.ArrayDeque;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Queue;
-import java.util.Set;
-import java.util.concurrent.CopyOnWriteArrayList;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import eu.stratosphere.nephele.configuration.Configuration;
 import eu.stratosphere.nephele.deployment.ChannelDeploymentDescriptor;
 import eu.stratosphere.nephele.deployment.GateDeploymentDescriptor;
@@ -48,14 +35,26 @@ import eu.stratosphere.nephele.template.AbstractInvokable;
 import eu.stratosphere.nephele.template.InputSplitProvider;
 import eu.stratosphere.nephele.types.Record;
 import eu.stratosphere.nephele.util.StringUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import java.io.IOException;
+import java.util.ArrayDeque;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * The user code of every Nephele task runs inside a <code>RuntimeEnvironment</code> object. The environment provides
  * important services to the task. It keeps track of setting up the communication channels and provides access to input
  * splits, memory manager, etc.
- * <p>
+ * <p/>
  * This class is thread-safe.
- * 
+ *
  * @author warneke
  */
 public class RuntimeEnvironment implements Environment, Runnable {
@@ -158,19 +157,13 @@ public class RuntimeEnvironment implements Environment, Runnable {
 	/**
 	 * Creates a new runtime environment object which contains the runtime information for the encapsulated Nephele
 	 * task.
-	 * 
-	 * @param jobID
-	 *        the ID of the original Nephele job
-	 * @param taskName
-	 *        the name of task running in this environment
-	 * @param invokableClass
-	 *        invokableClass the class that should be instantiated as a Nephele task
-	 * @param taskConfiguration
-	 *        the configuration object which was attached to the original {@link JobVertex}
-	 * @param jobConfiguration
-	 *        the configuration object which was attached to the original {@link JobGraph}
-	 * @throws Exception
-	 *         thrown if an error occurs while instantiating the invokable class
+	 *
+	 * @param jobID             the ID of the original Nephele job
+	 * @param taskName          the name of task running in this environment
+	 * @param invokableClass    invokableClass the class that should be instantiated as a Nephele task
+	 * @param taskConfiguration the configuration object which was attached to the original {@link JobVertex}
+	 * @param jobConfiguration  the configuration object which was attached to the original {@link JobGraph}
+	 * @throws Exception thrown if an error occurs while instantiating the invokable class
 	 */
 	public RuntimeEnvironment(final JobID jobID, final String taskName,
 			final Class<? extends AbstractInvokable> invokableClass, final Configuration taskConfiguration,
@@ -194,19 +187,14 @@ public class RuntimeEnvironment implements Environment, Runnable {
 
 	/**
 	 * Constructs a runtime environment from a task deployment description.
-	 * 
-	 * @param tdd
-	 *        the task deployment description
-	 * @param memoryManager
-	 *        the task manager's memory manager component
-	 * @param ioManager
-	 *        the task manager's I/O manager component
-	 * @param inputSplitProvider
-	 *        the input split provider for this environment
-	 * @throws Exception
-	 *         thrown if an error occurs while instantiating the invokable class
+	 *
+	 * @param tdd                the task deployment description
+	 * @param memoryManager      the task manager's memory manager component
+	 * @param ioManager          the task manager's I/O manager component
+	 * @param inputSplitProvider the input split provider for this environment
+	 * @throws Exception thrown if an error occurs while instantiating the invokable class
 	 */
-	@SuppressWarnings({ "unchecked", "rawtypes" })
+	@SuppressWarnings({"unchecked", "rawtypes"})
 	public RuntimeEnvironment(final TaskDeploymentDescriptor tdd, final MemoryManager memoryManager,
 			final IOManager ioManager, final InputSplitProvider inputSplitProvider) throws Exception {
 
@@ -221,11 +209,11 @@ public class RuntimeEnvironment implements Environment, Runnable {
 		this.ioManager = ioManager;
 		this.inputSplitProvider = inputSplitProvider;
 
-		for(int i=0; i<tdd.getNumberOfInputGateDescriptors(); i++) {
+		for (int i = 0; i < tdd.getNumberOfInputGateDescriptors(); i++) {
 			this.unboundInputGateIDs.add(tdd.getInputGateDescriptor(i).getGateID());
 		}
-		
-		for(int i=0; i<tdd.getNumberOfOutputGateDescriptors(); i++) {
+
+		for (int i = 0; i < tdd.getNumberOfOutputGateDescriptors(); i++) {
 			this.unboundOutputGateIDs.add(tdd.getOutputGateDescriptor(i).getGateID());
 		}
 
@@ -253,14 +241,14 @@ public class RuntimeEnvironment implements Environment, Runnable {
 
 				final ChannelDeploymentDescriptor cdd = gdd.getChannelDescriptor(j);
 				switch (channelType) {
-				case NETWORK:
-					og.createNetworkOutputChannel(og, cdd.getOutputChannelID(), cdd.getInputChannelID());
-					break;
-				case INMEMORY:
-					og.createInMemoryOutputChannel(og, cdd.getOutputChannelID(), cdd.getInputChannelID());
-					break;
-				default:
-					throw new IllegalStateException("Unknown channel type");
+					case NETWORK:
+						og.createNetworkOutputChannel(og, cdd.getOutputChannelID(), cdd.getInputChannelID());
+						break;
+					case INMEMORY:
+						og.createInMemoryOutputChannel(og, cdd.getOutputChannelID(), cdd.getInputChannelID());
+						break;
+					default:
+						throw new IllegalStateException("Unknown channel type");
 				}
 			}
 		}
@@ -277,14 +265,14 @@ public class RuntimeEnvironment implements Environment, Runnable {
 
 				final ChannelDeploymentDescriptor cdd = gdd.getChannelDescriptor(j);
 				switch (channelType) {
-				case NETWORK:
-					ig.createNetworkInputChannel(ig, cdd.getInputChannelID(), cdd.getOutputChannelID());
-					break;
-				case INMEMORY:
-					ig.createInMemoryInputChannel(ig, cdd.getInputChannelID(), cdd.getOutputChannelID());
-					break;
-				default:
-					throw new IllegalStateException("Unknown channel type");
+					case NETWORK:
+						ig.createNetworkInputChannel(ig, cdd.getInputChannelID(), cdd.getOutputChannelID());
+						break;
+					case INMEMORY:
+						ig.createInMemoryInputChannel(ig, cdd.getInputChannelID(), cdd.getOutputChannelID());
+						break;
+					default:
+						throw new IllegalStateException("Unknown channel type");
 				}
 			}
 		}
@@ -292,7 +280,7 @@ public class RuntimeEnvironment implements Environment, Runnable {
 
 	/**
 	 * Returns the invokable object that represents the Nephele task.
-	 * 
+	 *
 	 * @return the invokable object that represents the Nephele task
 	 */
 	public AbstractInvokable getInvokable() {
@@ -421,7 +409,7 @@ public class RuntimeEnvironment implements Environment, Runnable {
 	public <T extends Record> OutputGate<T> createOutputGate(final GateID gateID, Class<T> outputClass,
 			final ChannelSelector<T> selector, final boolean isBroadcast) {
 		final RuntimeOutputGate<T> rog = new RuntimeOutputGate<T>(getJobID(), gateID, outputClass,
-															getNumberOfOutputGates(), selector, isBroadcast);
+				getNumberOfOutputGates(), selector, isBroadcast);
 		return rog;
 	}
 
@@ -430,9 +418,9 @@ public class RuntimeEnvironment implements Environment, Runnable {
 	 */
 	@Override
 	public <T extends Record> InputGate<T> createInputGate(final GateID gateID,
-										final RecordDeserializerFactory<T> deserializerFactory) {
+			final RecordDeserializerFactory<T> deserializerFactory) {
 		final RuntimeInputGate<T> rig = new RuntimeInputGate<T>(getJobID(), gateID, deserializerFactory,
-			getNumberOfInputGates());
+				getNumberOfInputGates());
 		return rig;
 	}
 
@@ -492,9 +480,8 @@ public class RuntimeEnvironment implements Environment, Runnable {
 
 	/**
 	 * Returns the registered input gate with index <code>pos</code>.
-	 * 
-	 * @param pos
-	 *        the index of the input gate to return
+	 *
+	 * @param pos the index of the input gate to return
 	 * @return the input gate at index <code>pos</code> or <code>null</code> if no such index exists
 	 */
 	public InputGate<? extends Record> getInputGate(final int pos) {
@@ -507,9 +494,8 @@ public class RuntimeEnvironment implements Environment, Runnable {
 
 	/**
 	 * Returns the registered output gate with index <code>pos</code>.
-	 * 
-	 * @param pos
-	 *        the index of the output gate to return
+	 *
+	 * @param pos the index of the output gate to return
 	 * @return the output gate at index <code>pos</code> or <code>null</code> if no such index exists
 	 */
 	public OutputGate<? extends Record> getOutputGate(final int pos) {
@@ -522,7 +508,7 @@ public class RuntimeEnvironment implements Environment, Runnable {
 
 	/**
 	 * Returns the thread which is assigned to execute the user code.
-	 * 
+	 *
 	 * @return the thread which is assigned to execute the user code
 	 */
 	public Thread getExecutingThread() {
@@ -543,11 +529,9 @@ public class RuntimeEnvironment implements Environment, Runnable {
 
 	/**
 	 * Blocks until all output channels are closed.
-	 * 
-	 * @throws IOException
-	 *         thrown if an error occurred while closing the output channels
-	 * @throws InterruptedException
-	 *         thrown if the thread waiting for the channels to be closed is interrupted
+	 *
+	 * @throws IOException          thrown if an error occurred while closing the output channels
+	 * @throws InterruptedException thrown if the thread waiting for the channels to be closed is interrupted
 	 */
 	private void waitForOutputChannelsToBeClosed() throws IOException, InterruptedException {
 
@@ -577,11 +561,9 @@ public class RuntimeEnvironment implements Environment, Runnable {
 
 	/**
 	 * Blocks until all input channels are closed.
-	 * 
-	 * @throws IOException
-	 *         thrown if an error occurred while closing the input channels
-	 * @throws InterruptedException
-	 *         thrown if the thread waiting for the channels to be closed is interrupted
+	 *
+	 * @throws IOException          thrown if an error occurred while closing the input channels
+	 * @throws InterruptedException thrown if the thread waiting for the channels to be closed is interrupted
 	 */
 	private void waitForInputChannelsToBeClosed() throws IOException, InterruptedException {
 
@@ -700,20 +682,19 @@ public class RuntimeEnvironment implements Environment, Runnable {
 
 	/**
 	 * Returns the name of the task with its index in the subtask group and the total number of subtasks.
-	 * 
+	 *
 	 * @return the name of the task with its index in the subtask group and the total number of subtasks
 	 */
 	public String getTaskNameWithIndex() {
 
 		return this.taskName + " (" + (getIndexInSubtaskGroup() + 1) + "/"
-			+ getCurrentNumberOfSubtasks() + ")";
+				+ getCurrentNumberOfSubtasks() + ")";
 	}
 
 	/**
 	 * Sets the execution observer for this environment.
-	 * 
-	 * @param executionObserver
-	 *        the execution observer for this environment
+	 *
+	 * @param executionObserver the execution observer for this environment
 	 */
 	public void setExecutionObserver(final ExecutionObserver executionObserver) {
 		this.executionObserver = executionObserver;
@@ -892,10 +873,5 @@ public class RuntimeEnvironment implements Environment, Runnable {
 		}
 
 		return Collections.unmodifiableSet(inputChannelIDs);
-	}
-
-	@Override
-	public void registerMapper(Mapper<? extends Record, ? extends Record> mapper) {
-		// Nothing to do here
 	}
 }

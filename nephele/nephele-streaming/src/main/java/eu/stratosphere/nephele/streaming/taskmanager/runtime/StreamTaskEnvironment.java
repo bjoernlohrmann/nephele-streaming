@@ -15,7 +15,6 @@
 
 package eu.stratosphere.nephele.streaming.taskmanager.runtime;
 
-import eu.stratosphere.nephele.execution.Mapper;
 import eu.stratosphere.nephele.execution.RuntimeEnvironment;
 import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
 import eu.stratosphere.nephele.io.ChannelSelector;
@@ -28,11 +27,13 @@ import eu.stratosphere.nephele.plugins.wrapper.EnvironmentWrapper;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.io.StreamChannelSelector;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.io.StreamInputGate;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.io.StreamOutputGate;
+import eu.stratosphere.nephele.template.AbstractInvokable;
+import eu.stratosphere.nephele.template.ioc.IocTask;
 import eu.stratosphere.nephele.types.Record;
 
 /**
  * A StreamTaskEnvironment has task-scope and wraps the created input and output
- * gates in special {@link StreamingInputGate} and {@link StreamingOutputGate}
+ * gates in special {@link StreamInputGate} and {@link StreamOutputGate}
  * objects to intercept methods calls necessary for Qos statistics collection.
  * <p>
  * This class is thread-safe.
@@ -47,16 +48,12 @@ public final class StreamTaskEnvironment extends EnvironmentWrapper {
 	 */
 	private ExecutionVertexID vertexID;
 
-	private Mapper<? extends Record, ? extends Record> mapper;
-
 	/**
 	 * Constructs a new streaming environment
 	 * 
 	 * @param wrappedEnvironment
 	 *            the environment to be encapsulated by this streaming
 	 *            environment
-	 * @param streamListener
-	 *            the stream listener
 	 */
 	public StreamTaskEnvironment(final RuntimeEnvironment wrappedEnvironment) {
 		super(wrappedEnvironment);
@@ -108,12 +105,20 @@ public final class StreamTaskEnvironment extends EnvironmentWrapper {
 		return new StreamOutputGate<T>(outputGate, wrappedSelector);
 	}
 
-	public boolean isMapperTask() {
-		return this.mapper != null;
+	public boolean isIocTask() {
+		return getIocTask() != null;
 	}
 
-	public Mapper<? extends Record, ? extends Record> getMapper() {
-		return this.mapper;
+	public IocTask getIocTask() {
+		AbstractInvokable invokable = ((RuntimeEnvironment) getWrappedEnvironment()).getInvokable();
+		if (!(invokable instanceof StreamTaskWrapper)) {
+			return null;
+		}
+		invokable = ((StreamTaskWrapper) invokable).getWrappedInvokable();
+		if (invokable instanceof IocTask) {
+			return (IocTask) invokable;
+		}
+		return null;
 	}
 
 	/**
@@ -127,22 +132,6 @@ public final class StreamTaskEnvironment extends EnvironmentWrapper {
 				gateID, deserializer);
 
 		return new StreamInputGate<T>(inputGate);
-	}
-
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public void registerMapper(Mapper<? extends Record, ? extends Record> mapper) {
-
-		if (this.getNumberOfInputGates() != 1) {
-			return;
-		}
-
-		if (this.getNumberOfOutputGates() != 1) {
-			return;
-		}
-		this.mapper = mapper;
 	}
 
 	public StreamInputGate<? extends Record> getInputGate(GateID gateID) {

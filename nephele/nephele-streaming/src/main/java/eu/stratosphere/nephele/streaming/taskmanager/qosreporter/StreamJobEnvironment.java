@@ -14,11 +14,6 @@
  **********************************************************************************************************************/
 package eu.stratosphere.nephele.streaming.taskmanager.qosreporter;
 
-import java.util.HashMap;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import eu.stratosphere.nephele.execution.Environment;
 import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
 import eu.stratosphere.nephele.jobgraph.JobID;
@@ -34,6 +29,10 @@ import eu.stratosphere.nephele.streaming.taskmanager.chaining.ChainManagerThread
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosManagerThread;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.StreamTaskEnvironment;
 import eu.stratosphere.nephele.taskmanager.runtime.RuntimeTask;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import java.util.HashMap;
 
 /**
  * This class implements the Qos management and reporting for the vertices and
@@ -107,8 +106,8 @@ public class StreamJobEnvironment {
 							this.qosReportForwarder));
 		}
 
-		if (streamEnv.isMapperTask()) {
-			this.chainManager.registerMapperTask(task);
+		if (streamEnv.isIocTask()) {
+			this.chainManager.registerChainableTask(task);
 		}
 	}
 
@@ -250,7 +249,7 @@ public class StreamJobEnvironment {
 			qosCoordinator.shutdownReporting();
 			this.taskQosCoordinators.remove(vertexID);
 
-			this.chainManager.unregisterMapperTask(vertexID);
+			this.chainManager.unregisterChainableTask(vertexID);
 		}
 
 		if (this.taskQosCoordinators.isEmpty()) {

@@ -1,4 +1,4 @@
-package eu.stratosphere.nephele.template;
+package eu.stratosphere.nephele.template.ioc;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -8,7 +8,8 @@ import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
-public @interface LastRecordReadFromWriteTo {
-  int readerIndex();
-  int writerIndex();
+public @interface ReadFromWriteTo {
+	int readerIndex();
+
+	int[] writerIndices() default {};
 }

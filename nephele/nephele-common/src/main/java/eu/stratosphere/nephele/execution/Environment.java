@@ -15,8 +15,6 @@
 
 package eu.stratosphere.nephele.execution;
 
-import java.util.Set;
-
 import eu.stratosphere.nephele.configuration.Configuration;
 import eu.stratosphere.nephele.io.ChannelSelector;
 import eu.stratosphere.nephele.io.GateID;
@@ -29,6 +27,8 @@ import eu.stratosphere.nephele.services.iomanager.IOManager;
 import eu.stratosphere.nephele.services.memorymanager.MemoryManager;
 import eu.stratosphere.nephele.template.InputSplitProvider;
 import eu.stratosphere.nephele.types.Record;
+
+import java.util.Set;
 
 /**
  * The user code of every Nephele task runs inside an <code>Environment</code> object. The environment provides
@@ -249,5 +249,4 @@ public interface Environment {
 	 */
 	Set<ChannelID> getInputChannelIDsOfGate(GateID gateID);
 	
-	void registerMapper(Mapper<? extends Record, ? extends Record> mapper);
 }

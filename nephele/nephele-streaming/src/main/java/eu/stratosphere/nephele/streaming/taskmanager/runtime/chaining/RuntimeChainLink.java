@@ -15,35 +15,34 @@
 
 package eu.stratosphere.nephele.streaming.taskmanager.runtime.chaining;
 
-import eu.stratosphere.nephele.execution.Mapper;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.StreamTaskEnvironment;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.io.StreamInputGate;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.io.StreamOutputGate;
+import eu.stratosphere.nephele.template.ioc.IocTask;
 import eu.stratosphere.nephele.types.Record;
 
 public final class RuntimeChainLink {
 
 	private final StreamTaskEnvironment taskEnvironment;
 
-	private final Mapper<? extends Record, ? extends Record> mapper;
-
 	private final StreamInputGate<? extends Record> inputGate;
 
 	private final StreamOutputGate<? extends Record> outputGate;
 
-	public RuntimeChainLink(final StreamTaskEnvironment taskEnvironment,
+	private final IocTask iocTask;
+
+	public RuntimeChainLink(final StreamTaskEnvironment taskEnvironment, final IocTask iocTask,
 			final StreamInputGate<? extends Record> inputGate,
 			final StreamOutputGate<? extends Record> outputGate) {
 
 		this.taskEnvironment = taskEnvironment;
-		this.mapper = taskEnvironment.getMapper();
 		this.inputGate = inputGate;
 		this.outputGate = outputGate;
+		this.iocTask = iocTask;
 	}
 
-	public Mapper<? extends Record, ? extends Record> getMapper() {
-
-		return this.mapper;
+	public IocTask getIocTask() {
+		return iocTask;
 	}
 
 	public StreamInputGate<? extends Record> getInputGate() {

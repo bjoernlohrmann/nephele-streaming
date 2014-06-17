@@ -41,216 +41,219 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @author Bjoern Lohrmann
  */
 public final class StreamInputGate<T extends Record> extends
-    AbstractInputGateWrapper<T> {
+		AbstractInputGateWrapper<T> {
 
-  private final static Logger LOG = Logger.getLogger(StreamInputGate.class);
+	private final static Logger LOG = Logger.getLogger(StreamInputGate.class);
 
-  private final InputChannelChooser channelChooser;
+	private final InputChannelChooser channelChooser;
 
-  private HashMap<ChannelID, AbstractInputChannel<T>> inputChannels;
+	private HashMap<ChannelID, AbstractInputChannel<T>> inputChannels;
 
-  private AtomicBoolean taskThreadHalted = new AtomicBoolean(false);
+	private final AtomicBoolean taskThreadHalted = new AtomicBoolean(false);
 
-  private volatile InputGateQosReportingListener qosCallback;
+	private volatile InputGateQosReportingListener qosCallback;
 
-  private AbstractTaskEvent currentEvent;
+	private AbstractTaskEvent currentEvent;
 
-  public StreamInputGate(final InputGate<T> wrappedInputGate) {
-    super(wrappedInputGate);
-    this.channelChooser = new InputChannelChooser();
-    this.inputChannels = new HashMap<ChannelID, AbstractInputChannel<T>>();
-  }
+	public StreamInputGate(final InputGate<T> wrappedInputGate) {
+		super(wrappedInputGate);
+		this.channelChooser = new InputChannelChooser();
+		this.inputChannels = new HashMap<ChannelID, AbstractInputChannel<T>>();
+	}
 
-  public void setQosReportingListener(
-      InputGateQosReportingListener qosCallback) {
-    this.qosCallback = qosCallback;
-  }
+	public void setQosReportingListener(
+			InputGateQosReportingListener qosCallback) {
+		this.qosCallback = qosCallback;
+	}
 
-  public InputGateQosReportingListener getQosReportingListener() {
-    return this.qosCallback;
-  }
+	public InputGateQosReportingListener getQosReportingListener() {
+		return this.qosCallback;
+	}
 
 
-  @Override
-  public boolean hasInputAvailable() throws InterruptedException {
-    return this.channelChooser.hasChannelAvailable();
-  }
+	@Override
+	public boolean hasInputAvailable() throws InterruptedException {
+		return this.channelChooser.hasChannelAvailable();
+	}
 
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public InputChannelResult readRecord(final T target) throws IOException,
-      InterruptedException {
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public InputChannelResult readRecord(final T target) throws IOException,
+			InterruptedException {
 
-    if (this.isClosed()) {
-      return InputChannelResult.END_OF_STREAM;
-    }
+		if (this.isClosed()) {
+			return InputChannelResult.END_OF_STREAM;
+		}
 
-    if (Thread.interrupted()) {
-      throw new InterruptedException();
-    }
+		if (Thread.interrupted()) {
+			throw new InterruptedException();
+		}
 
-    int channelToReadFrom = -1;
+		int channelToReadFrom = -1;
 
-    while (channelToReadFrom == -1) {
-      channelToReadFrom = this.channelChooser.chooseNextAvailableChannel();
+		while (channelToReadFrom == -1) {
+			channelToReadFrom = this.channelChooser.chooseNextAvailableChannel();
 
-      if (channelToReadFrom == -1) {
-        // traps task thread because it is inside a chain
-        this.trapTaskThreadUntilWokenUp();
-      }
-    }
+			if (channelToReadFrom == -1) {
+				// traps task thread because it is inside a chain
+				this.trapTaskThreadUntilWokenUp();
+			}
+		}
 
-    InputChannelResult result = this.getInputChannel(channelToReadFrom).readRecord(target);
-    switch (result) {
-      case INTERMEDIATE_RECORD_FROM_BUFFER:
-        this.reportRecordReceived(target, channelToReadFrom);
-        return InputChannelResult.INTERMEDIATE_RECORD_FROM_BUFFER;
-      case LAST_RECORD_FROM_BUFFER:
-        this.reportRecordReceived(target, channelToReadFrom);
-        this.channelChooser.decreaseAvailableInputOnCurrentChannel();
-        return InputChannelResult.LAST_RECORD_FROM_BUFFER;
-      case EVENT:
-        this.channelChooser.decreaseAvailableInputOnCurrentChannel();
-        this.currentEvent = this.getInputChannel(channelToReadFrom).getCurrentEvent();
-        return InputChannelResult.EVENT;
-      case NONE:
-        this.channelChooser.decreaseAvailableInputOnCurrentChannel();
-        return InputChannelResult.NONE;
-      case END_OF_STREAM:
-        this.channelChooser.setNoAvailableInputOnCurrentChannel();
-        return isClosed() ? InputChannelResult.END_OF_STREAM
-            : InputChannelResult.NONE;
-      default: // silence the compiler
-        throw new RuntimeException();
-    }
-  }
+		InputChannelResult result = this.getInputChannel(channelToReadFrom).readRecord(target);
+		switch (result) {
+			case INTERMEDIATE_RECORD_FROM_BUFFER:
+				this.reportRecordReceived(target, channelToReadFrom);
+				return InputChannelResult.INTERMEDIATE_RECORD_FROM_BUFFER;
+			case LAST_RECORD_FROM_BUFFER:
+				this.reportRecordReceived(target, channelToReadFrom);
+				this.channelChooser.decreaseAvailableInputOnCurrentChannel();
+				return InputChannelResult.LAST_RECORD_FROM_BUFFER;
+			case EVENT:
+				this.channelChooser.decreaseAvailableInputOnCurrentChannel();
+				this.currentEvent = this.getInputChannel(channelToReadFrom).getCurrentEvent();
+				return InputChannelResult.EVENT;
+			case NONE:
+				this.channelChooser.decreaseAvailableInputOnCurrentChannel();
+				return InputChannelResult.NONE;
+			case END_OF_STREAM:
+				this.channelChooser.setNoAvailableInputOnCurrentChannel();
+				return isClosed() ? InputChannelResult.END_OF_STREAM
+						: InputChannelResult.NONE;
+			default: // silence the compiler
+				throw new RuntimeException();
+		}
+	}
 
-  /**
-   * @param record          The record that has been received.
-   * @param sourceChannelID The ID of the source channel (output channel)
-   */
-  public void reportRecordReceived(Record record, int inputChannel) {
-    if (this.qosCallback != null) {
-      AbstractTaggableRecord taggableRecord = (AbstractTaggableRecord) record;
-      this.qosCallback.recordReceived(inputChannel, taggableRecord);
-    }
-  }
+	/**
+	 * @param record       The record that has been received.
+	 * @param inputChannel The ID of the source channel (output channel)
+	 */
+	public void reportRecordReceived(Record record, int inputChannel) {
+		if (this.qosCallback != null) {
+			AbstractTaggableRecord taggableRecord = (AbstractTaggableRecord) record;
+			this.qosCallback.recordReceived(inputChannel, taggableRecord);
+		}
+	}
 
-  /**
-   * This method should only be called if this input gate is inside a chain
-   * and the task thread (doing this call) should therefore be halted (unless
-   * interrupted).
-   *
-   * @param target
-   * @throws InterruptedException if task thread is interrupted.
-   */
-  private void trapTaskThreadUntilWokenUp() throws InterruptedException {
-    synchronized (this.taskThreadHalted) {
-      this.taskThreadHalted.set(true);
-      this.taskThreadHalted.notify();
-      LOG.info("Task thread " + Thread.currentThread().getName() + " has halted");
-      this.taskThreadHalted.wait();
-      LOG.info("Task thread " + Thread.currentThread().getName() + " is awake again.");
-    }
-  }
+	/**
+	 * This method should only be called if this input gate is inside a chain
+	 * and the task thread (doing this call) should therefore be halted (unless
+	 * interrupted).
+	 *
+	 * @throws InterruptedException if task thread is interrupted.
+	 */
+	private void trapTaskThreadUntilWokenUp() throws InterruptedException {
+		synchronized (this.taskThreadHalted) {
+			this.taskThreadHalted.set(true);
+			this.taskThreadHalted.notify();
+			LOG.info("Task thread " + Thread.currentThread().getName() + " has halted");
+			this.taskThreadHalted.wait();
+			LOG.info("Task thread " + Thread.currentThread().getName() + " is awake again.");
+		}
+	}
 
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public void notifyRecordIsAvailable(final int channelIndex) {
-    this.channelChooser.increaseAvailableInput(channelIndex);
-    RecordAvailabilityListener<T> listener = this.getRecordAvailabilityListener();
-    if (listener != null) {
-      listener.reportRecordAvailability(this);
-    }
-  }
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public void notifyRecordIsAvailable(final int channelIndex) {
+		this.channelChooser.increaseAvailableInput(channelIndex);
+		RecordAvailabilityListener<T> listener = this.getRecordAvailabilityListener();
+		if (listener != null) {
+			listener.reportRecordAvailability(this);
+		}
+	}
 
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public void registerRecordAvailabilityListener(
-      final RecordAvailabilityListener<T> listener) {
-    this.getWrappedInputGate().registerRecordAvailabilityListener(listener);
-  }
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public void registerRecordAvailabilityListener(
+			final RecordAvailabilityListener<T> listener) {
+		this.getWrappedInputGate().registerRecordAvailabilityListener(listener);
+	}
 
-  @Override
-  public RecordAvailabilityListener<T> getRecordAvailabilityListener() {
-    return this.getWrappedInputGate().getRecordAvailabilityListener();
-  }
+	@Override
+	public RecordAvailabilityListener<T> getRecordAvailabilityListener() {
+		return this.getWrappedInputGate().getRecordAvailabilityListener();
+	}
 
-  @Override
-  public void notifyDataUnitConsumed(int channelIndex) {
-    this.getWrappedInputGate().notifyDataUnitConsumed(channelIndex);
-  }
+	@Override
+	public void notifyDataUnitConsumed(int channelIndex) {
+		this.getWrappedInputGate().notifyDataUnitConsumed(channelIndex);
+	}
 
-  public void haltTaskThreadIfNecessary() throws InterruptedException {
-    this.channelChooser.setBlockIfNoChannelAvailable(false);
-    synchronized (this.taskThreadHalted) {
-      if (!this.taskThreadHalted.get()) {
-        this.taskThreadHalted.wait();
-      }
-    }
-  }
+	public void haltTaskThreadIfNecessary() throws InterruptedException {
+		this.channelChooser.setBlockIfNoChannelAvailable(false);
+		RecordAvailabilityListener<T> listener = this.getRecordAvailabilityListener();
+		if (listener != null) {
+			listener.reportRecordAvailability(this);
+		}
+		synchronized (this.taskThreadHalted) {
+			if (!this.taskThreadHalted.get()) {
+				this.taskThreadHalted.wait();
+			}
+		}
+	}
 
-  public void wakeUpTaskThreadIfNecessary() {
-    this.channelChooser.setBlockIfNoChannelAvailable(true);
-    synchronized (this.taskThreadHalted) {
-      if (this.taskThreadHalted.get()) {
-        this.taskThreadHalted.notify();
-      }
-    }
-  }
+	public void wakeUpTaskThreadIfNecessary() {
+		this.channelChooser.setBlockIfNoChannelAvailable(true);
+		synchronized (this.taskThreadHalted) {
+			if (this.taskThreadHalted.get()) {
+				this.taskThreadHalted.notify();
+			}
+		}
+	}
 
-  public AbstractInputChannel<? extends Record> getInputChannel(
-      ChannelID channelID) {
-    return this.inputChannels.get(channelID);
-  }
+	public AbstractInputChannel<? extends Record> getInputChannel(
+			ChannelID channelID) {
+		return this.inputChannels.get(channelID);
+	}
 
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public NetworkInputChannel<T> createNetworkInputChannel(
-      final InputGate<T> inputGate, final ChannelID channelID,
-      final ChannelID connectedChannelID) {
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public NetworkInputChannel<T> createNetworkInputChannel(
+			final InputGate<T> inputGate, final ChannelID channelID,
+			final ChannelID connectedChannelID) {
 
-    NetworkInputChannel<T> channel = this.getWrappedInputGate()
-        .createNetworkInputChannel(inputGate, channelID,
-            connectedChannelID);
+		NetworkInputChannel<T> channel = this.getWrappedInputGate()
+				.createNetworkInputChannel(inputGate, channelID,
+						connectedChannelID);
 
-    this.inputChannels.put(channelID, channel);
+		this.inputChannels.put(channelID, channel);
 
-    return channel;
+		return channel;
 
-  }
+	}
 
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public InMemoryInputChannel<T> createInMemoryInputChannel(
-      final InputGate<T> inputGate, final ChannelID channelID,
-      final ChannelID connectedChannelID) {
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public InMemoryInputChannel<T> createInMemoryInputChannel(
+			final InputGate<T> inputGate, final ChannelID channelID,
+			final ChannelID connectedChannelID) {
 
-    InMemoryInputChannel<T> channel = this.getWrappedInputGate()
-        .createInMemoryInputChannel(inputGate, channelID,
-            connectedChannelID);
+		InMemoryInputChannel<T> channel = this.getWrappedInputGate()
+				.createInMemoryInputChannel(inputGate, channelID,
+						connectedChannelID);
 
-    this.inputChannels.put(channelID, channel);
-    return channel;
-  }
+		this.inputChannels.put(channelID, channel);
+		return channel;
+	}
 
-  /* (non-Javadoc)
-   * @see eu.stratosphere.nephele.io.InputGate#getCurrentEvent()
-   */
-  @Override
-  public AbstractTaskEvent getCurrentEvent() {
-    AbstractTaskEvent e = this.currentEvent;
-    this.currentEvent = null;
-    return e;
-  }
+	/* (non-Javadoc)
+	 * @see eu.stratosphere.nephele.io.InputGate#getCurrentEvent()
+	 */
+	@Override
+	public AbstractTaskEvent getCurrentEvent() {
+		AbstractTaskEvent e = this.currentEvent;
+		this.currentEvent = null;
+		return e;
+	}
 }

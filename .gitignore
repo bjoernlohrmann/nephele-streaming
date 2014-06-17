@@ -16,3 +16,4 @@ pact/pact-tests/tmp/*
 *.iml
 .idea/*
 .version.properties
+.DS_Store

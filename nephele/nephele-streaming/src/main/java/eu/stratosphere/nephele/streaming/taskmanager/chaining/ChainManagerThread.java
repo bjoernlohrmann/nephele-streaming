@@ -14,6 +14,13 @@
  **********************************************************************************************************************/
 package eu.stratosphere.nephele.streaming.taskmanager.chaining;
 
+import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
+import eu.stratosphere.nephele.profiling.ProfilingException;
+import eu.stratosphere.nephele.streaming.message.action.CandidateChainConfig;
+import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.QosReporterConfigCenter;
+import eu.stratosphere.nephele.taskmanager.runtime.RuntimeTask;
+import org.apache.log4j.Logger;
+
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.util.ArrayList;
@@ -21,14 +28,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
-import org.apache.log4j.Logger;
-
-import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
-import eu.stratosphere.nephele.profiling.ProfilingException;
-import eu.stratosphere.nephele.streaming.message.action.CandidateChainConfig;
-import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.QosReporterConfigCenter;
-import eu.stratosphere.nephele.taskmanager.runtime.RuntimeTask;
 
 /**
  * @author Bjoern Lohrmann
@@ -42,7 +41,7 @@ public class ChainManagerThread extends Thread {
 	private final ExecutorService backgroundChainingWorkers = Executors
 			.newCachedThreadPool();
 
-	private final ConcurrentHashMap<ExecutionVertexID, TaskInfo> activeMapperTasks = new ConcurrentHashMap<ExecutionVertexID, TaskInfo>();
+	private final ConcurrentHashMap<ExecutionVertexID, TaskInfo> activeChainableTasks = new ConcurrentHashMap<ExecutionVertexID, TaskInfo>();
 
 	private final CopyOnWriteArraySet<CandidateChainConfig> pendingCandidateChainConfigs = new CopyOnWriteArraySet<CandidateChainConfig>();
 
@@ -118,7 +117,7 @@ public class ChainManagerThread extends Thread {
 		for (ExecutionVertexID vertexID : candidateChainConfig
 				.getChainingCandidates()) {
 
-			TaskInfo taskInfo = this.activeMapperTasks.get(vertexID);
+			TaskInfo taskInfo = this.activeChainableTasks.get(vertexID);
 			if (taskInfo == null) {
 				return false;
 			}
@@ -146,9 +145,9 @@ public class ChainManagerThread extends Thread {
 		this.interrupt();
 	}
 
-	public synchronized void registerMapperTask(RuntimeTask task) {
+	public synchronized void registerChainableTask(RuntimeTask task) {
 		TaskInfo taskInfo = new TaskInfo(task, this.tmx);
-		this.activeMapperTasks.put(task.getVertexID(), taskInfo);
+		this.activeChainableTasks.put(task.getVertexID(), taskInfo);
 
 		if (!this.started) {
 			this.started = true;
@@ -156,13 +155,13 @@ public class ChainManagerThread extends Thread {
 		}
 	}
 
-	public synchronized void unregisterMapperTask(ExecutionVertexID vertexID) {
-		TaskInfo taskInfo = this.activeMapperTasks.remove(vertexID);
+	public synchronized void unregisterChainableTask(ExecutionVertexID vertexID) {
+		TaskInfo taskInfo = this.activeChainableTasks.remove(vertexID);
 		if (taskInfo != null) {
 			taskInfo.cleanUp();
 		}
 
-		if (this.activeMapperTasks.isEmpty()) {
+		if (this.activeChainableTasks.isEmpty()) {
 			shutdown();
 		}
 	}
