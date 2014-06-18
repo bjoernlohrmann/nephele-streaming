@@ -54,6 +54,8 @@ public class RuntimeOutputGate<T extends Record> extends AbstractGate<T> impleme
 	 * The list of output channels attached to this gate.
 	 */
 	private final ArrayList<AbstractOutputChannel<T>> outputChannels = new ArrayList<AbstractOutputChannel<T>>();
+	
+	private int suspendedOutputChannels = 0;
 
 	/**
 	 * Channel selector to determine which channel is supposed receive the next record.
@@ -259,7 +261,7 @@ public class RuntimeOutputGate<T extends Record> extends AbstractGate<T> impleme
 
 			if (getChannelType() == ChannelType.INMEMORY) {
 
-				final int numberOfOutputChannels = this.outputChannels.size();
+				final int numberOfOutputChannels = getNumberOfActiveOutputChannels();
 				for (int i = 0; i < numberOfOutputChannels; ++i) {
 					this.outputChannels.get(i).writeRecord(record);
 				}
@@ -273,7 +275,7 @@ public class RuntimeOutputGate<T extends Record> extends AbstractGate<T> impleme
 		} else {
 
 			// Non-broadcast gate, use channel selector to select output channels
-			final int numberOfOutputChannels = this.outputChannels.size();
+			final int numberOfOutputChannels = getNumberOfActiveOutputChannels();
 			final int[] selectedOutputChannels = this.channelSelector.selectChannels(record, numberOfOutputChannels);
 
 			if (selectedOutputChannels == null) {
@@ -368,5 +370,21 @@ public class RuntimeOutputGate<T extends Record> extends AbstractGate<T> impleme
 	@Override
 	public void outputBufferSent(final int channelIndex) {
 		// Nothing to do here
+	}
+
+	@Override
+	public void setOutputChannelSuspended(int index, boolean isSuspended) {
+		if (isSuspended != this.getOutputChannel(index).isSuspended()) {
+			this.getOutputChannel(index).setSuspended(isSuspended);
+
+			this.suspendedOutputChannels = (isSuspended) ? this.suspendedOutputChannels + 1
+					: this.suspendedOutputChannels - 1;
+
+		}
+	}
+
+	@Override
+	public int getNumberOfActiveOutputChannels() {
+		return this.outputChannels.size() - this.suspendedOutputChannels;
 	}
 }

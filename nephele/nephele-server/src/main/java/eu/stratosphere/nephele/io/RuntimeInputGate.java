@@ -22,6 +22,7 @@ import eu.stratosphere.nephele.io.channels.bytebuffered.InMemoryInputChannel;
 import eu.stratosphere.nephele.io.channels.bytebuffered.NetworkInputChannel;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.types.Record;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -33,306 +34,365 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * In Nephele input gates are a specialization of general gates and connect input channels and record readers. As
- * channels, input gates are always parameterized to a specific type of record which they can transport. In contrast to
- * output gates input gates can be associated with a {@link DistributionPattern} object which dictates the concrete
- * wiring between two groups of vertices.
- *
- * @param <T> The type of record that can be transported through this gate.
+ * In Nephele input gates are a specialization of general gates and connect
+ * input channels and record readers. As channels, input gates are always
+ * parameterized to a specific type of record which they can transport. In
+ * contrast to output gates input gates can be associated with a
+ * {@link DistributionPattern} object which dictates the concrete wiring between
+ * two groups of vertices.
+ * 
+ * @param <T>
+ *            The type of record that can be transported through this gate.
  */
-public class RuntimeInputGate<T extends Record> extends AbstractGate<T> implements InputGate<T> {
+public class RuntimeInputGate<T extends Record> extends AbstractGate<T>
+		implements InputGate<T> {
 
-  /**
-   * The log object used for debugging.
-   */
-  private static final Log LOG = LogFactory.getLog(InputGate.class);
+	/**
+	 * The log object used for debugging.
+	 */
+	private static final Log LOG = LogFactory.getLog(InputGate.class);
 
-  /**
-   * The deserializer factory used to instantiate the deserializers that construct records from byte streams.
-   */
-  private final RecordDeserializerFactory<T> deserializerFactory;
+	/**
+	 * The deserializer factory used to instantiate the deserializers that
+	 * construct records from byte streams.
+	 */
+	private final RecordDeserializerFactory<T> deserializerFactory;
 
-  /**
-   * The list of input channels attached to this input gate.
-   */
-  private final ArrayList<AbstractInputChannel<T>> inputChannels = new ArrayList<AbstractInputChannel<T>>();
+	/**
+	 * The list of input channels attached to this input gate.
+	 */
+	private final ArrayList<AbstractInputChannel<T>> inputChannels = new ArrayList<AbstractInputChannel<T>>();
 
-  /**
-   * Queue with indices of channels that store at least one available record.
-   */
-  private final BlockingQueue<Integer> availableChannels = new LinkedBlockingQueue<Integer>();
+	private int suspendedInputChannels = 0;
 
-  /**
-   * The listener object to be notified when a channel has at least one record available.
-   */
-  private final AtomicReference<RecordAvailabilityListener<T>> recordAvailabilityListener = new AtomicReference<RecordAvailabilityListener<T>>(null);
+	/**
+	 * Queue with indices of channels that store at least one available record.
+	 */
+	private final BlockingQueue<Integer> availableChannels = new LinkedBlockingQueue<Integer>();
 
+	/**
+	 * The listener object to be notified when a channel has at least one record
+	 * available.
+	 */
+	private final AtomicReference<RecordAvailabilityListener<T>> recordAvailabilityListener = new AtomicReference<RecordAvailabilityListener<T>>(
+			null);
 
-  private AbstractTaskEvent currentEvent;
+	private AbstractTaskEvent currentEvent;
 
-  /**
-   * If the value of this variable is set to <code>true</code>, the input gate is closed.
-   */
-  private boolean isClosed = false;
+	/**
+	 * If the value of this variable is set to <code>true</code>, the input gate
+	 * is closed.
+	 */
+	private boolean isClosed = false;
 
-  /**
-   * The channel to read from next.
-   */
-  private int channelToReadFrom = -1;
+	/**
+	 * The channel to read from next.
+	 */
+	private int channelToReadFrom = -1;
 
-  /**
-   * Constructs a new runtime input gate.
-   *
-   * @param jobID               the ID of the job this input gate belongs to
-   * @param gateID              the ID of the gate
-   * @param deserializerFactory The factory used to instantiate the deserializers that construct records from byte streams.
-   * @param index               the index assigned to this input gate at the {@link Environment} object
-   */
-  public RuntimeInputGate(final JobID jobID, final GateID gateID,
-                          final RecordDeserializerFactory<T> deserializerFactory, final int index) {
-    super(jobID, gateID, index);
-    this.deserializerFactory = deserializerFactory;
-  }
+	/**
+	 * Constructs a new runtime input gate.
+	 * 
+	 * @param jobID
+	 *            the ID of the job this input gate belongs to
+	 * @param gateID
+	 *            the ID of the gate
+	 * @param deserializerFactory
+	 *            The factory used to instantiate the deserializers that
+	 *            construct records from byte streams.
+	 * @param index
+	 *            the index assigned to this input gate at the
+	 *            {@link Environment} object
+	 */
+	public RuntimeInputGate(final JobID jobID, final GateID gateID,
+			final RecordDeserializerFactory<T> deserializerFactory,
+			final int index) {
+		super(jobID, gateID, index);
+		this.deserializerFactory = deserializerFactory;
+	}
 
-  /**
-   * Adds a new input channel to the input gate.
-   *
-   * @param inputChannel the input channel to be added.
-   */
-  private void addInputChannel(AbstractInputChannel<T> inputChannel) {
-    // in high DOPs, this can be a serious performance issue, as adding all channels and checking linearly has a
-    // quadratic complexity!
-    if (!this.inputChannels.contains(inputChannel)) {
-      this.inputChannels.add(inputChannel);
-    }
-  }
+	/**
+	 * Adds a new input channel to the input gate.
+	 * 
+	 * @param inputChannel
+	 *            the input channel to be added.
+	 */
+	private void addInputChannel(AbstractInputChannel<T> inputChannel) {
+		// in high DOPs, this can be a serious performance issue, as adding all
+		// channels and checking linearly has a
+		// quadratic complexity!
+		if (!this.inputChannels.contains(inputChannel)) {
+			this.inputChannels.add(inputChannel);
+		}
+	}
 
-  /**
-   * Removes the input channel with the given ID from the input gate if it exists.
-   *
-   * @param inputChannelID the ID of the channel to be removed
-   */
-  public void removeInputChannel(ChannelID inputChannelID) {
+	/**
+	 * Removes the input channel with the given ID from the input gate if it
+	 * exists.
+	 * 
+	 * @param inputChannelID
+	 *            the ID of the channel to be removed
+	 */
+	public void removeInputChannel(ChannelID inputChannelID) {
 
-    for (int i = 0; i < this.inputChannels.size(); i++) {
+		for (int i = 0; i < this.inputChannels.size(); i++) {
 
-      final AbstractInputChannel<T> inputChannel = this.inputChannels.get(i);
-      if (inputChannel.getID().equals(inputChannelID)) {
-        this.inputChannels.remove(i);
-        return;
-      }
-    }
+			final AbstractInputChannel<T> inputChannel = this.inputChannels
+					.get(i);
+			if (inputChannel.getID().equals(inputChannelID)) {
+				this.inputChannels.remove(i);
+				return;
+			}
+		}
 
-    if (LOG.isDebugEnabled())
-      LOG.debug("Cannot find output channel with ID " + inputChannelID + " to remove");
-  }
+		if (LOG.isDebugEnabled())
+			LOG.debug("Cannot find output channel with ID " + inputChannelID
+					+ " to remove");
+	}
 
-  @Override
-  public boolean isInputGate() {
-    return true;
-  }
+	@Override
+	public boolean isInputGate() {
+		return true;
+	}
 
-  @Override
-  public int getNumberOfInputChannels() {
-    return this.inputChannels.size();
-  }
+	@Override
+	public int getNumberOfInputChannels() {
+		return this.inputChannels.size();
+	}
 
-  @Override
-  public AbstractInputChannel<T> getInputChannel(int pos) {
-    return this.inputChannels.get(pos);
-  }
+	@Override
+	public AbstractInputChannel<T> getInputChannel(int pos) {
+		return this.inputChannels.get(pos);
+	}
 
+	@Override
+	public NetworkInputChannel<T> createNetworkInputChannel(
+			final InputGate<T> inputGate, final ChannelID channelID,
+			final ChannelID connectedChannelID) {
 
-  @Override
-  public NetworkInputChannel<T> createNetworkInputChannel(final InputGate<T> inputGate, final ChannelID channelID,
-                                                          final ChannelID connectedChannelID) {
+		final NetworkInputChannel<T> enic = new NetworkInputChannel<T>(
+				inputGate, this.inputChannels.size(),
+				this.deserializerFactory.createDeserializer(), channelID,
+				connectedChannelID);
+		addInputChannel(enic);
 
-    final NetworkInputChannel<T> enic = new NetworkInputChannel<T>(inputGate, this.inputChannels.size(),
-        this.deserializerFactory.createDeserializer(), channelID, connectedChannelID);
-    addInputChannel(enic);
+		return enic;
+	}
 
-    return enic;
-  }
+	@Override
+	public InMemoryInputChannel<T> createInMemoryInputChannel(
+			final InputGate<T> inputGate, final ChannelID channelID,
+			final ChannelID connectedChannelID) {
 
+		final InMemoryInputChannel<T> eimic = new InMemoryInputChannel<T>(
+				inputGate, this.inputChannels.size(),
+				this.deserializerFactory.createDeserializer(), channelID,
+				connectedChannelID);
+		addInputChannel(eimic);
 
-  @Override
-  public InMemoryInputChannel<T> createInMemoryInputChannel(final InputGate<T> inputGate, final ChannelID channelID,
-                                                            final ChannelID connectedChannelID) {
+		return eimic;
+	}
 
-    final InMemoryInputChannel<T> eimic = new InMemoryInputChannel<T>(inputGate, this.inputChannels.size(),
-        this.deserializerFactory.createDeserializer(), channelID, connectedChannelID);
-    addInputChannel(eimic);
+	@Override
+	public boolean hasInputAvailable() {
+		return this.channelToReadFrom != -1
+				|| !this.availableChannels.isEmpty();
+	}
 
-    return eimic;
-  }
+	@Override
+	public InputChannelResult readRecord(T target) throws IOException,
+			InterruptedException {
 
-  @Override
-  public boolean hasInputAvailable() {
-    return this.channelToReadFrom != -1 || !this.availableChannels.isEmpty();
-  }
+		if (this.channelToReadFrom == -1) {
+			if (this.isClosed()) {
+				return InputChannelResult.END_OF_STREAM;
+			}
 
-  @Override
-  public InputChannelResult readRecord(T target) throws IOException, InterruptedException {
+			if (Thread.interrupted()) {
+				throw new InterruptedException();
+			}
 
-    if (this.channelToReadFrom == -1) {
-      if (this.isClosed()) {
-        return InputChannelResult.END_OF_STREAM;
-      }
+			this.channelToReadFrom = waitForAnyChannelToBecomeAvailable();
+		}
 
-      if (Thread.interrupted()) {
-        throw new InterruptedException();
-      }
+		InputChannelResult result = this
+				.getInputChannel(this.channelToReadFrom).readRecord(target);
+		switch (result) {
+		case INTERMEDIATE_RECORD_FROM_BUFFER: // full record and we can stay on
+												// the same channel
+			return InputChannelResult.INTERMEDIATE_RECORD_FROM_BUFFER;
 
-      this.channelToReadFrom = waitForAnyChannelToBecomeAvailable();
-    }
+		case LAST_RECORD_FROM_BUFFER: // full record, but we must switch the
+										// channel afterwards
+			this.channelToReadFrom = -1;
+			return InputChannelResult.LAST_RECORD_FROM_BUFFER;
 
-    InputChannelResult result = this.getInputChannel(this.channelToReadFrom).readRecord(target);
-    switch (result) {
-      case INTERMEDIATE_RECORD_FROM_BUFFER: // full record and we can stay on the same channel
-        return InputChannelResult.INTERMEDIATE_RECORD_FROM_BUFFER;
+		case EVENT: // task event
+			this.currentEvent = this.getInputChannel(this.channelToReadFrom)
+					.getCurrentEvent();
+			this.channelToReadFrom = -1; // event always marks a unit as
+											// consumed
+			return InputChannelResult.EVENT;
 
-      case LAST_RECORD_FROM_BUFFER: // full record, but we must switch the channel afterwards
-        this.channelToReadFrom = -1;
-        return InputChannelResult.LAST_RECORD_FROM_BUFFER;
+		case NONE: // internal event or an incomplete record that needs further
+					// chunks
+			// the current unit is exhausted
+			this.channelToReadFrom = -1;
+			return InputChannelResult.NONE;
 
-      case EVENT: // task event
-        this.currentEvent = this.getInputChannel(this.channelToReadFrom).getCurrentEvent();
-        this.channelToReadFrom = -1;  // event always marks a unit as consumed
-        return InputChannelResult.EVENT;
+		case END_OF_STREAM: // channel is done
+			this.channelToReadFrom = -1;
+			return isClosed() ? InputChannelResult.END_OF_STREAM
+					: InputChannelResult.NONE;
 
-      case NONE: // internal event or an incomplete record that needs further chunks
-        // the current unit is exhausted
-        this.channelToReadFrom = -1;
-        return InputChannelResult.NONE;
+		default: // silence the compiler
+			throw new RuntimeException();
+		}
+	}
 
-      case END_OF_STREAM: // channel is done
-        this.channelToReadFrom = -1;
-        return isClosed() ? InputChannelResult.END_OF_STREAM : InputChannelResult.NONE;
+	@Override
+	public AbstractTaskEvent getCurrentEvent() {
+		AbstractTaskEvent e = this.currentEvent;
+		this.currentEvent = null;
+		return e;
+	}
 
-      default:   // silence the compiler
-        throw new RuntimeException();
-    }
-  }
+	@Override
+	public void notifyRecordIsAvailable(int channelIndex) {
+		this.availableChannels.add(Integer.valueOf(channelIndex));
 
-  @Override
-  public AbstractTaskEvent getCurrentEvent() {
-    AbstractTaskEvent e = this.currentEvent;
-    this.currentEvent = null;
-    return e;
-  }
+		RecordAvailabilityListener<T> listener = this.recordAvailabilityListener
+				.get();
+		if (listener != null) {
+			listener.reportRecordAvailability(this);
+		}
+	}
 
-  @Override
-  public void notifyRecordIsAvailable(int channelIndex) {
-    this.availableChannels.add(Integer.valueOf(channelIndex));
+	/**
+	 * This method returns the index of a channel which has at least one record
+	 * available. The method may block until at least one channel has become
+	 * ready.
+	 * 
+	 * @return the index of the channel which has at least one record available
+	 */
+	public int waitForAnyChannelToBecomeAvailable() throws InterruptedException {
+		return this.availableChannels.take().intValue();
+	}
 
-    RecordAvailabilityListener<T> listener = this.recordAvailabilityListener.get();
-    if (listener != null) {
-      listener.reportRecordAvailability(this);
-    }
-  }
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public boolean isClosed() throws IOException, InterruptedException {
 
-  /**
-   * This method returns the index of a channel which has at least
-   * one record available. The method may block until at least one
-   * channel has become ready.
-   *
-   * @return the index of the channel which has at least one record available
-   */
-  public int waitForAnyChannelToBecomeAvailable() throws InterruptedException {
-    return this.availableChannels.take().intValue();
-  }
+		if (this.isClosed) {
+			return true;
+		}
 
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public boolean isClosed() throws IOException, InterruptedException {
+		for (int i = 0; i < this.getNumberOfInputChannels(); i++) {
+			final AbstractInputChannel<T> inputChannel = this.inputChannels
+					.get(i);
+			if (!inputChannel.isClosed()) {
+				return false;
+			}
+		}
 
-    if (this.isClosed) {
-      return true;
-    }
+		this.isClosed = true;
 
-    for (int i = 0; i < this.getNumberOfInputChannels(); i++) {
-      final AbstractInputChannel<T> inputChannel = this.inputChannels.get(i);
-      if (!inputChannel.isClosed()) {
-        return false;
-      }
-    }
+		return true;
+	}
 
-    this.isClosed = true;
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public void close() throws IOException, InterruptedException {
 
-    return true;
-  }
+		for (int i = 0; i < this.getNumberOfInputChannels(); i++) {
+			final AbstractInputChannel<T> inputChannel = this.inputChannels
+					.get(i);
+			inputChannel.close();
+		}
 
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public void close() throws IOException, InterruptedException {
+	}
 
-    for (int i = 0; i < this.getNumberOfInputChannels(); i++) {
-      final AbstractInputChannel<T> inputChannel = this.inputChannels.get(i);
-      inputChannel.close();
-    }
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public String toString() {
+		return "Input " + super.toString();
+	}
 
-  }
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public void publishEvent(AbstractTaskEvent event) throws IOException,
+			InterruptedException {
 
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public String toString() {
-    return "Input " + super.toString();
-  }
+		// Copy event to all connected channels
+		final Iterator<AbstractInputChannel<T>> it = this.inputChannels
+				.iterator();
+		while (it.hasNext()) {
+			it.next().transferEvent(event);
+		}
+	}
 
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public void publishEvent(AbstractTaskEvent event) throws IOException, InterruptedException {
+	/**
+	 * Returns the {@link RecordDeserializerFactory} used by this input gate.
+	 * 
+	 * @return The {@link RecordDeserializerFactory} used by this input gate.
+	 */
+	public RecordDeserializerFactory<T> getRecordDeserializerFactory() {
+		return this.deserializerFactory;
+	}
 
-    // Copy event to all connected channels
-    final Iterator<AbstractInputChannel<T>> it = this.inputChannels.iterator();
-    while (it.hasNext()) {
-      it.next().transferEvent(event);
-    }
-  }
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public void releaseAllChannelResources() {
 
-  /**
-   * Returns the {@link RecordDeserializerFactory} used by this input gate.
-   *
-   * @return The {@link RecordDeserializerFactory} used by this input gate.
-   */
-  public RecordDeserializerFactory<T> getRecordDeserializerFactory() {
-    return this.deserializerFactory;
-  }
+		final Iterator<AbstractInputChannel<T>> it = this.inputChannels
+				.iterator();
+		while (it.hasNext()) {
+			it.next().releaseAllResources();
+		}
+	}
 
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public void releaseAllChannelResources() {
+	@Override
+	public void registerRecordAvailabilityListener(
+			final RecordAvailabilityListener<T> listener) {
+		if (!this.recordAvailabilityListener.compareAndSet(null, listener)) {
+			throw new IllegalStateException(
+					this.recordAvailabilityListener
+							+ " is already registered as a record availability listener");
+		}
+	}
 
-    final Iterator<AbstractInputChannel<T>> it = this.inputChannels.iterator();
-    while (it.hasNext()) {
-      it.next().releaseAllResources();
-    }
-  }
+	@Override
+	public RecordAvailabilityListener<T> getRecordAvailabilityListener() {
+		return this.recordAvailabilityListener.get();
+	}
 
-  @Override
-  public void registerRecordAvailabilityListener(final RecordAvailabilityListener<T> listener) {
-    if (!this.recordAvailabilityListener.compareAndSet(null, listener)) {
-      throw new IllegalStateException(this.recordAvailabilityListener
-          + " is already registered as a record availability listener");
-    }
-  }
+	public void notifyDataUnitConsumed(int channelIndex) {
+		this.channelToReadFrom = -1;
+	}
 
-  @Override
-  public RecordAvailabilityListener<T> getRecordAvailabilityListener() {
-    return this.recordAvailabilityListener.get();
-  }
+	@Override
+	public void setInputChannelSuspended(int index, boolean isSuspended) {
+		if (isSuspended != this.getInputChannel(index).isSuspended()) {
+			this.getInputChannel(index).setSuspended(isSuspended);
 
-  public void notifyDataUnitConsumed(int channelIndex) {
-    this.channelToReadFrom = -1;
-  }
+			this.suspendedInputChannels = (isSuspended) ? this.suspendedInputChannels + 1
+					: this.suspendedInputChannels - 1;
+
+		}
+	}
+
+	@Override
+	public int getNumberOfActiveInputChannels() {
+		return this.inputChannels.size() - this.suspendedInputChannels;
+	}
 }

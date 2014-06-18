@@ -69,6 +69,12 @@ public abstract class AbstractJobVertex implements IOReadableWritable {
 	 * Number of subtasks to split this task into at runtime.
 	 */
 	private int numberOfSubtasks = -1;
+	
+	private int minElasticNumberOfSubtasks = -1;
+
+	private int maxElasticNumberOfSubtasks = -1;
+
+	private int initialElasticNumberOfSubtasks = -1;
 
 	/**
 	 * The type of instance to be assigned to this task at runtime.
@@ -408,6 +414,12 @@ public abstract class AbstractJobVertex implements IOReadableWritable {
 
 		// Read number of subtasks
 		this.numberOfSubtasks = in.readInt();
+		
+		this.minElasticNumberOfSubtasks = in.readInt();
+		
+		this.maxElasticNumberOfSubtasks = in.readInt();
+		
+		this.initialElasticNumberOfSubtasks = in.readInt();
 
 		// Read number of subtasks per instance
 		this.numberOfSubtasksPerInstance = in.readInt();
@@ -492,6 +504,10 @@ public abstract class AbstractJobVertex implements IOReadableWritable {
 
 		// Number of subtasks
 		out.writeInt(this.numberOfSubtasks);
+		
+		out.writeInt(this.minElasticNumberOfSubtasks);
+		out.writeInt(this.maxElasticNumberOfSubtasks);
+		out.writeInt(this.initialElasticNumberOfSubtasks);
 
 		// Number of subtasks per instance
 		out.writeInt(this.numberOfSubtasksPerInstance);
@@ -557,6 +573,9 @@ public abstract class AbstractJobVertex implements IOReadableWritable {
 	 */
 	public void setNumberOfSubtasks(final int numberOfSubtasks) {
 		this.numberOfSubtasks = numberOfSubtasks;
+		this.minElasticNumberOfSubtasks = -1;
+		this.maxElasticNumberOfSubtasks = -1;
+		this.initialElasticNumberOfSubtasks = -1;
 	}
 
 	/**
@@ -567,6 +586,45 @@ public abstract class AbstractJobVertex implements IOReadableWritable {
 	 */
 	public int getNumberOfSubtasks() {
 		return this.numberOfSubtasks;
+	}
+
+	public void setElasticNumberOfSubtasks(int min, int max, int initial) {
+		this.numberOfSubtasks = -1;
+
+		if (min <= 0) {
+			throw new IllegalArgumentException(
+					"Illegal minimum number of elastic subtasks.");
+		}
+
+		if (min <= 0) {
+			throw new IllegalArgumentException(
+					"Illegal maximum number of elastic subtasks.");
+		}
+
+		if (initial < min || initial > max) {
+			throw new IllegalArgumentException(
+					"Illegal initial number of elastic subtasks.");
+		}
+
+		this.minElasticNumberOfSubtasks = min;
+		this.maxElasticNumberOfSubtasks = max;
+		this.initialElasticNumberOfSubtasks = initial;
+	}
+
+	public int getElasticMinNumberOfSubtasks() {
+		return this.minElasticNumberOfSubtasks;
+	}
+
+	public int getElasticMaxNumberOfSubtasks() {
+		return this.maxElasticNumberOfSubtasks;
+	}
+
+	public int getElasticInitialNumberOfSubtasks() {
+		return this.initialElasticNumberOfSubtasks;
+	}
+
+	public boolean hasElasticNumberOfSubtasks() {
+		return this.minElasticNumberOfSubtasks != -1;
 	}
 
 	/**

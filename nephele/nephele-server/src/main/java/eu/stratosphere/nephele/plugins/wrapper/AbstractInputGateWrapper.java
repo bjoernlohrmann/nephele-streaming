@@ -258,4 +258,20 @@ public abstract class AbstractInputGateWrapper<T extends Record> implements
 		return this.wrappedInputGate.createInMemoryInputChannel(inputGate,
 				channelID, connectedChannelID);
 	}
+	
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public void setInputChannelSuspended(int index, boolean isSuspended) {
+		this.getWrappedInputGate().setInputChannelSuspended(index, isSuspended);
+	}
+	
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public int getNumberOfActiveInputChannels() {
+		return this.getWrappedInputGate().getNumberOfActiveInputChannels();
+	}
 }

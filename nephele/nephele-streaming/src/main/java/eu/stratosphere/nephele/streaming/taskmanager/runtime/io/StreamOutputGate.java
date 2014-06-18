@@ -160,7 +160,7 @@ public final class StreamOutputGate<T extends Record> extends
 	public void reportRecordEmitted(final T record) {
 		int outputChannel = this.streamChannelSelector
 				.invokeWrappedChannelSelector(record,
-						this.getNumberOfOutputChannels())[0];
+						this.getNumberOfActiveOutputChannels())[0];
 
 		if (this.qosCallback != null) {
 			AbstractTaggableRecord taggableRecord = (AbstractTaggableRecord) record;

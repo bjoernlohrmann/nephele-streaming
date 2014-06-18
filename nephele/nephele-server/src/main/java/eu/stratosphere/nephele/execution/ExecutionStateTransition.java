@@ -81,6 +81,35 @@ public final class ExecutionStateTransition {
 		if (oldState == ExecutionState.FINISHING && newState == ExecutionState.FINISHED) {
 			unexpectedStateChange = false;
 		}
+		
+		// these transitions may occur when elastic tasks are used
+		if (oldState == ExecutionState.ASSIGNED && newState == ExecutionState.SUSPENDED) {
+			unexpectedStateChange = false;
+		}
+		if (oldState == ExecutionState.SUSPENDED && newState == ExecutionState.ASSIGNED) {
+			unexpectedStateChange = false;
+		}		
+		if (oldState == ExecutionState.SUSPENDED && newState == ExecutionState.ASSIGNED) {
+			unexpectedStateChange = false;
+		}
+		if (oldState == ExecutionState.RUNNING && newState == ExecutionState.SUSPENDING) {
+			unexpectedStateChange = false;
+		}
+		if (oldState == ExecutionState.SUSPENDING && newState == ExecutionState.SUSPENDED) {
+			unexpectedStateChange = false;
+		}
+		if (oldState == ExecutionState.SUSPENDING && newState == ExecutionState.FAILED) {
+			unexpectedStateChange = false;
+		}
+		if (oldState == ExecutionState.SUSPENDING && newState == ExecutionState.CANCELING) {
+			unexpectedStateChange = false;
+		}
+		if (oldState == ExecutionState.SUSPENDED && newState == ExecutionState.FAILED) {
+			unexpectedStateChange = false;
+		}
+		if (oldState == ExecutionState.SUSPENDED && newState == ExecutionState.CANCELING) {
+			unexpectedStateChange = false;
+		}		
 
 		// These transitions may occur during a task recovery
 		if (oldState == ExecutionState.FAILED && newState == ExecutionState.ASSIGNED) {

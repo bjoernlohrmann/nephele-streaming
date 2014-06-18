@@ -91,6 +91,10 @@ public class SWTGate extends AbstractSWTVertex {
 		case FAILED:
 			returnColor = ColorScheme.getGateFailedBorderColor(device);
 			break;
+		case SUSPENDING:
+		case SUSPENDED:
+			returnColor = ColorScheme.getGateSuspendBorderColor(device);
+			break;
 		default:
 			returnColor = ColorScheme.getGateDefaultBorderColor(device);
 			break;
@@ -120,6 +124,10 @@ public class SWTGate extends AbstractSWTVertex {
 			break;
 		case FAILED:
 			returnColor = ColorScheme.getGateFailedBackgroundColor(device);
+			break;
+		case SUSPENDING:
+		case SUSPENDED:
+			returnColor = ColorScheme.getGateSuspendBackgroundColor(device);
 			break;
 		default:
 			returnColor = ColorScheme.getGateDefaultBackgroundColor(device);

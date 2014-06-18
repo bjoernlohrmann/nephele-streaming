@@ -250,7 +250,8 @@ public class RuntimeEnvironment implements Environment, Runnable {
 					default:
 						throw new IllegalStateException("Unknown channel type");
 				}
-			}
+				og.setOutputChannelSuspended(j, cdd.isSuspended());
+			}			
 		}
 
 		final int noigdd = tdd.getNumberOfInputGateDescriptors();
@@ -274,6 +275,7 @@ public class RuntimeEnvironment implements Environment, Runnable {
 					default:
 						throw new IllegalStateException("Unknown channel type");
 				}
+				ig.setInputChannelSuspended(j, cdd.isSuspended());
 			}
 		}
 	}

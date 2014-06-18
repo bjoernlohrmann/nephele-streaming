@@ -84,6 +84,14 @@ public final class ExecutionGroupVertex {
 	 * Minimum number of execution vertices this group vertex can manage.
 	 */
 	private volatile int minMemberSize = 1;
+	
+	private volatile int minElasticNumberOfRunningSubtasks = -1;
+
+	private volatile int maxElasticNumberOfRunningSubtasks = -1;
+
+	private volatile int initialElasticNumberOfRunningSubtasks = -1;
+
+	private volatile int currentElasticNumberOfRunningSubtasks = 0;
 
 	/**
 	 * The user defined number of execution vertices, -1 if the user has not specified it.
@@ -952,5 +960,35 @@ public final class ExecutionGroupVertex {
 	Class<? extends AbstractInvokable> getInvokableClass() {
 
 		return this.invokableClass;
+	}
+	
+	public void setElasticNumberOfRunningSubtasks(int min, int max, int initial) {
+		this.minElasticNumberOfRunningSubtasks = min;
+		this.maxElasticNumberOfRunningSubtasks = max;
+		this.initialElasticNumberOfRunningSubtasks = initial;
+	}
+
+	public int getMinElasticNumberOfRunningSubtasks() {
+		return minElasticNumberOfRunningSubtasks;
+	}
+
+	public int getMaxElasticNumberOfRunningSubtasks() {
+		return maxElasticNumberOfRunningSubtasks;
+	}
+
+	public int getInitialElasticNumberOfRunningSubtasks() {
+		return initialElasticNumberOfRunningSubtasks;
+	}
+
+	public int getCurrentElasticNumberOfRunningSubtasks() {
+		return currentElasticNumberOfRunningSubtasks;
+	}
+
+	public void setCurrentElasticNumberOfRunningSubtasks(int current) {
+		this.currentElasticNumberOfRunningSubtasks = current;
+	}
+	
+	public boolean hasElasticNumberOfRunningSubtasks() {
+		return this.minElasticNumberOfRunningSubtasks != -1;
 	}
 }

@@ -158,4 +158,8 @@ public interface OutputGate<T extends Record> extends Gate<T> {
 	 *        the index of the channel within the gate
 	 */
 	void outputBufferSent(int channelIndex);
+	
+	int getNumberOfActiveOutputChannels();
+	
+	void setOutputChannelSuspended(int index, boolean isSuspended);
 }

@@ -493,14 +493,22 @@ public class ExecutionGraph implements ExecutionListener {
 		// Create a group vertex for the job vertex
 
 		ExecutionGroupVertex groupVertex = null;
+		int numberOfSubtasks = jobVertex.getNumberOfSubtasks();
+		if (jobVertex.hasElasticNumberOfSubtasks()) {
+			numberOfSubtasks = jobVertex.getElasticMaxNumberOfSubtasks();
+		}
+
 		try {
-			groupVertex = new ExecutionGroupVertex(jobVertex.getName(), jobVertex.getID(), this,
-				jobVertex.getNumberOfSubtasks(), instanceType, userDefinedInstanceType,
-				jobVertex.getNumberOfSubtasksPerInstance(), jobVertex.getVertexToShareInstancesWith() != null ? true
-					: false, jobVertex.getNumberOfExecutionRetries(), jobVertex.getConfiguration(), signature,
-				invokableClass);
+			groupVertex = new ExecutionGroupVertex(jobVertex.getName(),
+					jobVertex.getID(), this, numberOfSubtasks, instanceType,
+					userDefinedInstanceType,
+					jobVertex.getNumberOfSubtasksPerInstance(),
+					jobVertex.getVertexToShareInstancesWith() != null ? true
+							: false, jobVertex.getNumberOfExecutionRetries(),
+					jobVertex.getConfiguration(), signature, invokableClass);
 		} catch (Throwable t) {
-			throw new GraphConversionException(StringUtils.stringifyException(t));
+			throw new GraphConversionException(
+					StringUtils.stringifyException(t));
 		}
 
 		// Run the configuration check the user has provided for the vertex
@@ -515,23 +523,8 @@ public class ExecutionGraph implements ExecutionListener {
 			.getInvokable());
 		final int maximumNumberOfSubtasks = jobVertex.getMaximumNumberOfSubtasks(groupVertex.getEnvironment()
 			.getInvokable());
-		if (jobVertex.getNumberOfSubtasks() != -1) {
-			if (jobVertex.getNumberOfSubtasks() < 1) {
-				throw new GraphConversionException("Cannot split task " + jobVertex.getName() + " into "
-					+ jobVertex.getNumberOfSubtasks() + " subtasks");
-			}
-
-			if (jobVertex.getNumberOfSubtasks() < minimumNumberOfSubtasks) {
-				throw new GraphConversionException("Number of subtasks must be at least " + minimumNumberOfSubtasks);
-			}
-
-			if (maximumNumberOfSubtasks != -1) {
-				if (jobVertex.getNumberOfSubtasks() > maximumNumberOfSubtasks) {
-					throw new GraphConversionException("Number of subtasks for vertex " + jobVertex.getName()
-						+ " can be at most " + maximumNumberOfSubtasks);
-				}
-			}
-		}
+		validateNumberOfSubtasksOfVertex(jobVertex, minimumNumberOfSubtasks,
+				maximumNumberOfSubtasks);
 
 		// Check number of subtasks per instance
 		if (jobVertex.getNumberOfSubtasksPerInstance() != -1 && jobVertex.getNumberOfSubtasksPerInstance() < 1) {
@@ -542,6 +535,12 @@ public class ExecutionGraph implements ExecutionListener {
 		// Assign min/max to the group vertex (settings are actually applied in applyUserDefinedSettings)
 		groupVertex.setMinMemberSize(minimumNumberOfSubtasks);
 		groupVertex.setMaxMemberSize(maximumNumberOfSubtasks);
+		if (jobVertex.hasElasticNumberOfSubtasks()) {
+			groupVertex.setElasticNumberOfRunningSubtasks(
+					jobVertex.getElasticMinNumberOfSubtasks(),
+					jobVertex.getElasticMaxNumberOfSubtasks(),
+					jobVertex.getElasticInitialNumberOfSubtasks());
+		}
 
 		// Register input and output vertices separately
 		if (jobVertex instanceof AbstractJobInputVertex) {
@@ -588,6 +587,50 @@ public class ExecutionGraph implements ExecutionListener {
 			null));
 
 		return ev;
+	}
+	
+	private void validateNumberOfSubtasksOfVertex(AbstractJobVertex jobVertex,
+			int minimumNumberOfSubtasks, final int maximumNumberOfSubtasks)
+			throws GraphConversionException {
+
+		if (jobVertex.getNumberOfSubtasks() != -1) {
+			if (jobVertex.getNumberOfSubtasks() < 1) {
+				throw new GraphConversionException("Cannot split task "
+						+ jobVertex.getName() + " into "
+						+ jobVertex.getNumberOfSubtasks() + " subtasks");
+			}
+
+			if (jobVertex.getNumberOfSubtasks() < minimumNumberOfSubtasks) {
+				throw new GraphConversionException(
+						"Number of subtasks must be at least "
+								+ minimumNumberOfSubtasks);
+			}
+
+			if (maximumNumberOfSubtasks != -1) {
+				if (jobVertex.getNumberOfSubtasks() > maximumNumberOfSubtasks) {
+					throw new GraphConversionException(
+							"Number of subtasks for vertex "
+									+ jobVertex.getName() + " can be at most "
+									+ maximumNumberOfSubtasks);
+				}
+			}
+		} else if (jobVertex.hasElasticNumberOfSubtasks()) {
+			if (jobVertex.getElasticMinNumberOfSubtasks() < minimumNumberOfSubtasks) {
+				throw new GraphConversionException(
+						"Minimum number of elastic subtasks must be at least "
+								+ minimumNumberOfSubtasks);
+
+			}
+
+			if (maximumNumberOfSubtasks != -1) {
+				if (jobVertex.getElasticMaxNumberOfSubtasks() > maximumNumberOfSubtasks) {
+					throw new GraphConversionException(
+							"Maximum number of elastic subtasks for vertex "
+									+ jobVertex.getName() + " can be at most "
+									+ maximumNumberOfSubtasks);
+				}
+			}
+		}
 	}
 
 	/**

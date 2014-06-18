@@ -128,4 +128,8 @@ public interface InputGate<T extends Record> extends Gate<T> {
   RecordAvailabilityListener<T> getRecordAvailabilityListener();
 
   AbstractTaskEvent getCurrentEvent();
+  
+  int getNumberOfActiveInputChannels();
+
+  void setInputChannelSuspended(int index, boolean isSuspended);
 }

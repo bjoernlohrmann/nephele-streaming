@@ -17,6 +17,7 @@ package eu.stratosphere.nephele.deployment;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.IOException;
@@ -43,10 +44,11 @@ public class ChannelDeploymentDescriptorTest {
 		final ChannelID outputChannelID = new ChannelID();
 		final ChannelID inputChannelID = new ChannelID();
 
-		final ChannelDeploymentDescriptor cdd = new ChannelDeploymentDescriptor(outputChannelID, inputChannelID);
+		final ChannelDeploymentDescriptor cdd = new ChannelDeploymentDescriptor(outputChannelID, inputChannelID, true);
 
 		assertEquals(outputChannelID, cdd.getOutputChannelID());
 		assertEquals(inputChannelID, cdd.getInputChannelID());
+		assertTrue(cdd.isSuspended());
 	}
 
 	/**
@@ -62,7 +64,7 @@ public class ChannelDeploymentDescriptorTest {
 
 		try {
 
-			new ChannelDeploymentDescriptor(null, channelID);
+			new ChannelDeploymentDescriptor(null, channelID, true);
 
 		} catch (IllegalArgumentException e) {
 			firstExceptionCaught = true;
@@ -70,7 +72,7 @@ public class ChannelDeploymentDescriptorTest {
 
 		try {
 
-			new ChannelDeploymentDescriptor(channelID, null);
+			new ChannelDeploymentDescriptor(channelID, null, true);
 
 		} catch (IllegalArgumentException e) {
 			secondExceptionCaught = true;
@@ -94,7 +96,7 @@ public class ChannelDeploymentDescriptorTest {
 		final ChannelID outputChannelID = new ChannelID();
 		final ChannelID inputChannelID = new ChannelID();
 
-		final ChannelDeploymentDescriptor orig = new ChannelDeploymentDescriptor(outputChannelID, inputChannelID);
+		final ChannelDeploymentDescriptor orig = new ChannelDeploymentDescriptor(outputChannelID, inputChannelID, false);
 
 		ChannelDeploymentDescriptor copy = null;
 
@@ -109,5 +111,6 @@ public class ChannelDeploymentDescriptorTest {
 
 		assertEquals(orig.getOutputChannelID(), copy.getOutputChannelID());
 		assertEquals(orig.getInputChannelID(), copy.getInputChannelID());
+		assertEquals(orig.isSuspended(), copy.isSuspended());
 	}
 }

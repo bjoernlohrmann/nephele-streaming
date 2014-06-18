@@ -37,6 +37,8 @@ public abstract class AbstractChannel {
 
 	private final int channelIndex;
 
+	private boolean isSuspended;
+	
 	/**
 	 * Auxiliary constructor for channels
 	 * 
@@ -53,6 +55,7 @@ public abstract class AbstractChannel {
 		this.channelIndex = channelIndex;
 		this.channelID = channelID;
 		this.connectedChannelID = connectedChannelID;
+		this.isSuspended = false;
 	}
 
 	/**
@@ -95,7 +98,14 @@ public abstract class AbstractChannel {
 	public ChannelID getConnectedChannelID() {
 		return this.connectedChannelID;
 	}
-
+	
+	public boolean isSuspended() {
+		return this.isSuspended;
+	}
+	
+	public void setSuspended(boolean isSuspended) {
+		this.isSuspended = isSuspended;
+	}
 
 	/**
 	 * Returns the ID of the job this channel belongs to.

@@ -137,6 +137,12 @@ public class SWTVertex extends AbstractSWTVertex {
 		case FAILED:
 			returnColor = ColorScheme.getVertexFailedBackgroundColor(device);
 			break;
+		case SUSPENDING:
+			returnColor = ColorScheme.getVertexSuspendingBackgroundColor(device);
+			break;
+		case SUSPENDED:
+			returnColor = ColorScheme.getVertexSuspendedBackgroundColor(device);
+			break;
 		default:
 			returnColor = ColorScheme.getVertexDefaultBackgroundColor(device);
 			break;

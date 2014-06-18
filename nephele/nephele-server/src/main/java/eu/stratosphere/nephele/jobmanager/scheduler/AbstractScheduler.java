@@ -186,22 +186,25 @@ public abstract class AbstractScheduler implements InstanceListener {
 		if (!alreadyVisited.add(vertex)) {
 			return;
 		}
-
-		if (vertex.compareAndUpdateExecutionState(ExecutionState.ASSIGNED, ExecutionState.READY)) {
-			final AbstractInstance instance = vertex.getAllocatedResource().getInstance();
-
-			if (instance instanceof DummyInstance) {
-				LOG.error("Inconsistency: Vertex " + vertex + " is about to be deployed on a DummyInstance");
-			}
-
-			List<ExecutionVertex> verticesForInstance = verticesToBeDeployed.get(instance);
-			if (verticesForInstance == null) {
-				verticesForInstance = new ArrayList<ExecutionVertex>();
-				verticesToBeDeployed.put(instance, verticesForInstance);
-			}
-
-			verticesForInstance.add(vertex);
+		
+		if (!vertex.compareAndUpdateExecutionState(ExecutionState.ASSIGNED,
+				ExecutionState.READY)) {
+			return;
 		}
+
+		final AbstractInstance instance = vertex.getAllocatedResource().getInstance();
+
+		if (instance instanceof DummyInstance) {
+			LOG.error("Inconsistency: Vertex " + vertex + " is about to be deployed on a DummyInstance");
+		}
+
+		List<ExecutionVertex> verticesForInstance = verticesToBeDeployed.get(instance);
+		if (verticesForInstance == null) {
+			verticesForInstance = new ArrayList<ExecutionVertex>();
+			verticesToBeDeployed.put(instance, verticesForInstance);
+		}
+
+		verticesForInstance.add(vertex);
 
 		final int numberOfOutputGates = vertex.getNumberOfOutputGates();
 		for (int i = 0; i < numberOfOutputGates; ++i) {
@@ -415,68 +418,100 @@ public abstract class AbstractScheduler implements InstanceListener {
 			 */
 			@Override
 			public void run() {
+				try {
+					final ExecutionStage stage = eg.getCurrentExecutionStage();
+	
+					synchronized (stage) {
+	
+						for (final AllocatedResource allocatedResource : allocatedResources) {
+	
+							AllocatedResource resourceToBeReplaced = null;
+							// Important: only look for instances to be replaced in the current stage
+							final Iterator<ExecutionGroupVertex> groupIterator = new ExecutionGroupVertexIterator(eg, true,
+								stage.getStageNumber());
+							while (groupIterator.hasNext()) {
+	
+								final ExecutionGroupVertex groupVertex = groupIterator.next();
+								for (int i = 0; i < groupVertex.getCurrentNumberOfGroupMembers(); ++i) {
+	
+									final ExecutionVertex vertex = groupVertex.getGroupMember(i);
+	
+									if (vertex.getExecutionState() == ExecutionState.SCHEDULED
+										&& vertex.getAllocatedResource() != null) {
+										// In local mode, we do not consider any topology, only the instance type
+										if (vertex.getAllocatedResource().getInstanceType().equals(
+											allocatedResource.getInstanceType())) {
+											resourceToBeReplaced = vertex.getAllocatedResource();
+											break;
+										}
+									}
+								}
+	
+								if (resourceToBeReplaced != null) {
+									break;
+								}
+							}
+	
+							// For some reason, we don't need this instance
+							if (resourceToBeReplaced == null) {
+								LOG.error("Instance " + allocatedResource.getInstance() + " is not required for job"
+									+ eg.getJobID());
+								try {
+									getInstanceManager().releaseAllocatedResource(jobID, eg.getJobConfiguration(),
+										allocatedResource);
+								} catch (InstanceException e) {
+									LOG.error(e);
+								}
+								return;
+							}
+	
+							// Replace the selected instance
+							final Iterator<ExecutionVertex> it = resourceToBeReplaced.assignedVertices();
+							while (it.hasNext()) {
+								final ExecutionVertex vertex = it.next();
+								vertex.setAllocatedResource(allocatedResource);
+								vertex.updateExecutionState(ExecutionState.ASSIGNED);
+							}
+						}
+					}
+					
+					suspendElasticStandbyTasks(eg);
+	
+					// Deploy the assigned vertices
+					deployAssignedInputVertices(eg);
+				} catch (Exception e) {
+					LOG.error("Exception while deploying tasks", e);
+				}
 
+			}
+			
+			private void suspendElasticStandbyTasks(ExecutionGraph eg) {
 				final ExecutionStage stage = eg.getCurrentExecutionStage();
 
 				synchronized (stage) {
+					final Iterator<ExecutionGroupVertex> groupIterator = new ExecutionGroupVertexIterator(
+							eg, true, stage.getStageNumber());
+					while (groupIterator.hasNext()) {
 
-					for (final AllocatedResource allocatedResource : allocatedResources) {
+						final ExecutionGroupVertex groupVertex = groupIterator
+								.next();
 
-						AllocatedResource resourceToBeReplaced = null;
-						// Important: only look for instances to be replaced in the current stage
-						final Iterator<ExecutionGroupVertex> groupIterator = new ExecutionGroupVertexIterator(eg, true,
-							stage.getStageNumber());
-						while (groupIterator.hasNext()) {
-
-							final ExecutionGroupVertex groupVertex = groupIterator.next();
-							for (int i = 0; i < groupVertex.getCurrentNumberOfGroupMembers(); ++i) {
-
-								final ExecutionVertex vertex = groupVertex.getGroupMember(i);
-
-								if (vertex.getExecutionState() == ExecutionState.SCHEDULED
-									&& vertex.getAllocatedResource() != null) {
-									// In local mode, we do not consider any topology, only the instance type
-									if (vertex.getAllocatedResource().getInstanceType().equals(
-										allocatedResource.getInstanceType())) {
-										resourceToBeReplaced = vertex.getAllocatedResource();
-										break;
-									}
-								}
-							}
-
-							if (resourceToBeReplaced != null) {
-								break;
-							}
+						if (!groupVertex.hasElasticNumberOfRunningSubtasks()) {
+							continue;
 						}
 
-						// For some reason, we don't need this instance
-						if (resourceToBeReplaced == null) {
-							LOG.error("Instance " + allocatedResource.getInstance() + " is not required for job"
-								+ eg.getJobID());
-							try {
-								getInstanceManager().releaseAllocatedResource(jobID, eg.getJobConfiguration(),
-									allocatedResource);
-							} catch (InstanceException e) {
-								LOG.error(e);
-							}
-							return;
-						}
+						for (int i = groupVertex.getInitialElasticNumberOfRunningSubtasks(); 
+								i < groupVertex.getMaxElasticNumberOfRunningSubtasks(); i++) {
 
-						// Replace the selected instance
-						final Iterator<ExecutionVertex> it = resourceToBeReplaced.assignedVertices();
-						while (it.hasNext()) {
-							final ExecutionVertex vertex = it.next();
-							vertex.setAllocatedResource(allocatedResource);
-							vertex.updateExecutionState(ExecutionState.ASSIGNED);
+							ExecutionVertex vertex = groupVertex.getGroupMember(i);
+
+							if (vertex.getExecutionState() == ExecutionState.ASSIGNED) {
+								vertex.updateExecutionState(ExecutionState.SUSPENDED);
+							}
 						}
 					}
 				}
-
-				// Deploy the assigned vertices
-				deployAssignedInputVertices(eg);
-
 			}
-
 		};
 
 		eg.executeCommand(command);

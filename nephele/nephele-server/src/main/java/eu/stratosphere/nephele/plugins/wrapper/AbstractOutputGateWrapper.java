@@ -299,5 +299,21 @@ public abstract class AbstractOutputGateWrapper<T extends Record> implements Out
 	@Override
 	public void outputBufferSent(final int channelIndex) {
 		this.wrappedOutputGate.outputBufferSent(channelIndex);
-	}	
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public void setOutputChannelSuspended(int index, boolean isSuspended) {
+		this.getWrappedOutputGate().setOutputChannelSuspended(index, isSuspended);
+	}
+	
+	/**
+	 * {@inheritDoc}
+	 */	
+	@Override
+	public int getNumberOfActiveOutputChannels() {
+		return this.getWrappedOutputGate().getNumberOfActiveOutputChannels();
+	}
 }

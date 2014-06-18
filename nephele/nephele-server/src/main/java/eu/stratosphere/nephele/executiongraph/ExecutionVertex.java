@@ -1014,7 +1014,8 @@ public final class ExecutionVertex {
 			for (int j = 0; j < numberOfOutputChannels; ++j) {
 
 				final ExecutionEdge ee = eg.getEdge(j);
-				cdd.add(new ChannelDeploymentDescriptor(ee.getOutputChannelID(), ee.getInputChannelID()));
+				boolean isSuspended = ee.getInputGate().getVertex().getExecutionState() == ExecutionState.SUSPENDED;
+				cdd.add(new ChannelDeploymentDescriptor(ee.getOutputChannelID(), ee.getInputChannelID(), isSuspended));
 			}
 
 			ogd.add(new GateDeploymentDescriptor(eg.getGateID(), eg.getChannelType(), cdd));
@@ -1031,7 +1032,8 @@ public final class ExecutionVertex {
 			for (int j = 0; j < numberOfInputChannels; ++j) {
 
 				final ExecutionEdge ee = eg.getEdge(j);
-				cdd.add(new ChannelDeploymentDescriptor(ee.getOutputChannelID(), ee.getInputChannelID()));
+				boolean isSuspended = ee.getOutputGate().getVertex().getExecutionState() == ExecutionState.SUSPENDED;
+				cdd.add(new ChannelDeploymentDescriptor(ee.getOutputChannelID(), ee.getInputChannelID(), isSuspended));
 			}
 
 			igd.add(new GateDeploymentDescriptor(eg.getGateID(), eg.getChannelType(), cdd));

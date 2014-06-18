@@ -38,6 +38,10 @@ public class ColorScheme {
 	private final Color VERTEXCANCELBACKGROUNDCOLOR;
 
 	private final Color VERTEXFAILEDBACKGROUNDCOLOR;
+	
+	private final Color VERTEXSUSPENDINGCOLOR;
+	
+	private final Color VERTEXSUSPENDEDCOLOR;
 
 	// Gate colors
 	private final Color GATEDEFAULTBORDERCOLOR;
@@ -67,6 +71,10 @@ public class ColorScheme {
 	private final Color GATEFAILEDBORDERCOLOR;
 
 	private final Color GATEFAILEDBACKGROUNDCOLOR;
+	
+	private final Color GATESUSPENDBACKGROUNDCOLOR;
+	
+	private final Color GATESUSPENDBORDERCOLOR;
 
 	private final Color GROUPVERTEXBACKGROUNDCOLOR;
 
@@ -96,6 +104,8 @@ public class ColorScheme {
 		this.VERTEXFINISHEDBACKGROUNDCOLOR = new Color(device, 93, 121, 246);
 		this.VERTEXCANCELBACKGROUNDCOLOR = new Color(device, 247, 150, 70);
 		this.VERTEXFAILEDBACKGROUNDCOLOR = new Color(device, 229, 36, 36);
+		this.VERTEXSUSPENDINGCOLOR = new Color(device, 211, 188, 95);
+		this.VERTEXSUSPENDEDCOLOR = new Color(device, 200, 171, 55);
 
 		this.GATEDEFAULTBORDERCOLOR = new Color(device, 162, 162, 162);
 		this.GATEDEFAULTBACKGROUNDCOLOR = new Color(device, 104, 104, 104);
@@ -111,6 +121,8 @@ public class ColorScheme {
 		this.GATECANCELBACKGROUNDCOLOR = new Color(device, 178, 108, 50);
 		this.GATEFAILEDBORDERCOLOR = new Color(device, 229, 36, 36);
 		this.GATEFAILEDBACKGROUNDCOLOR = new Color(device, 166, 27, 27);
+		this.GATESUSPENDBACKGROUNDCOLOR = new Color(device, 120, 103, 33);
+		this.GATESUSPENDBORDERCOLOR = new Color(device, 200, 171, 55);
 
 		this.GROUPVERTEXBACKGROUNDCOLOR = new Color(device, 210, 210, 210);
 		this.GROUPVERTEXBORDERCOLOR = new Color(device, 89, 89, 89);
@@ -161,6 +173,14 @@ public class ColorScheme {
 
 	public static Color getVertexReplayingBackgroundColor(Device device) {
 		return getInstance(device).VERTEXREPLAYINGBACKGROUNDCOLOR;
+	}
+	
+	public static Color getVertexSuspendingBackgroundColor(Device device) {
+		return getInstance(device).VERTEXSUSPENDINGCOLOR;
+	}
+	
+	public static Color getVertexSuspendedBackgroundColor(Device device) {
+		return getInstance(device).VERTEXSUSPENDEDCOLOR;
 	}
 
 	public static Color getGraphBackgroundColor(Device device) {
@@ -221,6 +241,14 @@ public class ColorScheme {
 
 	public static Color getGateFailedBackgroundColor(Device device) {
 		return getInstance(device).GATEFAILEDBACKGROUNDCOLOR;
+	}
+	
+	public static Color getGateSuspendBorderColor(Device device) {
+		return getInstance(device).GATESUSPENDBORDERCOLOR;
+	}
+
+	public static Color getGateSuspendBackgroundColor(Device device) {
+		return getInstance(device).GATESUSPENDBACKGROUNDCOLOR;
 	}
 
 	public static Color getGroupVertexBackgroundColor(Device device) {

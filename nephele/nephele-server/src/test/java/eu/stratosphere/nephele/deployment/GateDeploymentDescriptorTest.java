@@ -110,7 +110,7 @@ public class GateDeploymentDescriptorTest {
 		final GateID gateID = new GateID();
 		final ChannelType channelType = ChannelType.INMEMORY;
 		final List<ChannelDeploymentDescriptor> channels = new ArrayList<ChannelDeploymentDescriptor>(0);
-		final ChannelDeploymentDescriptor cdd = new ChannelDeploymentDescriptor(new ChannelID(), new ChannelID());
+		final ChannelDeploymentDescriptor cdd = new ChannelDeploymentDescriptor(new ChannelID(), new ChannelID(), true);
 		channels.add(cdd);
 
 		final GateDeploymentDescriptor orig = new GateDeploymentDescriptor(gateID, channelType,

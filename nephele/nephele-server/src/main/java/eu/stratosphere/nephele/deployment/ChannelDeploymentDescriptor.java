@@ -41,6 +41,9 @@ public final class ChannelDeploymentDescriptor implements IOReadableWritable {
 	 * The ID of the input channel.
 	 */
 	private final ChannelID inputChannelID;
+	
+	
+	private boolean isSuspended;
 
 	/**
 	 * Constructs a new channel deployment descriptor.
@@ -50,7 +53,7 @@ public final class ChannelDeploymentDescriptor implements IOReadableWritable {
 	 * @param inputChannelID
 	 *        the ID of the input channel
 	 */
-	public ChannelDeploymentDescriptor(final ChannelID outputChannelID, final ChannelID inputChannelID) {
+	public ChannelDeploymentDescriptor(final ChannelID outputChannelID, final ChannelID inputChannelID, final boolean isSuspended) {
 
 		if (outputChannelID == null) {
 			throw new IllegalArgumentException("Argument outputChannelID must not be null");
@@ -62,6 +65,7 @@ public final class ChannelDeploymentDescriptor implements IOReadableWritable {
 
 		this.outputChannelID = outputChannelID;
 		this.inputChannelID = inputChannelID;
+		this.isSuspended = isSuspended;
 	}
 
 	/**
@@ -71,6 +75,7 @@ public final class ChannelDeploymentDescriptor implements IOReadableWritable {
 
 		this.outputChannelID = new ChannelID();
 		this.inputChannelID = new ChannelID();
+		this.isSuspended = false;
 	}
 
 	/**
@@ -81,6 +86,7 @@ public final class ChannelDeploymentDescriptor implements IOReadableWritable {
 
 		this.outputChannelID.write(out);
 		this.inputChannelID.write(out);
+		out.writeBoolean(this.isSuspended);
 	}
 
 	/**
@@ -91,6 +97,7 @@ public final class ChannelDeploymentDescriptor implements IOReadableWritable {
 
 		this.outputChannelID.read(in);
 		this.inputChannelID.read(in);
+		this.isSuspended = in.readBoolean();
 	}
 
 	/**
@@ -111,5 +118,9 @@ public final class ChannelDeploymentDescriptor implements IOReadableWritable {
 	public ChannelID getInputChannelID() {
 
 		return this.inputChannelID;
+	}
+
+	public boolean isSuspended() {
+		return isSuspended;
 	}
 }
