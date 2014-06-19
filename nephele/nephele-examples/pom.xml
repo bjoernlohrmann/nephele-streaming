@@ -8,7 +8,7 @@
 	<parent>
 		<artifactId>nephele</artifactId>
 		<groupId>eu.stratosphere</groupId>
-		<version>streaming-git</version>
+		<version>cloudcom-git</version>
 		<relativePath>..</relativePath>
 	</parent>
 
