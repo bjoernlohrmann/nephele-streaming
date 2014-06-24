@@ -18,6 +18,8 @@ package eu.stratosphere.nephele.io.channels;
 import java.io.IOException;
 
 import eu.stratosphere.nephele.event.task.AbstractEvent;
+import eu.stratosphere.nephele.io.channels.bytebuffered.ChannelSuspendEvent;
+import eu.stratosphere.nephele.io.channels.bytebuffered.ChannelUnsuspendEvent;
 import eu.stratosphere.nephele.jobgraph.JobID;
 
 /**
@@ -103,8 +105,25 @@ public abstract class AbstractChannel {
 		return this.isSuspended;
 	}
 	
-	public void setSuspended(boolean isSuspended) {
-		this.isSuspended = isSuspended;
+	/**
+	 * Marks this channel locally as suspended and notifies the other channel side about the
+	 * state change if required
+	 * 
+	 * @param isSuspended
+	 * @throws InterruptedException 
+	 * @throws IOException 
+	 */
+	public void setSuspended(boolean isSuspended, boolean notifyOtherSide)
+			throws IOException, InterruptedException {
+		if (this.isSuspended != isSuspended) {
+			this.isSuspended = isSuspended;
+
+			if (notifyOtherSide) {
+				AbstractEvent event = (isSuspended) ? new ChannelSuspendEvent()
+						: new ChannelUnsuspendEvent();
+				this.transferEvent(event);
+			}
+		}
 	}
 
 	/**

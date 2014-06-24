@@ -22,8 +22,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -50,6 +50,7 @@ import eu.stratosphere.nephele.instance.InstanceManager;
 import eu.stratosphere.nephele.instance.InstanceRequestMap;
 import eu.stratosphere.nephele.instance.InstanceType;
 import eu.stratosphere.nephele.jobgraph.JobID;
+import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.jobmanager.DeploymentManager;
 import eu.stratosphere.nephele.util.StringUtils;
 
@@ -418,71 +419,66 @@ public abstract class AbstractScheduler implements InstanceListener {
 			 */
 			@Override
 			public void run() {
-				try {
-					final ExecutionStage stage = eg.getCurrentExecutionStage();
-	
-					synchronized (stage) {
-	
-						for (final AllocatedResource allocatedResource : allocatedResources) {
-	
-							AllocatedResource resourceToBeReplaced = null;
-							// Important: only look for instances to be replaced in the current stage
-							final Iterator<ExecutionGroupVertex> groupIterator = new ExecutionGroupVertexIterator(eg, true,
-								stage.getStageNumber());
-							while (groupIterator.hasNext()) {
-	
-								final ExecutionGroupVertex groupVertex = groupIterator.next();
-								for (int i = 0; i < groupVertex.getCurrentNumberOfGroupMembers(); ++i) {
-	
-									final ExecutionVertex vertex = groupVertex.getGroupMember(i);
-	
-									if (vertex.getExecutionState() == ExecutionState.SCHEDULED
-										&& vertex.getAllocatedResource() != null) {
-										// In local mode, we do not consider any topology, only the instance type
-										if (vertex.getAllocatedResource().getInstanceType().equals(
-											allocatedResource.getInstanceType())) {
-											resourceToBeReplaced = vertex.getAllocatedResource();
-											break;
-										}
+				final ExecutionStage stage = eg.getCurrentExecutionStage();
+
+				synchronized (stage) {
+
+					for (final AllocatedResource allocatedResource : allocatedResources) {
+
+						AllocatedResource resourceToBeReplaced = null;
+						// Important: only look for instances to be replaced in the current stage
+						final Iterator<ExecutionGroupVertex> groupIterator = new ExecutionGroupVertexIterator(eg, true,
+							stage.getStageNumber());
+						while (groupIterator.hasNext()) {
+
+							final ExecutionGroupVertex groupVertex = groupIterator.next();
+							for (int i = 0; i < groupVertex.getCurrentNumberOfGroupMembers(); ++i) {
+
+								final ExecutionVertex vertex = groupVertex.getGroupMember(i);
+
+								if (vertex.getExecutionState() == ExecutionState.SCHEDULED
+									&& vertex.getAllocatedResource() != null) {
+									// In local mode, we do not consider any topology, only the instance type
+									if (vertex.getAllocatedResource().getInstanceType().equals(
+										allocatedResource.getInstanceType())) {
+										resourceToBeReplaced = vertex.getAllocatedResource();
+										break;
 									}
 								}
-	
-								if (resourceToBeReplaced != null) {
-									break;
-								}
 							}
-	
-							// For some reason, we don't need this instance
-							if (resourceToBeReplaced == null) {
-								LOG.error("Instance " + allocatedResource.getInstance() + " is not required for job"
-									+ eg.getJobID());
-								try {
-									getInstanceManager().releaseAllocatedResource(jobID, eg.getJobConfiguration(),
-										allocatedResource);
-								} catch (InstanceException e) {
-									LOG.error(e);
-								}
-								return;
-							}
-	
-							// Replace the selected instance
-							final Iterator<ExecutionVertex> it = resourceToBeReplaced.assignedVertices();
-							while (it.hasNext()) {
-								final ExecutionVertex vertex = it.next();
-								vertex.setAllocatedResource(allocatedResource);
-								vertex.updateExecutionState(ExecutionState.ASSIGNED);
+
+							if (resourceToBeReplaced != null) {
+								break;
 							}
 						}
-					}
-					
-					suspendElasticStandbyTasks(eg);
-	
-					// Deploy the assigned vertices
-					deployAssignedInputVertices(eg);
-				} catch (Exception e) {
-					LOG.error("Exception while deploying tasks", e);
-				}
 
+						// For some reason, we don't need this instance
+						if (resourceToBeReplaced == null) {
+							LOG.error("Instance " + allocatedResource.getInstance() + " is not required for job"
+								+ eg.getJobID());
+							try {
+								getInstanceManager().releaseAllocatedResource(jobID, eg.getJobConfiguration(),
+									allocatedResource);
+							} catch (InstanceException e) {
+								LOG.error(e);
+							}
+							return;
+						}
+
+						// Replace the selected instance
+						final Iterator<ExecutionVertex> it = resourceToBeReplaced.assignedVertices();
+						while (it.hasNext()) {
+							final ExecutionVertex vertex = it.next();
+							vertex.setAllocatedResource(allocatedResource);
+							vertex.updateExecutionState(ExecutionState.ASSIGNED);
+						}
+					}
+				}
+				
+				suspendElasticStandbyTasks(eg);
+
+				// Deploy the assigned vertices
+				deployAssignedInputVertices(eg);
 			}
 			
 			private void suspendElasticStandbyTasks(ExecutionGraph eg) {
@@ -500,7 +496,8 @@ public abstract class AbstractScheduler implements InstanceListener {
 							continue;
 						}
 
-						for (int i = groupVertex.getInitialElasticNumberOfRunningSubtasks(); 
+						int initialElasticSubtasks = groupVertex.getInitialElasticNumberOfRunningSubtasks();
+						for (int i = initialElasticSubtasks; 
 								i < groupVertex.getMaxElasticNumberOfRunningSubtasks(); i++) {
 
 							ExecutionVertex vertex = groupVertex.getGroupMember(i);
@@ -509,6 +506,7 @@ public abstract class AbstractScheduler implements InstanceListener {
 								vertex.updateExecutionState(ExecutionState.SUSPENDED);
 							}
 						}
+						groupVertex.setCurrentElasticNumberOfRunningSubtasks(initialElasticSubtasks);
 					}
 				}
 			}
@@ -701,4 +699,67 @@ public abstract class AbstractScheduler implements InstanceListener {
 
 		eg.executeCommand(command);
 	}
+	
+	public void scaleUpElasticTask(JobID jobID, JobVertexID jobVertexID,
+			final int noOfSubtasksToStart) {
+
+		final ExecutionGraph graph = getExecutionGraphByID(jobID);
+		final ExecutionGroupVertex groupVertex = getExecutionGroupVertex(
+				jobVertexID, graph);
+
+		Runnable command = new Runnable() {
+
+			@Override
+			public void run() {
+				// FIXME: ensure there are no currently SUSPENDING subtasks	
+				// FIXME: propagate switching SUSPENDED->ASSIGNED to subsequent group vertices
+				
+				if (groupVertex.getCurrentElasticNumberOfRunningSubtasks()
+						+ noOfSubtasksToStart > groupVertex
+						.getCurrentNumberOfGroupMembers()) {
+					throw new RuntimeException(
+							"Not enough SUSPENDED subtasks found. This is a bug.");
+				}
+				
+				List<ExecutionVertex> verticesToBeDeployed = new ArrayList<ExecutionVertex>(); 
+
+				int offset = groupVertex
+						.getCurrentElasticNumberOfRunningSubtasks();
+				for (int i = 0; i < noOfSubtasksToStart; i++) {
+					ExecutionVertex vertexToStart = groupVertex
+							.getGroupMember(offset + i);
+					vertexToStart.compareAndUpdateExecutionState(
+							ExecutionState.SUSPENDED, ExecutionState.ASSIGNED);
+					
+					verticesToBeDeployed.add(vertexToStart);
+				}
+				
+				
+				deployAssignedVertices(verticesToBeDeployed);
+			}
+		};
+
+		graph.executeCommand(command);
+	}
+
+	private ExecutionGroupVertex getExecutionGroupVertex(
+			JobVertexID jobVertexID, final ExecutionGraph graph) {
+
+		ExecutionGroupVertex groupVertex = null;
+
+		ExecutionStage stage = graph.getCurrentExecutionStage();
+		for (int i = 0; i < stage.getNumberOfStageMembers(); i++) {
+			if (stage.getStageMember(i).getJobVertexID().equals(jobVertexID)) {
+				groupVertex = stage.getStageMember(i);
+				break;
+			}
+		}
+		return groupVertex;
+	}
+
+	public void scaleDownElasticTask(JobID jobID, JobVertexID jobVertexID,
+			int noOfubtasksToSuspend) {
+
+	}
+
 }

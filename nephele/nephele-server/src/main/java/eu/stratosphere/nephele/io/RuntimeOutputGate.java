@@ -373,13 +373,31 @@ public class RuntimeOutputGate<T extends Record> extends AbstractGate<T> impleme
 	}
 
 	@Override
-	public void setOutputChannelSuspended(int index, boolean isSuspended) {
+	public void setOutputChannelSuspended(int index, boolean isSuspended,
+			boolean notifyOtherSide) throws IOException, InterruptedException {
+				
 		if (isSuspended != this.getOutputChannel(index).isSuspended()) {
-			this.getOutputChannel(index).setSuspended(isSuspended);
-
-			this.suspendedOutputChannels = (isSuspended) ? this.suspendedOutputChannels + 1
-					: this.suspendedOutputChannels - 1;
-
+			this.getOutputChannel(index).setSuspended(isSuspended, notifyOtherSide);
+			
+			// channel (un)suspension may occur out of order. For example unsuspension
+			// for channel 10 can occur before channel 9 is unsuspended. Unfortunately
+			// the channel selector interface does not offer a way to signal which channel
+			// index specifically is suspended and which not. This means that in the above example
+			// we cannot start using channel 10 while channel 9 is still suspended.
+			
+			if (isSuspended) {
+				this.suspendedOutputChannels = Math.max(this.suspendedOutputChannels, 
+						this.getNumberOfOutputChannels() - index);
+			} else {
+				if (index == this.getNumberOfActiveOutputChannels()) {
+					
+					int walk = index;
+					while(!this.getOutputChannel(walk).isSuspended()) {
+						this.suspendedOutputChannels--;
+						walk++;
+					}
+				}
+			}
 		}
 	}
 

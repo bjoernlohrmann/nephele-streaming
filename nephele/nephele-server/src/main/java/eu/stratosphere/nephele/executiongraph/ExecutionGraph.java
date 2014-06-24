@@ -1444,7 +1444,18 @@ public class ExecutionGraph implements ExecutionListener {
 	 *        the update command to be asynchronously executed on this graph
 	 */
 	public void executeCommand(final Runnable command) {
+		Runnable wrapper = new Runnable() {
+			
+			@Override
+			public void run() {
+				try {
+					command.run();
+				} catch(Exception e) {
+					LOG.error(e);
+				}
+			}
+		};
 
-		this.executorService.execute(command);
+		this.executorService.execute(wrapper);
 	}
 }

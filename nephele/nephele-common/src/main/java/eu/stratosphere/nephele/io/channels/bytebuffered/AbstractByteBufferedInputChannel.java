@@ -216,13 +216,7 @@ public abstract class AbstractByteBufferedInputChannel<T extends Record> extends
 		this.deserializer.clear();
 
 		// The buffers are recycled by the input channel wrapper
-	}
-
-	
-	@Override
-	public void activate() throws IOException, InterruptedException {
-		transferEvent(new ByteBufferedChannelActivateEvent());
-	}
+	}	
 
 	
 	@Override

@@ -250,7 +250,9 @@ public class RuntimeEnvironment implements Environment, Runnable {
 					default:
 						throw new IllegalStateException("Unknown channel type");
 				}
-				og.setOutputChannelSuspended(j, cdd.isSuspended());
+				
+				boolean notifyOtherSide = !cdd.isSuspended();
+				og.setOutputChannelSuspended(j, cdd.isSuspended(), notifyOtherSide);
 			}			
 		}
 
@@ -275,7 +277,8 @@ public class RuntimeEnvironment implements Environment, Runnable {
 					default:
 						throw new IllegalStateException("Unknown channel type");
 				}
-				ig.setInputChannelSuspended(j, cdd.isSuspended());
+				boolean notifyOtherSide = !cdd.isSuspended();
+				ig.setInputChannelSuspended(j, cdd.isSuspended(), notifyOtherSide);
 			}
 		}
 	}
