@@ -381,11 +381,9 @@ public class RuntimeInputGate<T extends Record> extends AbstractGate<T>
 	}
 
 	@Override
-	public void setInputChannelSuspended(int index, boolean isSuspended,
-			boolean notifyOtherSide) throws IOException, InterruptedException {
-		
+	public void setInputChannelSuspended(int index, boolean isSuspended) {
 		if (isSuspended != this.getInputChannel(index).isSuspended()) {
-			this.getInputChannel(index).setSuspended(isSuspended, notifyOtherSide);
+			this.getInputChannel(index).setSuspended(isSuspended);
 
 			this.suspendedInputChannels = (isSuspended) ? this.suspendedInputChannels + 1
 					: this.suspendedInputChannels - 1;

@@ -111,6 +111,14 @@ public abstract class AbstractByteBufferedInputChannel<T extends Record> extends
 					this.brokerAggreedToCloseChannel = true;
 					return InputChannelResult.END_OF_STREAM;
 				}
+				else if (evt instanceof ChannelUnsuspendEvent) {
+					this.getInputGate().setInputChannelSuspended(getChannelIndex(), false);
+					return InputChannelResult.NONE;
+				}
+				else if (evt instanceof ChannelSuspendEvent) {
+					this.getInputGate().setInputChannelSuspended(getChannelIndex(), true);
+					return InputChannelResult.NONE;
+				}
 				else if (evt instanceof AbstractTaskEvent) {
 					this.currentEvent = (AbstractTaskEvent) evt;
 					return InputChannelResult.EVENT;

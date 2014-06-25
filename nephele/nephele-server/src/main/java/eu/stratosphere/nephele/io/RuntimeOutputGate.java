@@ -55,7 +55,7 @@ public class RuntimeOutputGate<T extends Record> extends AbstractGate<T> impleme
 	 */
 	private final ArrayList<AbstractOutputChannel<T>> outputChannels = new ArrayList<AbstractOutputChannel<T>>();
 	
-	private int suspendedOutputChannels = 0;
+	private volatile int suspendedOutputChannels = 0;
 
 	/**
 	 * Channel selector to determine which channel is supposed receive the next record.
@@ -373,31 +373,34 @@ public class RuntimeOutputGate<T extends Record> extends AbstractGate<T> impleme
 	}
 
 	@Override
-	public void setOutputChannelSuspended(int index, boolean isSuspended,
-			boolean notifyOtherSide) throws IOException, InterruptedException {
-				
+	public void setOutputChannelSuspended(int index, boolean isSuspended) {
+
 		if (isSuspended != this.getOutputChannel(index).isSuspended()) {
-			this.getOutputChannel(index).setSuspended(isSuspended, notifyOtherSide);
-			
+			this.getOutputChannel(index).setSuspended(isSuspended);
+						
 			// channel (un)suspension may occur out of order. For example unsuspension
 			// for channel 10 can occur before channel 9 is unsuspended. Unfortunately
 			// the channel selector interface does not offer a way to signal which channel
 			// index specifically is suspended and which not. This means that in the above example
 			// we cannot start using channel 10 while channel 9 is still suspended.
 			
+			
+			int newSuspendedOutputChannels = this.suspendedOutputChannels;
 			if (isSuspended) {
-				this.suspendedOutputChannels = Math.max(this.suspendedOutputChannels, 
+				newSuspendedOutputChannels = Math.max(newSuspendedOutputChannels, 
 						this.getNumberOfOutputChannels() - index);
 			} else {
 				if (index == this.getNumberOfActiveOutputChannels()) {
 					
-					int walk = index;
-					while(!this.getOutputChannel(walk).isSuspended()) {
-						this.suspendedOutputChannels--;
-						walk++;
+					for(int i=index; i<this.getNumberOfOutputChannels(); i++) {
+						if (this.getOutputChannel(i).isSuspended()) {
+							break;
+						}
+						newSuspendedOutputChannels--;
 					}
 				}
 			}
+			this.suspendedOutputChannels = newSuspendedOutputChannels;
 		}
 	}
 

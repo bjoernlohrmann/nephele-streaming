@@ -210,6 +210,12 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 
 		if (event instanceof AbstractTaskEvent) {
 			getOutputGate().deliverEvent((AbstractTaskEvent) event);
+		} else if (event instanceof ChannelSuspendEvent) {
+			getOutputGate().setOutputChannelSuspended(this.getChannelIndex(),
+					true);
+		} else if (event instanceof ChannelUnsuspendEvent) {
+			getOutputGate().setOutputChannelSuspended(this.getChannelIndex(),
+					false);
 		} else {
 			LOG.error("Channel " + getID() + " received unknown event " + event);
 		}
@@ -220,7 +226,6 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 	 */
 	@Override
 	public void transferEvent(AbstractEvent event) throws IOException, InterruptedException {
-
 		flush();
 		this.outputChannelBroker.transferEventToInputChannel(event);
 	}

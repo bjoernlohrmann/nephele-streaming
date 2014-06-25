@@ -131,6 +131,5 @@ public interface InputGate<T extends Record> extends Gate<T> {
   
   int getNumberOfActiveInputChannels();
 
-	void setInputChannelSuspended(int index, boolean isSuspended,
-			boolean notifyOtherSide) throws IOException, InterruptedException;
+  void setInputChannelSuspended(int index, boolean isSuspended);
 }

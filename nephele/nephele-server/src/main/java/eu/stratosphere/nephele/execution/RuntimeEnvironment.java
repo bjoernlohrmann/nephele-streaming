@@ -28,6 +28,7 @@ import eu.stratosphere.nephele.io.RuntimeInputGate;
 import eu.stratosphere.nephele.io.RuntimeOutputGate;
 import eu.stratosphere.nephele.io.channels.ChannelID;
 import eu.stratosphere.nephele.io.channels.ChannelType;
+import eu.stratosphere.nephele.io.channels.bytebuffered.ChannelUnsuspendEvent;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.services.iomanager.IOManager;
 import eu.stratosphere.nephele.services.memorymanager.MemoryManager;
@@ -251,8 +252,7 @@ public class RuntimeEnvironment implements Environment, Runnable {
 						throw new IllegalStateException("Unknown channel type");
 				}
 				
-				boolean notifyOtherSide = !cdd.isSuspended();
-				og.setOutputChannelSuspended(j, cdd.isSuspended(), notifyOtherSide);
+				og.setOutputChannelSuspended(j, cdd.isSuspended());
 			}			
 		}
 
@@ -277,8 +277,7 @@ public class RuntimeEnvironment implements Environment, Runnable {
 					default:
 						throw new IllegalStateException("Unknown channel type");
 				}
-				boolean notifyOtherSide = !cdd.isSuspended();
-				ig.setInputChannelSuspended(j, cdd.isSuspended(), notifyOtherSide);
+				ig.setInputChannelSuspended(j, cdd.isSuspended());
 			}
 		}
 	}
@@ -336,10 +335,9 @@ public class RuntimeEnvironment implements Environment, Runnable {
 			return;
 		}
 
-		try {
-
-			// Activate input channels
-			// activateInputChannels();
+		try {	
+			announceUnsuspendedChannels();
+		
 			this.invokable.invoke();
 
 			// Make sure, we enter the catch block when the task has been canceled
@@ -405,6 +403,22 @@ public class RuntimeEnvironment implements Environment, Runnable {
 
 		// Finally, switch execution state to FINISHED and report to job manager
 		changeExecutionState(ExecutionState.FINISHED, null);
+	}
+
+	private void announceUnsuspendedChannels() throws IOException,
+			InterruptedException {
+
+		for (OutputGate<?> gate : this.outputGates) {
+			for(int i=0; i<gate.getNumberOfActiveOutputChannels(); i++) {
+				gate.getOutputChannel(i).transferEvent(new ChannelUnsuspendEvent());
+			}
+		}
+		
+		for (InputGate<?> gate : this.inputGates) {
+			for(int i=0; i<gate.getNumberOfActiveInputChannels(); i++) {
+				gate.getInputChannel(i).transferEvent(new ChannelUnsuspendEvent());
+			}
+		}
 	}
 
 	/**

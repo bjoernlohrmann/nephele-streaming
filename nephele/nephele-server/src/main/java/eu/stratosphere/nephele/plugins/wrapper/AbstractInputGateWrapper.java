@@ -263,9 +263,8 @@ public abstract class AbstractInputGateWrapper<T extends Record> implements
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void setInputChannelSuspended(int index, boolean isSuspended,
-			boolean notify) throws IOException, InterruptedException {
-		this.getWrappedInputGate().setInputChannelSuspended(index, isSuspended, notify);
+	public void setInputChannelSuspended(int index, boolean isSuspended) {
+		this.getWrappedInputGate().setInputChannelSuspended(index, isSuspended);
 	}
 	
 	/**

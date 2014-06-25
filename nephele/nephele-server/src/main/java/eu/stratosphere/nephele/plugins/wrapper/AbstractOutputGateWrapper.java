@@ -305,9 +305,8 @@ public abstract class AbstractOutputGateWrapper<T extends Record> implements Out
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void setOutputChannelSuspended(int index, boolean isSuspended,
-			boolean notify) throws IOException, InterruptedException {
-		this.getWrappedOutputGate().setOutputChannelSuspended(index, isSuspended, notify);
+	public void setOutputChannelSuspended(int index, boolean isSuspended) {
+		this.getWrappedOutputGate().setOutputChannelSuspended(index, isSuspended);
 	}
 	
 	/**

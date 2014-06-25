@@ -23,6 +23,8 @@ import eu.stratosphere.nephele.io.channels.Buffer;
 import eu.stratosphere.nephele.io.channels.bytebuffered.AbstractByteBufferedOutputChannel;
 import eu.stratosphere.nephele.io.channels.bytebuffered.ByteBufferedChannelCloseEvent;
 import eu.stratosphere.nephele.io.channels.bytebuffered.ByteBufferedOutputChannelBroker;
+import eu.stratosphere.nephele.io.channels.bytebuffered.ChannelSuspendEvent;
+import eu.stratosphere.nephele.io.channels.bytebuffered.ChannelUnsuspendEvent;
 import eu.stratosphere.nephele.taskmanager.bytebuffered.AbstractOutputChannelForwarder;
 import eu.stratosphere.nephele.taskmanager.bytebuffered.OutputChannelForwardingChain;
 import eu.stratosphere.nephele.taskmanager.bytebuffered.ReceiverNotFoundEvent;
@@ -121,6 +123,8 @@ final class RuntimeOutputChannelBroker extends AbstractOutputChannelForwarder im
 			this.closeAcknowledgmentReceived = true;
 		} else if (event instanceof ReceiverNotFoundEvent) {
 			this.lastSequenceNumberWithReceiverNotFound = ((ReceiverNotFoundEvent) event).getSequenceNumber();
+		} else if (event instanceof ChannelSuspendEvent || event instanceof ChannelUnsuspendEvent) {
+			this.byteBufferedOutputChannel.processEvent(event);
 		} else if (event instanceof AbstractTaskEvent) {
 			throw new IllegalStateException("Received synchronous task event " + event);
 		}
