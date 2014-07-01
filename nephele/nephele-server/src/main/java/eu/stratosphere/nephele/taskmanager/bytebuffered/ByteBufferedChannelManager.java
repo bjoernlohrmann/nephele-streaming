@@ -468,21 +468,11 @@ public final class ByteBufferedChannelManager implements TransferEnvelopeDispatc
 	}
 
 	private void addReceiverListHint(final ChannelID source, final ChannelID localReceiver) {
-
-		final TransferEnvelopeReceiverList receiverList = new TransferEnvelopeReceiverList(localReceiver);
-
-		if (this.receiverCache.put(source, receiverList) != null) {
-			LOG.warn("Receiver cache already contained entry for " + source);
-		}
+		this.receiverCache.put(source, new TransferEnvelopeReceiverList(localReceiver));
 	}
 
 	private void addReceiverListHint(final ChannelID source, final RemoteReceiver remoteReceiver) {
-
-		final TransferEnvelopeReceiverList receiverList = new TransferEnvelopeReceiverList(remoteReceiver);
-
-		if (this.receiverCache.put(source, receiverList) != null) {
-			LOG.warn("Receiver cache already contained entry for " + source);
-		}
+		this.receiverCache.put(source, new TransferEnvelopeReceiverList(remoteReceiver));
 	}
 
 	private void generateSenderHint(final TransferEnvelope transferEnvelope, final List<RemoteReceiver> remoteReceivers) {

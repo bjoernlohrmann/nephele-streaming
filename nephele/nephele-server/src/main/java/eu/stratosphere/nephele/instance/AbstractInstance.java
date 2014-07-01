@@ -37,6 +37,7 @@ import eu.stratosphere.nephele.protocols.TaskOperationProtocol;
 import eu.stratosphere.nephele.taskmanager.TaskCancelResult;
 import eu.stratosphere.nephele.taskmanager.TaskKillResult;
 import eu.stratosphere.nephele.taskmanager.TaskSubmissionResult;
+import eu.stratosphere.nephele.taskmanager.TaskSuspendResult;
 import eu.stratosphere.nephele.topology.NetworkNode;
 import eu.stratosphere.nephele.topology.NetworkTopology;
 
@@ -259,6 +260,21 @@ public abstract class AbstractInstance extends NetworkNode {
 	public synchronized TaskKillResult killTask(final ExecutionVertexID id) throws IOException {
 
 		return getTaskManagerProxy().killTask(id);
+	}
+
+	/**
+	 * Suspends the task identified by the given ID at the instance's
+	 * {@link eu.stratosphere.nephele.taskmanager.TaskManager}.
+	 * 
+	 * @param id
+	 *        the ID identifying the task to be suspended
+	 * @throws IOException
+	 *         thrown if an error occurs while transmitting the request or receiving the response
+	 * @return the result of the suspend attempt
+	 */
+	public synchronized TaskSuspendResult suspendTask(final ExecutionVertexID id) throws IOException {
+
+		return getTaskManagerProxy().suspendTask(id);
 	}
 
 	/**

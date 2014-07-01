@@ -58,6 +58,8 @@ public final class RuntimeTask implements Task, ExecutionObserver {
 	 * Stores whether the task has been canceled.
 	 */
 	private volatile boolean isCanceled = false;
+	
+	private volatile boolean isSuspended = false;
 
 	/**
 	 * The current execution state of the task
@@ -277,6 +279,14 @@ public final class RuntimeTask implements Task, ExecutionObserver {
 	 * {@inheritDoc}
 	 */
 	@Override
+	public boolean isSuspended() {
+		return this.isSuspended;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
 	public boolean isTerminated() {
 
 		final Thread executingThread = this.environment.getExecutingThread();
@@ -378,4 +388,36 @@ public final class RuntimeTask implements Task, ExecutionObserver {
 		return this.executionState;
 	}
 
+	@Override
+	public void suspendExecution() {
+
+		final Thread executingThread = this.environment.getExecutingThread();
+
+		if (executingThread == null) {
+			return;
+		}
+
+		if (this.executionState != ExecutionState.RUNNING) {
+			return;
+		}
+
+		LOG.info("Suspending " + this.environment.getTaskNameWithIndex());
+		this.isSuspended = true;
+
+		executionStateChanged(ExecutionState.SUSPENDING, null);
+
+		// Request user code to suspend
+		try {
+			final AbstractInvokable invokable = this.environment.getInvokable();
+			if (invokable != null) {
+				invokable.suspend();
+			}
+
+			// FIXME: suspension currently only works for tasks with a single
+			// input gate
+			this.environment.getInputGate(0).requestSuspend();
+		} catch (Throwable e) {
+			LOG.error(StringUtils.stringifyException(e));
+		}
+	}
 }

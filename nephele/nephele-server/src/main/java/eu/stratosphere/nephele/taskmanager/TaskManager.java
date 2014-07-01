@@ -689,12 +689,13 @@ public class TaskManager implements TaskOperationProtocol, PluginCommunicationPr
 			final ExecutionState newExecutionState, final String optionalDescription) {
 
 		// Don't propagate state CANCELING back to the job manager
-		if (newExecutionState == ExecutionState.CANCELING) {
+		if (newExecutionState == ExecutionState.CANCELING || newExecutionState == ExecutionState.SUSPENDING) {
 			return;
 		}
 
 		if (newExecutionState == ExecutionState.FINISHED || newExecutionState == ExecutionState.CANCELED
-				|| newExecutionState == ExecutionState.FAILED) {
+				|| newExecutionState == ExecutionState.FAILED
+				|| newExecutionState == ExecutionState.SUSPENDED) {
 
 			// Unregister the task (free all buffers, remove all channels, task-specific class loaders, etc...)
 			unregisterTask(id);
@@ -941,5 +942,33 @@ public class TaskManager implements TaskOperationProtocol, PluginCommunicationPr
 				throw new Exception("Temporary file directory #" + (i + 1) + " is not writable.");
 			}
 		}
+	}
+
+	@Override
+	public TaskSuspendResult suspendTask(ExecutionVertexID id)
+			throws IOException {
+		
+		final Task task = this.runningTasks.get(id);
+
+		if (task == null) {
+			final TaskSuspendResult taskKillResult = new TaskSuspendResult(id,
+					AbstractTaskResult.ReturnCode.TASK_NOT_FOUND);
+			taskKillResult.setDescription("No task with ID + " + id + " is currently running");
+			return taskKillResult;
+		}
+
+		// Pass call to executor service so IPC thread can return immediately
+		final Runnable r = new Runnable() {
+
+			@Override
+			public void run() {
+				// Finally, request user code to suspend
+				task.suspendExecution();
+			}
+		};
+
+		this.executorService.execute(r);
+
+		return new TaskSuspendResult(id, AbstractTaskResult.ReturnCode.SUCCESS);
 	}
 }

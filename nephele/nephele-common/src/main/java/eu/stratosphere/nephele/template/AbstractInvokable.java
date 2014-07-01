@@ -178,4 +178,15 @@ public abstract class AbstractInvokable {
 
 		// The default implementation does nothing.
 	}
+
+	/**
+	 * This method is called when a task is suspended. It can be overwritten to respond to suspend the
+	 * user code properly.
+	 * 
+	 * @throws Exception
+	 *         thrown if any exception occurs during the execution of the user code
+	 */
+	public void suspend() {
+		// The default implementation does nothing.	
+	}
 }

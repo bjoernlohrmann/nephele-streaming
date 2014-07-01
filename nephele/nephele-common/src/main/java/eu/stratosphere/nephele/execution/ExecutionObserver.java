@@ -49,4 +49,11 @@ public interface ExecutionObserver {
 	 * @return <code>true</code> if the task has been canceled, <code>false</code> otherwise
 	 */
 	boolean isCanceled();
+
+	/**
+	 * Returns whether the task has been suspended.
+	 * 
+	 * @return <code>true</code> if the task has been suspended, <code>false</code> otherwise
+	 */
+	boolean isSuspended();
 }

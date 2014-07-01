@@ -15,12 +15,16 @@
 
 package eu.stratosphere.nephele.io;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import eu.stratosphere.nephele.event.task.AbstractTaskEvent;
 import eu.stratosphere.nephele.event.task.EventListener;
 import eu.stratosphere.nephele.event.task.EventNotificationManager;
 import eu.stratosphere.nephele.io.channels.ChannelType;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.types.Record;
+import eu.stratosphere.nephele.util.AtomicEnum;
 
 /**
  * In Nephele a gate represents the connection between a user program and the processing framework. A gate
@@ -35,6 +39,11 @@ import eu.stratosphere.nephele.types.Record;
  *        the record type to be transported from this gate
  */
 public abstract class AbstractGate<T extends Record> implements Gate<T> {
+	
+	/**
+	 * The log object used for debugging.
+	 */
+	private static final Log LOG = LogFactory.getLog(AbstractGate.class);
 
 	/**
 	 * The ID of the job this gate belongs to.
@@ -60,6 +69,10 @@ public abstract class AbstractGate<T extends Record> implements Gate<T> {
 	 * The type of input/output channels connected to this gate.
 	 */
 	private ChannelType channelType = ChannelType.NETWORK;
+	
+	private AtomicEnum<GateState> gateState = new AtomicEnum<GateState>(
+			GateState.RUNNING);
+
 
 	/**
 	 * Constructs a new abstract gate
@@ -165,5 +178,26 @@ public abstract class AbstractGate<T extends Record> implements Gate<T> {
 	public GateID getGateID() {
 
 		return this.gateID;
+	}
+	  
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public GateState getGateState() {
+		return this.gateState.get();
+	}
+	
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public boolean updateGateState(GateState oldState, GateState newState) {
+		boolean result = this.gateState.compareAndSet(oldState, newState);
+		if (!result) {
+			LOG.error(String.format("Could not switch %s gate to %s",
+					this.getGateState(), newState), new Exception("foobar"));
+		}
+		return result;
 	}
 }

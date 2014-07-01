@@ -20,10 +20,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import eu.stratosphere.nephele.event.task.AbstractTaskEvent;
+import eu.stratosphere.nephele.execution.Environment;
 import eu.stratosphere.nephele.io.channels.AbstractOutputChannel;
 import eu.stratosphere.nephele.io.channels.ChannelID;
 import eu.stratosphere.nephele.io.channels.ChannelType;
@@ -46,16 +44,11 @@ import eu.stratosphere.nephele.types.Record;
 public class RuntimeOutputGate<T extends Record> extends AbstractGate<T> implements OutputGate<T> {
 
 	/**
-	 * The log object used for debugging.
-	 */
-	private static final Log LOG = LogFactory.getLog(OutputGate.class);
-
-	/**
 	 * The list of output channels attached to this gate.
 	 */
 	private final ArrayList<AbstractOutputChannel<T>> outputChannels = new ArrayList<AbstractOutputChannel<T>>();
 	
-	private volatile int suspendedOutputChannels = 0;
+	private volatile int activeOutputChannels = 0;
 
 	/**
 	 * Channel selector to determine which channel is supposed receive the next record.
@@ -126,36 +119,8 @@ public class RuntimeOutputGate<T extends Record> extends AbstractGate<T> impleme
 	private void addOutputChannel(AbstractOutputChannel<T> outputChannel) {
 		if (!this.outputChannels.contains(outputChannel)) {
 			this.outputChannels.add(outputChannel);
+			this.activeOutputChannels++;
 		}
-	}
-
-	/**
-	 * Removes the output channel with the given ID from the output gate if it
-	 * exists.
-	 * 
-	 * @param outputChannelID
-	 *        the ID of the channel to be removed
-	 */
-	public void removeOutputChannel(ChannelID outputChannelID) {
-
-		for (int i = 0; i < this.outputChannels.size(); i++) {
-
-			final AbstractOutputChannel<T> outputChannel = this.outputChannels.get(i);
-			if (outputChannel.getID().equals(outputChannelID)) {
-				this.outputChannels.remove(i);
-				return;
-			}
-		}
-
-		LOG.debug("Cannot find output channel with ID " + outputChannelID + " to remove");
-	}
-
-	/**
-	 * Removes all output channels from the output gate.
-	 */
-	public void removeAllOutputChannels() {
-
-		this.outputChannels.clear();
 	}
 
 	/**
@@ -372,40 +337,76 @@ public class RuntimeOutputGate<T extends Record> extends AbstractGate<T> impleme
 		// Nothing to do here
 	}
 
+	/**
+	 * Marks the output channel with the given index as suspended and recomputes the gate's
+	 * number of active output channels.
+	 */
 	@Override
-	public void setOutputChannelSuspended(int index, boolean isSuspended) {
+	public synchronized void setOutputChannelSuspended(int index, boolean isSuspended) {
 
 		if (isSuspended != this.getOutputChannel(index).isSuspended()) {
 			this.getOutputChannel(index).setSuspended(isSuspended);
-						
-			// channel (un)suspension may occur out of order. For example unsuspension
-			// for channel 10 can occur before channel 9 is unsuspended. Unfortunately
-			// the channel selector interface does not offer a way to signal which channel
-			// index specifically is suspended and which not. This means that in the above example
-			// we cannot start using channel 10 while channel 9 is still suspended.
 			
-			
-			int newSuspendedOutputChannels = this.suspendedOutputChannels;
-			if (isSuspended) {
-				newSuspendedOutputChannels = Math.max(newSuspendedOutputChannels, 
-						this.getNumberOfOutputChannels() - index);
-			} else {
-				if (index == this.getNumberOfActiveOutputChannels()) {
-					
-					for(int i=index; i<this.getNumberOfOutputChannels(); i++) {
-						if (this.getOutputChannel(i).isSuspended()) {
-							break;
-						}
-						newSuspendedOutputChannels--;
-					}
+			switch(this.getGateState()) {
+			case RUNNING:
+				// channel (un)suspension may occur out of order. For example unsuspension
+				// for channel 10 can occur before channel 9 is unsuspended. Unfortunately
+				// the channel selector interface does not offer a way to signal which channel
+				// index specifically is suspended and which not. This means that in the above example
+				// channel 10 is unusable despite being unsuspended (and channel 9 unusable & suspended).
+				this.activeOutputChannels = countUsableOutputChannels();
+				break;
+			case DRAINING:
+				this.activeOutputChannels = countUnsuspendedOutputChannels();
+				if (this.activeOutputChannels == 0) {
+					this.updateGateState(GateState.DRAINING,
+							GateState.SUSPENDED);
 				}
+				break;
+			default:
+				break;
 			}
-			this.suspendedOutputChannels = newSuspendedOutputChannels;
 		}
+	}
+
+	private int countUnsuspendedOutputChannels() {
+		int unsuspendedOutputChannels = 0;
+		for (int i = 0; i < this.outputChannels.size(); i++) {
+			if (!this.getOutputChannel(i).isSuspended()) {
+				unsuspendedOutputChannels++;
+			}
+		}
+		return unsuspendedOutputChannels;
+	}
+
+	private int countUsableOutputChannels() {
+		int usableOutputChannels = 0;
+		for (int i = 0; i < this.outputChannels.size(); i++) {
+			if (this.getOutputChannel(i).isSuspended()) {
+				break;
+			}
+			usableOutputChannels++;
+		}
+		return usableOutputChannels;
 	}
 
 	@Override
 	public int getNumberOfActiveOutputChannels() {
-		return this.outputChannels.size() - this.suspendedOutputChannels;
+		return this.activeOutputChannels;
+	}
+
+	@Override
+	public void requestSuspend() throws IOException, InterruptedException {
+		if (this.getGateState() != GateState.RUNNING) {
+			return;
+		}
+		
+		this.updateGateState(GateState.RUNNING, GateState.DRAINING);
+
+		for (AbstractOutputChannel<?> outputChannel : this.outputChannels) {
+			if (!outputChannel.isSuspended()) {
+				outputChannel.requestSuspend();
+			}
+		}
 	}
 }

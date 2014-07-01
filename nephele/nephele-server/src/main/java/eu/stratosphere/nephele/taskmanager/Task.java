@@ -78,6 +78,12 @@ public interface Task {
 	void killExecution();
 
 	/**
+	 * Suspends the task (i.e. suspends its input channels, waits until all queued input has
+	 * been processed and then interrupts the execution thread). 
+	 */
+	void suspendExecution();
+
+	/**
 	 * Registers the task manager profiler with the task.
 	 * 
 	 * @param taskManagerProfiler

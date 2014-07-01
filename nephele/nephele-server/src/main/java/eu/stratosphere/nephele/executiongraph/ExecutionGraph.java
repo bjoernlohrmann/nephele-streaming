@@ -28,6 +28,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.logging.Log;
@@ -1443,7 +1444,7 @@ public class ExecutionGraph implements ExecutionListener {
 	 * @param command
 	 *        the update command to be asynchronously executed on this graph
 	 */
-	public void executeCommand(final Runnable command) {
+	public Future<?> executeCommand(final Runnable command) {
 		Runnable wrapper = new Runnable() {
 			
 			@Override
@@ -1451,11 +1452,12 @@ public class ExecutionGraph implements ExecutionListener {
 				try {
 					command.run();
 				} catch(Exception e) {
-					LOG.error(e);
+					LOG.error("Exception while performing operation on execution graph", e);
+					throw new RuntimeException(e);
 				}
 			}
 		};
 
-		this.executorService.execute(wrapper);
+		return this.executorService.submit(wrapper);
 	}
 }

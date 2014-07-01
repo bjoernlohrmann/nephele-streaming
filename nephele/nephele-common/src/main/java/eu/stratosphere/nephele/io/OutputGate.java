@@ -113,10 +113,6 @@ public interface OutputGate<T extends Record> extends Gate<T> {
 	 */
 	void requestClose() throws IOException, InterruptedException;
 
-	/**
-	 * Removes all output channels from the output gate.
-	 */
-	void removeAllOutputChannels();
 
 	/**
 	 * Creates a new network output channel and assigns it to the given output gate.

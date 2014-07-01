@@ -30,6 +30,7 @@ import eu.stratosphere.nephele.io.channels.ChannelType;
 import eu.stratosphere.nephele.io.channels.bytebuffered.AbstractByteBufferedInputChannel;
 import eu.stratosphere.nephele.io.channels.bytebuffered.BufferOrEvent;
 import eu.stratosphere.nephele.io.channels.bytebuffered.ByteBufferedInputChannelBroker;
+import eu.stratosphere.nephele.io.channels.bytebuffered.ChannelSuspendConfirmEvent;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.taskmanager.bufferprovider.BufferAvailabilityListener;
 import eu.stratosphere.nephele.taskmanager.bytebuffered.InputChannelContext;
@@ -116,6 +117,10 @@ final class RuntimeInputChannelContext implements InputChannelContext, ByteBuffe
 
 	@Override
 	public void transferEventToOutputChannel(AbstractEvent event) throws IOException, InterruptedException {
+		if (event instanceof ChannelSuspendConfirmEvent) {
+			this.lastReceivedEnvelope = -1;
+		}
+		
 		TransferEnvelope ephemeralTransferEnvelope = new TransferEnvelope(0, getJobID(), getChannelID());
 		ephemeralTransferEnvelope.addEvent(event);
 		

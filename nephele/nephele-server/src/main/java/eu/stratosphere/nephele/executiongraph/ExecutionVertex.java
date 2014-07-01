@@ -46,6 +46,7 @@ import eu.stratosphere.nephele.taskmanager.AbstractTaskResult.ReturnCode;
 import eu.stratosphere.nephele.taskmanager.TaskCancelResult;
 import eu.stratosphere.nephele.taskmanager.TaskKillResult;
 import eu.stratosphere.nephele.taskmanager.TaskSubmissionResult;
+import eu.stratosphere.nephele.taskmanager.TaskSuspendResult;
 import eu.stratosphere.nephele.util.AtomicEnum;
 import eu.stratosphere.nephele.util.SerializableArrayList;
 import eu.stratosphere.nephele.util.SerializableHashMap;
@@ -737,6 +738,33 @@ public final class ExecutionVertex {
 			result.setDescription(StringUtils.stringifyException(e));
 			return result;
 		}
+	}
+	
+	public TaskSuspendResult suspendTask() {
+		final ExecutionState state = this.executionState.get();
+
+		if (state != ExecutionState.RUNNING) {
+			final TaskSuspendResult result = new TaskSuspendResult(getID(), AbstractTaskResult.ReturnCode.ILLEGAL_STATE);
+			result.setDescription("Vertex " + this.toString() + " is in state " + state);
+			return result;
+		}
+
+		final AllocatedResource ar = this.allocatedResource.get();
+
+		if (ar == null) {
+			final TaskSuspendResult result = new TaskSuspendResult(getID(), AbstractTaskResult.ReturnCode.NO_INSTANCE);
+			result.setDescription("Assigned instance of vertex " + this.toString() + " is null!");
+			return result;
+		}
+
+		try {
+			return ar.getInstance().suspendTask(this.vertexID);
+		} catch (IOException e) {
+			final TaskSuspendResult result = new TaskSuspendResult(getID(), AbstractTaskResult.ReturnCode.IPC_ERROR);
+			result.setDescription(StringUtils.stringifyException(e));
+			return result;
+		}
+		
 	}
 
 	/**

@@ -124,4 +124,15 @@ public interface Gate<T extends Record> {
 	 *        the type of input/output channels which are connected to this gate
 	 */
 	void setChannelType(ChannelType channelType);
+	
+	public enum GateState {
+		RUNNING, SUSPENDING, DRAINING, SUSPENDED
+	}
+	
+	void requestSuspend() throws IOException, InterruptedException;
+	  
+	GateState getGateState();
+	
+	boolean updateGateState(GateState oldState, GateState newState);
+
 }

@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -52,6 +53,8 @@ import eu.stratosphere.nephele.instance.InstanceType;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.jobmanager.DeploymentManager;
+import eu.stratosphere.nephele.taskmanager.AbstractTaskResult.ReturnCode;
+import eu.stratosphere.nephele.taskmanager.TaskSuspendResult;
 import eu.stratosphere.nephele.util.StringUtils;
 
 /**
@@ -701,7 +704,7 @@ public abstract class AbstractScheduler implements InstanceListener {
 	}
 	
 	public void scaleUpElasticTask(JobID jobID, JobVertexID jobVertexID,
-			final int noOfSubtasksToStart) {
+			final int noOfSubtasksToStart) throws Exception {
 
 		final ExecutionGraph graph = getExecutionGraphByID(jobID);
 		final ExecutionGroupVertex groupVertex = getExecutionGroupVertex(
@@ -739,7 +742,17 @@ public abstract class AbstractScheduler implements InstanceListener {
 			}
 		};
 
-		graph.executeCommand(command);
+		try {
+			graph.executeCommand(command).get();
+		} catch (ExecutionException e) {
+			RuntimeException cause = (RuntimeException) e.getCause();
+			throw cause;
+		}
+
+		waitForStableState(groupVertex);
+		groupVertex.setCurrentElasticNumberOfRunningSubtasks(groupVertex
+				.getCurrentElasticNumberOfRunningSubtasks()
+				+ noOfSubtasksToStart);
 	}
 
 	private ExecutionGroupVertex getExecutionGroupVertex(
@@ -758,8 +771,74 @@ public abstract class AbstractScheduler implements InstanceListener {
 	}
 
 	public void scaleDownElasticTask(JobID jobID, JobVertexID jobVertexID,
-			int noOfubtasksToSuspend) {
+			final int noOfSubtasksToSuspend) throws Exception {
 
+		final ExecutionGraph graph = getExecutionGraphByID(jobID);
+		final ExecutionGroupVertex groupVertex = getExecutionGroupVertex(
+				jobVertexID, graph);
+
+		if (groupVertex.getCurrentElasticNumberOfRunningSubtasks()
+				- noOfSubtasksToSuspend < groupVertex
+					.getMinElasticNumberOfRunningSubtasks()) {
+			throw new RuntimeException(
+					"Not enough subtasks to suspend available. This is a bug.");
+		}
+
+		for (int i = 0; i < noOfSubtasksToSuspend; i++) {
+			int idxToSuspend = groupVertex
+					.getCurrentElasticNumberOfRunningSubtasks() - (i+1);
+			final ExecutionVertex toSuspend = groupVertex
+					.getGroupMember(idxToSuspend);
+
+			Runnable command = new Runnable() {
+				@Override
+				public void run() {
+					TaskSuspendResult result = toSuspend.suspendTask();
+					if (result.getReturnCode() == ReturnCode.SUCCESS) {
+						toSuspend.compareAndUpdateExecutionState(
+								ExecutionState.RUNNING,
+								ExecutionState.SUSPENDING);
+					} else {
+						throw new RuntimeException(String.format(
+								"Failed to suspend task %s",
+								result.getDescription()));
+					}
+				}
+			};
+
+			try {
+				graph.executeCommand(command).get();
+			} catch (ExecutionException e) {
+				RuntimeException cause = (RuntimeException) e.getCause();
+				throw cause;
+			}
+			waitForStableState(groupVertex);
+		}
+		
+		groupVertex.setCurrentElasticNumberOfRunningSubtasks(groupVertex
+				.getCurrentElasticNumberOfRunningSubtasks()
+				- noOfSubtasksToSuspend);
+	}
+
+	private void waitForStableState(ExecutionGroupVertex groupVertex)
+			throws InterruptedException {
+
+		boolean dirty = false;
+		do {
+			dirty = false;
+			for (int i = 0; i < groupVertex.getCurrentNumberOfGroupMembers(); i++) {
+				ExecutionVertex vertex = groupVertex.getGroupMember(i);
+				if (vertex.getExecutionState() != ExecutionState.RUNNING
+						&& vertex.getExecutionState() != ExecutionState.SUSPENDED) {
+					dirty = true;
+					break;
+				}
+			}
+
+			if (dirty) {
+				Thread.sleep(500);
+			}
+		} while (dirty);
 	}
 
 }

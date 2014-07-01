@@ -46,6 +46,10 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 	 * Stores whether the channel is requested to be closed.
 	 */
 	private boolean closeRequested = false;
+	
+	private volatile boolean suspendRequested = false;
+	
+	private volatile boolean receivedChannelSuspendEvent = false;
 
 	/**
 	 * The output channel broker the channel should contact to request and release write buffers.
@@ -121,6 +125,19 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 			}
 		}
 	}
+	
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public void requestSuspend() throws IOException, InterruptedException {
+
+		if (!this.suspendRequested) {
+			this.suspendRequested = true;
+			transferEvent(new ChannelSuspendEvent());
+		}
+	}
+
 
 	/**
 	 * Requests a new write buffer from the framework. This method blocks until the requested buffer is available.
@@ -167,8 +184,8 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 			requestWriteBufferFromBroker();
 		}
 
-		if (this.closeRequested) {
-			throw new IOException("Channel is aready requested to be closed");
+		if (this.closeRequested || this.suspendRequested) {
+			throw new IOException("Channel is aready requested to be closed/suspended");
 		}
 
 		if (this.serializationBuffer.dataLeftFromPreviousSerialization()) {
@@ -192,6 +209,14 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 			releaseWriteBuffer();
 			requestWriteBufferFromBroker();
 		}
+		
+		if (this.receivedChannelSuspendEvent) {
+			getOutputGate().setOutputChannelSuspended(this.getChannelIndex(),
+					true);
+			// send confirmation
+			transferEvent(new ChannelSuspendConfirmEvent());
+			this.receivedChannelSuspendEvent = false;
+		}
 	}
 
 	/**
@@ -210,9 +235,15 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 
 		if (event instanceof AbstractTaskEvent) {
 			getOutputGate().deliverEvent((AbstractTaskEvent) event);
+		} else if (event instanceof ChannelSuspendConfirmEvent) {
+			if (this.suspendRequested) {
+				getOutputGate().setOutputChannelSuspended(
+						this.getChannelIndex(), true);
+			} else {
+				LOG.error("Received unsolicited ChannelSuspendConfirmEvent");
+			}
 		} else if (event instanceof ChannelSuspendEvent) {
-			getOutputGate().setOutputChannelSuspended(this.getChannelIndex(),
-					true);
+			this.receivedChannelSuspendEvent = true;
 		} else if (event instanceof ChannelUnsuspendEvent) {
 			getOutputGate().setOutputChannelSuspended(this.getChannelIndex(),
 					false);

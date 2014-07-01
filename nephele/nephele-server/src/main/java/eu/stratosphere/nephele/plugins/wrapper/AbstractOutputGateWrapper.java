@@ -268,15 +268,6 @@ public abstract class AbstractOutputGateWrapper<T extends Record> implements Out
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void removeAllOutputChannels() {
-
-		this.wrappedOutputGate.removeAllOutputChannels();
-	}
-
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
 	public NetworkOutputChannel<T> createNetworkOutputChannel(final OutputGate<T> outputGate,
 			final ChannelID channelID, final ChannelID connectedChannelID) {
 
@@ -315,5 +306,23 @@ public abstract class AbstractOutputGateWrapper<T extends Record> implements Out
 	@Override
 	public int getNumberOfActiveOutputChannels() {
 		return this.getWrappedOutputGate().getNumberOfActiveOutputChannels();
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */	
+	@Override
+	public void requestSuspend() throws IOException, InterruptedException {
+		this.getWrappedOutputGate().requestSuspend();
+	}
+	
+	@Override
+	public GateState getGateState() {
+		return this.getWrappedOutputGate().getGateState();
+	}
+
+	@Override
+	public boolean updateGateState(GateState oldState, GateState newState) {
+		return this.getWrappedOutputGate().updateGateState(oldState, newState);
 	}
 }

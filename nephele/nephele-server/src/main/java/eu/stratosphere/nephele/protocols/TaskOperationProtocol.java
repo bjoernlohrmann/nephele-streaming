@@ -25,10 +25,10 @@ import eu.stratosphere.nephele.execution.librarycache.LibraryCacheProfileRespons
 import eu.stratosphere.nephele.execution.librarycache.LibraryCacheUpdate;
 import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
 import eu.stratosphere.nephele.io.channels.ChannelID;
-import eu.stratosphere.nephele.protocols.VersionedProtocol;
 import eu.stratosphere.nephele.taskmanager.TaskCancelResult;
 import eu.stratosphere.nephele.taskmanager.TaskKillResult;
 import eu.stratosphere.nephele.taskmanager.TaskSubmissionResult;
+import eu.stratosphere.nephele.taskmanager.TaskSuspendResult;
 
 /**
  * The task submission protocol is implemented by the task manager and allows the job manager
@@ -71,6 +71,15 @@ public interface TaskOperationProtocol extends VersionedProtocol {
 	 *         thrown if an error occurs during this remote procedure call
 	 */
 	TaskKillResult killTask(ExecutionVertexID id) throws IOException;
+	
+	/**
+	 * Advises the task manager to suspend the task with the given ID.
+	 *  
+	 * @param id
+	 * @return
+	 * @throws IOException
+	 */
+	TaskSuspendResult suspendTask(ExecutionVertexID id) throws IOException;
 
 	/**
 	 * Queries the task manager about the cache status of the libraries stated in the {@link LibraryCacheProfileRequest}

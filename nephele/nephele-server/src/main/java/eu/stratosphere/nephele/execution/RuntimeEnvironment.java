@@ -20,6 +20,7 @@ import eu.stratosphere.nephele.deployment.ChannelDeploymentDescriptor;
 import eu.stratosphere.nephele.deployment.GateDeploymentDescriptor;
 import eu.stratosphere.nephele.deployment.TaskDeploymentDescriptor;
 import eu.stratosphere.nephele.io.ChannelSelector;
+import eu.stratosphere.nephele.io.Gate.GateState;
 import eu.stratosphere.nephele.io.GateID;
 import eu.stratosphere.nephele.io.InputGate;
 import eu.stratosphere.nephele.io.OutputGate;
@@ -252,7 +253,9 @@ public class RuntimeEnvironment implements Environment, Runnable {
 						throw new IllegalStateException("Unknown channel type");
 				}
 				
-				og.setOutputChannelSuspended(j, cdd.isSuspended());
+				if (cdd.isSuspended()) {
+					og.setOutputChannelSuspended(j, true);
+				}
 			}			
 		}
 
@@ -277,7 +280,10 @@ public class RuntimeEnvironment implements Environment, Runnable {
 					default:
 						throw new IllegalStateException("Unknown channel type");
 				}
-				ig.setInputChannelSuspended(j, cdd.isSuspended());
+
+				if (cdd.isSuspended()) {
+					ig.setInputChannelSuspended(j, true);
+				}
 			}
 		}
 	}
@@ -368,41 +374,64 @@ public class RuntimeEnvironment implements Environment, Runnable {
 
 			return;
 		}
-
-		// Task finished running, but there may be unconsumed output data in some of the channels
-		changeExecutionState(ExecutionState.FINISHING, null);
-
+		
 		try {
-			// If there is any unclosed input gate, close it and propagate close operation to corresponding output gate
-			closeInputGates();
-
-			// First, close all output gates to indicate no records will be emitted anymore
-			requestAllOutputGatesToClose();
-
-			// Wait until all input channels are closed
-			waitForInputChannelsToBeClosed();
-
-			// Now we wait until all output channels have written out their data and are closed
-			waitForOutputChannelsToBeClosed();
+			if (this.executionObserver.isSuspended()) {
+				finalizeSuspend();
+			} else {
+				finalizeFinish();
+			}
 		} catch (Throwable t) {
-
-			// Release all resources that may currently be allocated by the individual channels
-			releaseAllChannelResources();
-
 			if (this.executionObserver.isCanceled()) {
 				changeExecutionState(ExecutionState.CANCELED, null);
 			} else {
 				changeExecutionState(ExecutionState.FAILED, StringUtils.stringifyException(t));
 			}
-
-			return;
+		} finally {
+			// Release all resources that may currently be allocated by the individual channels
+			releaseAllChannelResources();
 		}
+	}
 
-		// Release all resources that may currently be allocated by the individual channels
-		releaseAllChannelResources();
+	private void finalizeFinish() throws IOException, InterruptedException {
+		// Task finished running, but there may be unconsumed output data in some of the channels
+		changeExecutionState(ExecutionState.FINISHING, null);
+		
+		// If there is any unclosed input gate, close it and propagate close operation to corresponding output gate
+		closeInputGates();
 
+		// First, close all output gates to indicate no records will be emitted anymore
+		requestAllOutputGatesToClose();
+
+		// Wait until all input channels are closed
+		waitForInputChannelsToBeClosed();
+
+		// Now we wait until all output channels have written out their data and are closed
+		waitForOutputChannelsToBeClosed();
+		
 		// Finally, switch execution state to FINISHED and report to job manager
 		changeExecutionState(ExecutionState.FINISHED, null);
+	}
+
+	private void finalizeSuspend() throws IOException, InterruptedException {
+		
+		// input gates have already been suspended, therefore we only need
+		// to suspend output gates
+		suspendAllOutputGates();
+		
+		// Finally, switch execution state to FINISHED and report to job manager
+		changeExecutionState(ExecutionState.SUSPENDED, null);		
+	}
+
+	private void suspendAllOutputGates() throws IOException,
+			InterruptedException {
+		
+		for (int i = 0; i < this.outputGates.size(); i++) {
+			this.outputGates.get(i).requestSuspend();
+			while (this.outputGates.get(i).getGateState() != GateState.SUSPENDED) {
+				Thread.sleep(500);
+			}
+		}
 	}
 
 	private void announceUnsuspendedChannels() throws IOException,

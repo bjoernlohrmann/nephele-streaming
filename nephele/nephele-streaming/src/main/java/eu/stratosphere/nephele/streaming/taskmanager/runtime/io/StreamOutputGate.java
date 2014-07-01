@@ -222,14 +222,4 @@ public final class StreamOutputGate<T extends Record> extends
 	public ChannelSelector<T> getChannelSelector() {
 		return this.streamChannelSelector;
 	}
-
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public void removeAllOutputChannels() {
-		this.outputChannels.clear();
-		this.getWrappedOutputGate().removeAllOutputChannels();
-	}
-
 }

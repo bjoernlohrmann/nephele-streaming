@@ -85,7 +85,8 @@ public abstract class AbstractOutputChannel<T extends Record> extends AbstractCh
 	 *         thrown if an I/O error occurs while requesting the close operation
 	 */
 	public abstract void requestClose() throws IOException, InterruptedException;
-
+	
+	public abstract void requestSuspend() throws IOException, InterruptedException;
 
 	/**
 	 * {@inheritDoc}

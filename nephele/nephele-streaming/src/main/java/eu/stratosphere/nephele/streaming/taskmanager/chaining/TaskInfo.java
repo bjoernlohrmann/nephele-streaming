@@ -167,6 +167,8 @@ public class TaskInfo implements ExecutionListener {
 		case CANCELING:
 		case CANCELED:
 		case FAILED:
+		case SUSPENDING:
+		case SUSPENDED:
 			setEnvironmentThreadSet(null);
 			break;
 		default:

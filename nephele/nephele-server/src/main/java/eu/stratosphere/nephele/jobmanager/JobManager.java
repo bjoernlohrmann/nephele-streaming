@@ -875,7 +875,9 @@ public class JobManager implements DeploymentManager, ExtendedManagementProtocol
 				return ConnectionInfoLookupResponse.createReceiverFoundAndReady();
 			}
 
-			if (executionState != ExecutionState.RUNNING && executionState != ExecutionState.FINISHING) {
+			if (executionState != ExecutionState.RUNNING 
+					&& executionState != ExecutionState.FINISHING
+					&& executionState != ExecutionState.SUSPENDING) {
 				// LOG.info("Created receiverNotReady for " + connectedVertex + " in state " + executionState + " 2");
 				return ConnectionInfoLookupResponse.createReceiverNotReady();
 			}
@@ -906,7 +908,9 @@ public class JobManager implements DeploymentManager, ExtendedManagementProtocol
 			// Check execution state
 			final ExecutionState executionState = targetVertex.getExecutionState();
 
-			if (executionState != ExecutionState.RUNNING && executionState != ExecutionState.FINISHING
+			if (executionState != ExecutionState.RUNNING
+					&& executionState != ExecutionState.SUSPENDING
+					&& executionState != ExecutionState.FINISHING
 					&& executionState != ExecutionState.FINISHED) {
 
 				if (executionState == ExecutionState.ASSIGNED) {

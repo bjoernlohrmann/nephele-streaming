@@ -22,6 +22,7 @@ import eu.stratosphere.nephele.event.task.EventListener;
 import eu.stratosphere.nephele.io.GateID;
 import eu.stratosphere.nephele.io.InputChannelResult;
 import eu.stratosphere.nephele.io.InputGate;
+import eu.stratosphere.nephele.io.RecordAvailabilityListener;
 import eu.stratosphere.nephele.io.channels.AbstractInputChannel;
 import eu.stratosphere.nephele.io.channels.ChannelID;
 import eu.stratosphere.nephele.io.channels.ChannelType;
@@ -237,6 +238,31 @@ public abstract class AbstractInputGateWrapper<T extends Record> implements
 
 	/**
 	 * {@inheritDoc}
+	 */	
+	@Override
+	public void notifyDataUnitConsumed(int channelIndex) {
+		this.wrappedInputGate.notifyDataUnitConsumed(channelIndex);
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public void registerRecordAvailabilityListener(
+			RecordAvailabilityListener<T> listener) {
+		this.wrappedInputGate.registerRecordAvailabilityListener(listener);
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public RecordAvailabilityListener<T> getRecordAvailabilityListener() {
+		return this.wrappedInputGate.getRecordAvailabilityListener();
+	}
+	
+	/**
+	 * {@inheritDoc}
 	 */
 	@Override
 	public NetworkInputChannel<T> createNetworkInputChannel(
@@ -273,5 +299,25 @@ public abstract class AbstractInputGateWrapper<T extends Record> implements
 	@Override
 	public int getNumberOfActiveInputChannels() {
 		return this.getWrappedInputGate().getNumberOfActiveInputChannels();
+	}
+	
+	@Override
+	public void requestSuspend() throws IOException, InterruptedException {
+		this.getWrappedInputGate().requestSuspend();
+	}
+
+	@Override
+	public void handleGateState() throws InterruptedException, IOException {
+		this.getWrappedInputGate().handleGateState();
+	}
+
+	@Override
+	public GateState getGateState() {
+		return this.getWrappedInputGate().getGateState();
+	}
+	
+	@Override
+	public boolean updateGateState(GateState oldState, GateState newState) {
+		return this.getWrappedInputGate().updateGateState(oldState, newState);
 	}
 }

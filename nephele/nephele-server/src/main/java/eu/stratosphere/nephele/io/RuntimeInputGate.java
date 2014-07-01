@@ -15,23 +15,22 @@
 
 package eu.stratosphere.nephele.io;
 
-import eu.stratosphere.nephele.event.task.AbstractTaskEvent;
-import eu.stratosphere.nephele.io.channels.AbstractInputChannel;
-import eu.stratosphere.nephele.io.channels.ChannelID;
-import eu.stratosphere.nephele.io.channels.bytebuffered.InMemoryInputChannel;
-import eu.stratosphere.nephele.io.channels.bytebuffered.NetworkInputChannel;
-import eu.stratosphere.nephele.jobgraph.JobID;
-import eu.stratosphere.nephele.types.Record;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicReference;
+
+import eu.stratosphere.nephele.event.task.AbstractTaskEvent;
+import eu.stratosphere.nephele.execution.Environment;
+import eu.stratosphere.nephele.io.channels.AbstractInputChannel;
+import eu.stratosphere.nephele.io.channels.ChannelID;
+import eu.stratosphere.nephele.io.channels.bytebuffered.ChannelSuspendEvent;
+import eu.stratosphere.nephele.io.channels.bytebuffered.InMemoryInputChannel;
+import eu.stratosphere.nephele.io.channels.bytebuffered.NetworkInputChannel;
+import eu.stratosphere.nephele.jobgraph.JobID;
+import eu.stratosphere.nephele.types.Record;
 
 /**
  * In Nephele input gates are a specialization of general gates and connect
@@ -46,12 +45,7 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class RuntimeInputGate<T extends Record> extends AbstractGate<T>
 		implements InputGate<T> {
-
-	/**
-	 * The log object used for debugging.
-	 */
-	private static final Log LOG = LogFactory.getLog(InputGate.class);
-
+	
 	/**
 	 * The deserializer factory used to instantiate the deserializers that
 	 * construct records from byte streams.
@@ -63,7 +57,7 @@ public class RuntimeInputGate<T extends Record> extends AbstractGate<T>
 	 */
 	private final ArrayList<AbstractInputChannel<T>> inputChannels = new ArrayList<AbstractInputChannel<T>>();
 
-	private int suspendedInputChannels = 0;
+	private int activeInputChannels = 0;
 
 	/**
 	 * Queue with indices of channels that store at least one available record.
@@ -123,31 +117,8 @@ public class RuntimeInputGate<T extends Record> extends AbstractGate<T>
 		// quadratic complexity!
 		if (!this.inputChannels.contains(inputChannel)) {
 			this.inputChannels.add(inputChannel);
+			this.activeInputChannels++;
 		}
-	}
-
-	/**
-	 * Removes the input channel with the given ID from the input gate if it
-	 * exists.
-	 * 
-	 * @param inputChannelID
-	 *            the ID of the channel to be removed
-	 */
-	public void removeInputChannel(ChannelID inputChannelID) {
-
-		for (int i = 0; i < this.inputChannels.size(); i++) {
-
-			final AbstractInputChannel<T> inputChannel = this.inputChannels
-					.get(i);
-			if (inputChannel.getID().equals(inputChannelID)) {
-				this.inputChannels.remove(i);
-				return;
-			}
-		}
-
-		if (LOG.isDebugEnabled())
-			LOG.debug("Cannot find output channel with ID " + inputChannelID
-					+ " to remove");
 	}
 
 	@Override
@@ -203,6 +174,8 @@ public class RuntimeInputGate<T extends Record> extends AbstractGate<T>
 	public InputChannelResult readRecord(T target) throws IOException,
 			InterruptedException {
 
+		this.handleGateState();
+		
 		if (this.channelToReadFrom == -1) {
 			if (this.isClosed()) {
 				return InputChannelResult.END_OF_STREAM;
@@ -234,11 +207,18 @@ public class RuntimeInputGate<T extends Record> extends AbstractGate<T>
 											// consumed
 			return InputChannelResult.EVENT;
 
-		case NONE: // internal event or an incomplete record that needs further
-					// chunks
-			// the current unit is exhausted
+		case NONE: 
+			// internal event or an incomplete record that needs further
+			// chunks the current unit is exhausted
 			this.channelToReadFrom = -1;
-			return InputChannelResult.NONE;
+			this.handleGateState();
+			
+			// handleGateState() can declare the gate closed
+			if (this.isClosed()) {
+				return InputChannelResult.END_OF_STREAM;
+			} else {
+				return InputChannelResult.NONE;
+			}
 
 		case END_OF_STREAM: // channel is done
 			this.channelToReadFrom = -1;
@@ -332,10 +312,10 @@ public class RuntimeInputGate<T extends Record> extends AbstractGate<T>
 			InterruptedException {
 
 		// Copy event to all connected channels
-		final Iterator<AbstractInputChannel<T>> it = this.inputChannels
-				.iterator();
-		while (it.hasNext()) {
-			it.next().transferEvent(event);
+		for (AbstractInputChannel<?> inputChannel : this.inputChannels) {
+			if (!inputChannel.isSuspended()) {
+				inputChannel.transferEvent(event);
+			}
 		}
 	}
 
@@ -384,15 +364,41 @@ public class RuntimeInputGate<T extends Record> extends AbstractGate<T>
 	public void setInputChannelSuspended(int index, boolean isSuspended) {
 		if (isSuspended != this.getInputChannel(index).isSuspended()) {
 			this.getInputChannel(index).setSuspended(isSuspended);
-
-			this.suspendedInputChannels = (isSuspended) ? this.suspendedInputChannels + 1
-					: this.suspendedInputChannels - 1;
-
+			
+			this.activeInputChannels = (isSuspended) ? this.activeInputChannels - 1
+					: this.activeInputChannels + 1;
 		}
 	}
 
 	@Override
 	public int getNumberOfActiveInputChannels() {
-		return this.inputChannels.size() - this.suspendedInputChannels;
+		return this.activeInputChannels;
+	}
+
+	@Override
+	public void requestSuspend() throws IOException, InterruptedException {
+		this.updateGateState(GateState.RUNNING, GateState.SUSPENDING);
+	}
+
+	@Override
+	public void handleGateState() throws InterruptedException, IOException {
+		switch (this.getGateState()) {
+		case SUSPENDING:
+			for (AbstractInputChannel<?> inputChannel : this.inputChannels) {
+				if (!inputChannel.isSuspended()) {
+					inputChannel.transferEvent(new ChannelSuspendEvent());
+				}
+			}
+			this.updateGateState(GateState.SUSPENDING, GateState.DRAINING);
+			break;
+		case DRAINING:
+			if (this.activeInputChannels == 0) {
+				this.updateGateState(GateState.DRAINING, GateState.SUSPENDED);
+				this.isClosed = true;
+			}
+			break;
+		default:
+			break;
+		}
 	}
 }

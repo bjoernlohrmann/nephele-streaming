@@ -19,6 +19,7 @@ import java.util.Iterator;
 
 import eu.stratosphere.nephele.event.task.AbstractEvent;
 import eu.stratosphere.nephele.event.task.AbstractTaskEvent;
+import eu.stratosphere.nephele.io.channels.bytebuffered.ChannelSuspendConfirmEvent;
 import eu.stratosphere.nephele.io.channels.bytebuffered.ChannelSuspendEvent;
 import eu.stratosphere.nephele.io.channels.bytebuffered.ChannelUnsuspendEvent;
 import eu.stratosphere.nephele.taskmanager.transferenvelope.TransferEnvelope;
@@ -49,9 +50,10 @@ public abstract class AbstractOutputChannelContext implements OutputChannelConte
 		while (it.hasNext()) {
 
 			final AbstractEvent event = it.next();
-			if (event instanceof AbstractTaskEvent ||
-					event instanceof ChannelUnsuspendEvent ||
-					event instanceof ChannelSuspendEvent) {
+			if (event instanceof AbstractTaskEvent 
+					|| event instanceof ChannelUnsuspendEvent
+					|| event instanceof ChannelSuspendEvent
+					|| event instanceof ChannelSuspendConfirmEvent) {
 				processEventAsynchronously(event);
 			} else {
 				processEventSynchronously(event);
