@@ -114,14 +114,10 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 
 		if (!this.closeRequested) {
 			this.closeRequested = true;
-			if (this.serializationBuffer.dataLeftFromPreviousSerialization()) {
-				// make sure we serialized all data before we send the close event
-				flush();
-			}
+			flush();
 
 			if (getType() == ChannelType.INMEMORY || !isBroadcastChannel() || getChannelIndex() == 0) {
 				transferEvent(new ByteBufferedChannelCloseEvent());
-				flush();
 			}
 		}
 	}
@@ -179,11 +175,6 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 	@Override
 	public void writeRecord(T record) throws IOException, InterruptedException {
 
-		// Get a write buffer from the broker
-		if (this.dataBuffer == null) {
-			requestWriteBufferFromBroker();
-		}
-
 		if (this.closeRequested || this.suspendRequested) {
 			throw new IOException("Channel is aready requested to be closed/suspended");
 		}
@@ -195,19 +186,10 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 
 		this.serializationBuffer.serialize(record);
 
-		while (this.serializationBuffer.dataLeftFromPreviousSerialization()) {
-			this.serializationBuffer.read(this.dataBuffer);
-			if (this.dataBuffer.remaining() == 0) {
-				releaseWriteBuffer();
-				requestWriteBufferFromBroker();
-			}
-		}
-
-		int bytesInBuffer = this.dataBuffer.size()
-				- this.dataBuffer.remaining();
-		if (bytesInBuffer >= this.bufferSizeLimit) {
+		flushSerializationBuffer();
+		
+		if (this.dataBuffer.position() >= this.bufferSizeLimit) {
 			releaseWriteBuffer();
-			requestWriteBufferFromBroker();
 		}
 		
 		if (this.receivedChannelSuspendEvent) {
@@ -216,6 +198,21 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 			// send confirmation
 			transferEvent(new ChannelSuspendConfirmEvent());
 			this.receivedChannelSuspendEvent = false;
+		}
+	}
+
+	private void flushSerializationBuffer() throws InterruptedException, IOException {
+		// Get a write buffer from the broker
+		if (this.dataBuffer == null) {
+			requestWriteBufferFromBroker();
+		}
+		
+		while (this.serializationBuffer.dataLeftFromPreviousSerialization()) {
+			this.serializationBuffer.read(this.dataBuffer);
+			if (this.dataBuffer.remaining() == 0) {
+				releaseWriteBuffer();
+				requestWriteBufferFromBroker();
+			}
 		}
 	}
 
@@ -267,25 +264,18 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 	@Override
 	public void flush() throws IOException, InterruptedException {
 
-		// Get rid of remaining data in the serialization buffer
+		// Get rid of remaining data in the serialization buffer igoring
+		// interrupt signals
 		while (this.serializationBuffer.dataLeftFromPreviousSerialization()) {
-
-			if (this.dataBuffer == null) {
-
 				try {
-					requestWriteBufferFromBroker();
+					flushSerializationBuffer();
 				} catch (InterruptedException e) {
 					LOG.error(e);
 				}
-			}
-			this.serializationBuffer.read(this.dataBuffer);
-			if (this.dataBuffer.remaining() == 0) {
-				releaseWriteBuffer();
-			}
 		}
 
 		// Get rid of the leased write buffer
-		if (this.dataBuffer != null) {
+		if (this.dataBuffer != null && this.dataBuffer.position() > 0) {
 			releaseWriteBuffer();
 		}
 	}
