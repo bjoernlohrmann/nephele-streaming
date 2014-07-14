@@ -119,3 +119,5 @@ plugins.streaming.qosreporter.aggregationinterval: 1000
 plugins.streaming.qosmanager.adjustmentinterval: 10000
 plugins.streaming.qosmanager.logging.buffersfile: /tmp/buffersizes.txt
 plugins.streaming.qosmanager.logging.qos_statistics_filepattern: /tmp/qos_statistics_%s
+plugins.streaming.taskmanager.io.initialTargetOutputBufferLatencyMillis: 40
+plugins.streaming.taskmanager.io.outputBufferSizeAdjustmentIntervalMillis: 2000

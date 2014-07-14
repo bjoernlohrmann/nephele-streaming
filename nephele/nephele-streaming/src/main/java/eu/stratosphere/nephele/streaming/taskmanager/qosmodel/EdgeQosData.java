@@ -31,6 +31,8 @@ public class EdgeQosData {
 	private final static int DEFAULT_NO_OF_STATISTICS_ENTRIES = 4;
 
 	private boolean isInChain;
+	
+	private int targetOutputBufferLatency;
 
 	public EdgeQosData(QosEdge edge, int noOfStatisticsEntries) {
 		this.edge = edge;
@@ -46,6 +48,8 @@ public class EdgeQosData {
 				GlobalConfiguration.getInteger(
 						"channel.network.bufferSizeInBytes",
 						GlobalBufferPool.DEFAULT_BUFFER_SIZE_IN_BYTES));
+		
+		this.targetOutputBufferLatency = -1; 
 	}
 
 	public EdgeQosData(QosEdge edge) {
@@ -151,5 +155,13 @@ public class EdgeQosData {
 
 	public int getBufferSize() {
 		return this.bufferSizeHistory.getLastEntry().getBufferSize();
+	}
+
+	public int getTargetOutputBufferLatency() {
+		return targetOutputBufferLatency;
+	}
+
+	public void setTargetOutputBufferLatency(int targetOutputBufferLatency) {
+		this.targetOutputBufferLatency = targetOutputBufferLatency;
 	}
 }

@@ -47,9 +47,7 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 
 	private QosGraphTraversal graphTraversal;
 
-	private double[] memberLatencies;
-
-	private int totalLatency;
+	private SequenceQosSummary sequenceSummary;
 
 	private int sequenceLength;
 
@@ -80,10 +78,8 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 
 		this.graphTraversal = new QosGraphTraversal(null,
 				this.constraint.getSequence(), this, this);
-
+		this.sequenceSummary = new SequenceQosSummary(this.constraint.getSequence());
 		this.sequenceLength = this.constraint.getSequence().size();
-		this.memberLatencies = new double[this.sequenceLength];
-		this.totalLatency = 0;
 
 		// init sequence with nulls so that during graph traversal we can
 		// just invoke set(index, member).
@@ -159,11 +155,7 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 			SequenceElement<JobVertexID> sequenceElem) {
 
 		int index = sequenceElem.getIndexInSequence();
-		int inputGateIndex = sequenceElem.getInputGateIndex();
-		int outputGateIndex = sequenceElem.getOutputGateIndex();
 		this.currentSequenceMembers.set(index, vertex);
-		this.memberLatencies[index] = vertex.getQosData().getLatencyInMillis(
-				inputGateIndex, outputGateIndex);
 
 		if (index + 1 == this.sequenceLength) {
 			this.handleFullSequence();
@@ -171,27 +163,21 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 	}
 
 	private void handleFullSequence() {
+		sequenceSummary.update(this.currentSequenceMembers);
+		
 		if (this.logger != null) {
-			this.logger.addMemberSequenceToLog(this.currentSequenceMembers);
+			this.logger.addMemberSequenceToLog(this.sequenceSummary);
 		}
 
-		this.computeTotalLatency();
-
-		double constraintViolatedByMillis = this.totalLatency
+		double constraintViolatedByMillis = this.sequenceSummary.getSequenceLatency()
 				- this.constraint.getLatencyConstraintInMillis();
 
 		// only act on violations of >5% of the constraint
 		if (Math.abs(constraintViolatedByMillis)
 				/ this.constraint.getLatencyConstraintInMillis() > 0.05) {
-			this.constraintViolationListener.handleViolatedConstraint(
-					this.currentSequenceMembers, constraintViolatedByMillis);
-		}
-	}
-
-	private void computeTotalLatency() {
-		this.totalLatency = 0;
-		for (int i = 0; i < this.sequenceLength; i++) {
-			this.totalLatency += this.memberLatencies[i];
+			this.constraintViolationListener.handleViolatedConstraint(this.constraint,
+					this.currentSequenceMembers, 
+					this.sequenceSummary);
 		}
 	}
 
@@ -210,8 +196,6 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 
 		int index = sequenceElem.getIndexInSequence();
 		this.currentSequenceMembers.set(index, edge);
-		this.memberLatencies[index] = edge.getQosData()
-				.getChannelLatencyInMillis();
 
 		if (index + 1 == this.sequenceLength) {
 			this.handleFullSequence();

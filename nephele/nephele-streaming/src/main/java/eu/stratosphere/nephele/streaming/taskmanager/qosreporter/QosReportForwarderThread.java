@@ -367,7 +367,7 @@ public class QosReportForwarderThread extends Thread {
 				this.registerVertexQosReporter(vertexReporter);
 			}
 
-			LOG.info(String
+			LOG.debug(String
 					.format("Prepared Qos reports for %d vertices and %d edges. Max %d reports each reporting interval.",
 							rolesDeployment.getVertexQosReporters().size(),
 							rolesDeployment.getEdgeQosReporters().size(),
@@ -394,7 +394,7 @@ public class QosReportForwarderThread extends Thread {
 
 		this.reporterActivityMap.put(reporterID, Boolean.FALSE);
 
-		LOG.info(String.format(
+		LOG.debug(String.format(
 				"Registered Qos reports to %d QosManagers for QosReporter %s",
 				edgeReports.size(), edgeReporter.getName()));
 	}

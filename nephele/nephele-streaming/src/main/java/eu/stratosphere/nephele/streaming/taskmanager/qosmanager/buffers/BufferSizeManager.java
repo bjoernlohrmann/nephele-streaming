@@ -12,15 +12,16 @@ import eu.stratosphere.nephele.instance.InstanceConnectionInfo;
 import eu.stratosphere.nephele.io.channels.ChannelID;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.plugins.PluginManager;
-import eu.stratosphere.nephele.streaming.message.action.LimitBufferSizeAction;
+import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
+import eu.stratosphere.nephele.streaming.message.action.SetOutputLatencyTargetAction;
 import eu.stratosphere.nephele.streaming.taskmanager.StreamMessagingThread;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosConstraintViolationListener;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosModel;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosUtils;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.SequenceQosSummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.EdgeQosData;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosEdge;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphMember;
-import eu.stratosphere.nephele.taskmanager.bufferprovider.GlobalBufferPool;
 
 /**
  * Used by the Qos manager to manage the output buffer sizes in a Qos graph. It
@@ -44,7 +45,7 @@ public class BufferSizeManager {
 
 	public static final long DEFAULT_ADJUSTMENTINTERVAL = 5000;
 
-	public final static long WAIT_BEFORE_FIRST_ADJUSTMENT = 30 * 1000;
+	public final static long WAIT_BEFORE_FIRST_ADJUSTMENT = 10 * 1000;
 
 	public long adjustmentInterval;
 
@@ -54,9 +55,7 @@ public class BufferSizeManager {
 
 	private long timeOfNextAdjustment;
 
-	private int maximumBufferSize;
-
-	private BufferSizeLogger bufferSizeLogger;
+//	private BufferSizeLogger bufferSizeLogger;
 
 	private JobID jobID;
 
@@ -71,10 +70,6 @@ public class BufferSizeManager {
 		this.timeOfNextAdjustment = QosUtils.alignToInterval(
 				System.currentTimeMillis() + WAIT_BEFORE_FIRST_ADJUSTMENT,
 				this.adjustmentInterval);
-
-		this.maximumBufferSize = GlobalConfiguration.getInteger(
-				"channel.network.bufferSizeInBytes",
-				GlobalBufferPool.DEFAULT_BUFFER_SIZE_IN_BYTES);
 	}
 
 	public long getAdjustmentInterval() {
@@ -92,11 +87,15 @@ public class BufferSizeManager {
 		QosConstraintViolationListener listener = new QosConstraintViolationListener() {
 			@Override
 			public void handleViolatedConstraint(
+					JobGraphLatencyConstraint constraint,
 					List<QosGraphMember> sequenceMembers,
-					double constraintViolatedByMillis) {
-				if (constraintViolatedByMillis > 0) {
-					BufferSizeManager.this.collectEdgesToAdjust(
-							sequenceMembers, edgesToAdjust);
+					SequenceQosSummary qosSummary) {
+
+				if (qosSummary.isMemberQosDataFresh()) {
+					BufferSizeManager.this.collectEdgesToAdjust(constraint,
+							sequenceMembers, qosSummary, edgesToAdjust);
+				} else {
+					LOG.debug("Rejecting sequence: stale qos data");
 				}
 			}
 		};
@@ -116,13 +115,13 @@ public class BufferSizeManager {
 			throws InterruptedException {
 
 		for (QosEdge edge : edgesToAdjust.keySet()) {
-			int newBufferSize = edgesToAdjust.get(edge);
+			int newTargetObl = edgesToAdjust.get(edge);
 
 			BufferSizeHistory sizeHistory = edge.getQosData()
 					.getBufferSizeHistory();
-			sizeHistory.addToHistory(this.timeOfNextAdjustment, newBufferSize);
+			sizeHistory.addToHistory(this.timeOfNextAdjustment, newTargetObl);
 
-			this.setBufferSize(edge, newBufferSize);
+			this.setTargetOutputBufferLatency(edge, newTargetObl);
 		}
 	}
 
@@ -133,8 +132,13 @@ public class BufferSizeManager {
 		}
 	}
 
-	private void collectEdgesToAdjust(List<QosGraphMember> sequenceMembers,
+	private void collectEdgesToAdjust(JobGraphLatencyConstraint constraint,
+			List<QosGraphMember> sequenceMembers,
+			SequenceQosSummary qosSummary,
 			HashMap<QosEdge, Integer> edgesToAdjust) {
+
+		int targetOutputBufferLatency = (int) computeBufferSizeAdjustmentFactor(
+				constraint, qosSummary);
 
 		for (QosGraphMember member : sequenceMembers) {
 
@@ -143,118 +147,73 @@ public class BufferSizeManager {
 			}
 
 			QosEdge edge = (QosEdge) member;
-
 			EdgeQosData qosData = edge.getQosData();
 
-			if (edgesToAdjust.containsKey(edge) || qosData.isInChain()) {
+			if (qosData.isInChain()) {
 				continue;
 			}
 
-			if (!this.hasFreshValues(qosData)) {
-				this.staleEdges.add(edge.getSourceChannelID());
-				// LOG.info("Rejecting edge due to stale values: " +
-				// QosUtils.formatName(edge));
+			int newTargetObl;
+			if (targetOutputBufferLatency > 0) {
+				// regular case (nonOutputBufferLatency < constraint): we have a
+				// chance of meeting the constraint
+				// by telling the TM to adjusting output buffer sizes
+				newTargetObl = targetOutputBufferLatency;
+
+			} else {
+				// overload case (nonOutputBufferLatency >= constraint): we
+				// don't have a chance of meeting the constraint by
+				// adjusting output buffer sizes . in this case just pick a
+				// sensible output buffer size for each edge
+				newTargetObl = 10;
+			}
+
+			// do nothing if change is very small
+			double oldTargetObl = qosData.getTargetOutputBufferLatency();
+			if (oldTargetObl != -1
+					&& Math.abs(oldTargetObl - newTargetObl) / oldTargetObl < 0.05) {
+				LOG.debug(String.format(
+						"Rejecting edge: target obl change from %d to %d",
+						oldTargetObl, newTargetObl));
 				continue;
 			}
 
-			double outputBufferLatency = qosData
-					.getOutputBufferLifetimeInMillis() / 2;
-			double millisBetweenRecordEmissions = 1 / (qosData
-					.getRecordsPerSecond() * 1000);
-
-			if (outputBufferLatency > 5
-					&& outputBufferLatency > millisBetweenRecordEmissions) {
-				this.reduceBufferSize(qosData, edgesToAdjust);
-			} else if (outputBufferLatency <= 1
-					&& qosData.getBufferSize() < this.maximumBufferSize) {
-				this.increaseBufferSize(qosData, edgesToAdjust);
+			// do nothing if buffers on this edge are already being adjusted to
+			// a smaller size
+			if (!edgesToAdjust.containsKey(edge)
+					|| edgesToAdjust.get(edge) > newTargetObl) {
+				edgesToAdjust.put(qosData.getEdge(), newTargetObl);
 			}
 		}
 	}
 
-	private void increaseBufferSize(EdgeQosData qosData,
-			HashMap<QosEdge, Integer> edgesToAdjust) {
+	private double computeBufferSizeAdjustmentFactor(
+			JobGraphLatencyConstraint constraint, SequenceQosSummary qosSummary) {
 
-		int oldBufferSize = qosData.getBufferSize();
-		int newBufferSize = Math.min(
-				this.proposeIncreasedBufferSize(oldBufferSize),
-				this.maximumBufferSize);
-
-		if (this.isRelevantIncrease(oldBufferSize, newBufferSize)
-				|| newBufferSize == this.maximumBufferSize) {
-			edgesToAdjust.put(qosData.getEdge(), newBufferSize);
+		if (constraint.getLatencyConstraintInMillis() > qosSummary
+				.getNonOutputBufferLatency()) {
+			return (constraint.getLatencyConstraintInMillis() - qosSummary
+					.getNonOutputBufferLatency()) / qosSummary.getNoOfEdges();
+		} else {
+			return -1;
 		}
 	}
 
-	private boolean isRelevantIncrease(int oldBufferSize, int newBufferSize) {
-		return newBufferSize >= oldBufferSize + 100;
-	}
-
-	private int proposeIncreasedBufferSize(int oldBufferSize) {
-		return (int) (oldBufferSize * 1.2);
-	}
-
-	private void reduceBufferSize(EdgeQosData qosData,
-			HashMap<QosEdge, Integer> edgesToAdjust) {
-
-		int oldBufferSize = qosData.getBufferSizeHistory().getLastEntry()
-				.getBufferSize();
-		int newBufferSize = this.proposeReducedBufferSize(qosData,
-				oldBufferSize);
-
-		// filters pointless minor changes in buffer size
-		if (this.isRelevantReduction(newBufferSize, oldBufferSize)) {
-			edgesToAdjust.put(qosData.getEdge(), newBufferSize);
-		}
-
-		// else {
-		// LOG.info(String.format("Filtering reduction due to insignificance: %s (old:%d new:%d)",
-		// QosUtils.formatName(edge), oldBufferSize, newBufferSize));
-		// }
-	}
-
-	private boolean isRelevantReduction(int newBufferSize, int oldBufferSize) {
-		return newBufferSize < oldBufferSize * 0.98;
-	}
-
-	private int proposeReducedBufferSize(EdgeQosData qosData, int oldBufferSize) {
-
-		double avgOutputBufferLatency = qosData
-				.getOutputBufferLifetimeInMillis() / 2;
-
-		double reductionFactor = Math.pow(0.95, avgOutputBufferLatency);
-		reductionFactor = Math.max(0.01, reductionFactor);
-
-		int newBufferSize = (int) Math.max(50, oldBufferSize * reductionFactor);
-
-		return newBufferSize;
-	}
-
-	private boolean hasFreshValues(EdgeQosData qosData) {
-		long freshnessThreshold = qosData.getBufferSizeHistory().getLastEntry()
-				.getTimestamp();
-
-		return qosData.isChannelLatencyFresherThan(freshnessThreshold)
-				&& qosData
-						.isOutputBufferLifetimeFresherThan(freshnessThreshold);
-	}
 
 	public boolean isAdjustmentNecessary(long now) {
 		return now >= this.timeOfNextAdjustment;
 	}
 
-	private void setBufferSize(QosEdge edge, int bufferSize)
+	private void setTargetOutputBufferLatency(QosEdge edge, int targetObl)
 			throws InterruptedException {
 
-		LimitBufferSizeAction limitBufferSizeAction = new LimitBufferSizeAction(
+		SetOutputLatencyTargetAction action = new SetOutputLatencyTargetAction(
 				this.jobID, edge.getOutputGate().getVertex().getID(), edge
 						.getOutputGate().getGateID(),
-				edge.getSourceChannelID(), bufferSize);
+				edge.getSourceChannelID(), targetObl);
 
 		InstanceConnectionInfo receiver = edge.getOutputGate().getVertex()
 				.getExecutingInstance();
-		this.messagingThread.sendToTaskManagerAsynchronously(receiver,
-				limitBufferSizeAction);
-
+		this.messagingThread.sendToTaskManagerAsynchronously(receiver, action);
 	}
 }

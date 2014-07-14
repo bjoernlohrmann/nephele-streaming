@@ -16,6 +16,7 @@ package eu.stratosphere.nephele.streaming.taskmanager.qosmanager;
 
 import java.util.List;
 
+import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphMember;
 
 /**
@@ -27,8 +28,8 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphMember;
  */
 public interface QosConstraintViolationListener {
 
-	public void handleViolatedConstraint(
+	public void handleViolatedConstraint(JobGraphLatencyConstraint constraint,
 			List<QosGraphMember> currentSequenceMembers,
-			double constraintViolatedByMillis);
+			SequenceQosSummary qosSummary);
 
 }

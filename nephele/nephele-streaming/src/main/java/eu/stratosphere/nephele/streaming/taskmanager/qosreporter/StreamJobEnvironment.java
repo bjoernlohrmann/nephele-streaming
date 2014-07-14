@@ -23,6 +23,7 @@ import eu.stratosphere.nephele.streaming.message.ChainUpdates;
 import eu.stratosphere.nephele.streaming.message.action.CandidateChainConfig;
 import eu.stratosphere.nephele.streaming.message.action.DeployInstanceQosRolesAction;
 import eu.stratosphere.nephele.streaming.message.action.LimitBufferSizeAction;
+import eu.stratosphere.nephele.streaming.message.action.SetOutputLatencyTargetAction;
 import eu.stratosphere.nephele.streaming.message.qosreport.QosReport;
 import eu.stratosphere.nephele.streaming.taskmanager.StreamTaskManagerPlugin;
 import eu.stratosphere.nephele.streaming.taskmanager.chaining.ChainManagerThread;
@@ -160,11 +161,24 @@ public class StreamJobEnvironment {
 			this.handleChainUpdates((ChainUpdates) streamMsg);
 		} else if (streamMsg instanceof LimitBufferSizeAction) {
 			this.handleLimitBufferSizeAction((LimitBufferSizeAction) streamMsg);
+		} else if (streamMsg instanceof SetOutputLatencyTargetAction) {
+			this.handleSetOutputLatencyTargetAction((SetOutputLatencyTargetAction) streamMsg);
 		} else if (streamMsg instanceof DeployInstanceQosRolesAction) {
 			this.handleDeployInstanceQosRolesAction((DeployInstanceQosRolesAction) streamMsg);
 		} else {
 			LOG.error("Received message is of unknown type "
 					+ streamMsg.getClass());
+		}
+	}
+
+	private void handleSetOutputLatencyTargetAction(
+			SetOutputLatencyTargetAction action) {
+
+		StreamTaskQosCoordinator qosCoordinator = this.taskQosCoordinators
+				.get(action.getVertexID());
+
+		if (qosCoordinator != null) {
+			qosCoordinator.handleSetOutputLatencyTargetAction(action);
 		}
 	}
 

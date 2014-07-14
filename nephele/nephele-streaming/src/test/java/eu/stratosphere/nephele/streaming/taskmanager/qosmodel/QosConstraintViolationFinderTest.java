@@ -47,6 +47,7 @@ import eu.stratosphere.nephele.streaming.SequenceElement;
 import eu.stratosphere.nephele.streaming.message.qosreport.EdgeStatistics;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosConstraintViolationFinder;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosConstraintViolationListener;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.SequenceQosSummary;
 
 /**
  * Tests for {@link QosConstraintViolationFinder}
@@ -80,8 +81,8 @@ public class QosConstraintViolationFinderTest {
 	public void testTooFast() throws Exception {
 		this.testConstraint1WithLatencies(0.0d, 0.0d, this.listener, true,
 				false);
-		verify(this.listener, atLeastOnce()).handleViolatedConstraint(
-				any(List.class), any(Double.class));
+		verify(this.listener, atLeastOnce()).handleViolatedConstraint(any(JobGraphLatencyConstraint.class),
+				any(List.class), any(SequenceQosSummary.class));
 	}
 
 	/**
@@ -96,7 +97,8 @@ public class QosConstraintViolationFinderTest {
 		this.testConstraint1WithLatencies(0.0d, 0.0d, this.listener, false,
 				true);
 		verify(this.listener, atLeastOnce()).handleViolatedConstraint(
-				any(List.class), any(Double.class));
+				any(JobGraphLatencyConstraint.class),
+				any(List.class), any(SequenceQosSummary.class));
 	}
 
 	/**
@@ -116,7 +118,8 @@ public class QosConstraintViolationFinderTest {
 
 		this.testConstraint1WithLatencies(d, d, this.listener, true, false);
 		verify(this.listener, never()).handleViolatedConstraint(
-				any(List.class), any(Double.class));
+				any(JobGraphLatencyConstraint.class),
+				any(List.class), any(SequenceQosSummary.class));
 	}
 
 	/**
@@ -136,7 +139,8 @@ public class QosConstraintViolationFinderTest {
 
 		this.testConstraint1WithLatencies(d, d, this.listener, false, true);
 		verify(this.listener, never()).handleViolatedConstraint(
-				any(List.class), any(Double.class));
+				any(JobGraphLatencyConstraint.class),
+				any(List.class), any(SequenceQosSummary.class));
 	}
 
 	/**
@@ -151,7 +155,8 @@ public class QosConstraintViolationFinderTest {
 		this.testConstraint1WithLatencies(Double.POSITIVE_INFINITY,
 				Double.POSITIVE_INFINITY, this.listener, true, false);
 		verify(this.listener, atLeastOnce()).handleViolatedConstraint(
-				any(List.class), any(Double.class));
+				any(JobGraphLatencyConstraint.class),
+				any(List.class), any(SequenceQosSummary.class));
 	}
 
 	@SuppressWarnings("unchecked")
@@ -160,7 +165,8 @@ public class QosConstraintViolationFinderTest {
 		this.testConstraint1WithLatencies(Double.POSITIVE_INFINITY,
 				Double.POSITIVE_INFINITY, this.listener, false, true);
 		verify(this.listener, atLeastOnce()).handleViolatedConstraint(
-				any(List.class), any(Double.class));
+				any(JobGraphLatencyConstraint.class),
+				any(List.class), any(SequenceQosSummary.class));
 	}
 
 	/**
@@ -211,7 +217,8 @@ public class QosConstraintViolationFinderTest {
 		new QosConstraintViolationFinder(this.fix.constraint1.getID(), qg,
 				this.listener).findSequencesWithViolatedQosConstraint();
 		verify(this.listener, never()).handleViolatedConstraint(
-				any(List.class), any(Double.class));
+				any(JobGraphLatencyConstraint.class),
+				any(List.class), any(SequenceQosSummary.class));
 	}
 
 	/**
@@ -274,7 +281,8 @@ public class QosConstraintViolationFinderTest {
 				qosGraph, this.listener)
 				.findSequencesWithViolatedQosConstraint();
 		verify(this.listener, atLeastOnce()).handleViolatedConstraint(
-				any(List.class), any(Double.class));
+				any(JobGraphLatencyConstraint.class),
+				any(List.class), any(SequenceQosSummary.class));
 	}
 
 	/**

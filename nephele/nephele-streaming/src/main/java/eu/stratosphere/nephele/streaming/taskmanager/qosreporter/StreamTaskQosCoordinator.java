@@ -23,6 +23,7 @@ import org.apache.commons.logging.LogFactory;
 import eu.stratosphere.nephele.io.channels.ChannelID;
 import eu.stratosphere.nephele.streaming.message.action.EdgeQosReporterConfig;
 import eu.stratosphere.nephele.streaming.message.action.LimitBufferSizeAction;
+import eu.stratosphere.nephele.streaming.message.action.SetOutputLatencyTargetAction;
 import eu.stratosphere.nephele.streaming.message.action.VertexQosReporterConfig;
 import eu.stratosphere.nephele.streaming.message.qosreport.DummyVertexReporterActivity;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
@@ -257,7 +258,7 @@ public class StreamTaskQosCoordinator implements QosReporterConfigListener {
 					.getConfigCenter().getEdgeQosReporter(sourceChannelID);
 
 			if (edgeReporter != null) {
-				LOG.info(String
+				LOG.debug(String
 						.format("Setting buffer size output channel %s (%s) to %d bytes",
 								sourceChannelID, edgeReporter.getName(),
 								limitBufferSizeAction.getBufferSize()));
@@ -265,6 +266,35 @@ public class StreamTaskQosCoordinator implements QosReporterConfigListener {
 			}
 		}
 	}
+	
+	public void handleSetOutputLatencyTargetAction(
+			SetOutputLatencyTargetAction action) {
+
+		if (this.isShutdown) {
+			return;
+		}
+
+		StreamOutputGate<?> outputGate = this.taskEnvironment
+				.getOutputGate(action.getOutputGateID());
+
+		if (outputGate != null) {
+			ChannelID sourceChannelID = action
+					.getSourceChannelID();
+			EdgeQosReporterConfig edgeReporter = this.reporterThread
+					.getConfigCenter().getEdgeQosReporter(sourceChannelID);
+
+			if (edgeReporter != null) {
+				LOG.debug(String
+						.format("Setting obl target for %s (%s) to %d ms",
+								sourceChannelID, edgeReporter.getName(),
+								action.getOutputBufferLatencyTarget()));
+				outputGate.enqueueQosAction(action);
+			}
+		}
+
+		
+	}
+
 
 	/*
 	 * (non-Javadoc)

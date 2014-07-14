@@ -33,6 +33,7 @@ import eu.stratosphere.nephele.streaming.message.action.DropCurrentChainAction;
 import eu.stratosphere.nephele.streaming.message.action.EstablishNewChainAction;
 import eu.stratosphere.nephele.streaming.message.action.LimitBufferSizeAction;
 import eu.stratosphere.nephele.streaming.message.action.QosAction;
+import eu.stratosphere.nephele.streaming.message.action.SetOutputLatencyTargetAction;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.listener.OutputGateQosReportingListener;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.chaining.RuntimeChain;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.chaining.RuntimeChainLink;
@@ -61,6 +62,8 @@ public final class StreamOutputGate<T extends Record> extends
 	private StreamChannelSelector<T> streamChannelSelector;
 
 	private LinkedBlockingQueue<QosAction> qosActionQueue;
+	
+	private OutputBufferLatencyEnforcer oblEnforcer;
 
 	public StreamOutputGate(final OutputGate<T> wrappedOutputGate,
 			StreamChannelSelector<T> streamChannelSelector) {
@@ -68,6 +71,7 @@ public final class StreamOutputGate<T extends Record> extends
 		this.outputChannels = new HashMap<ChannelID, AbstractOutputChannel<T>>();
 		this.streamChannelSelector = streamChannelSelector;
 		this.qosActionQueue = new LinkedBlockingQueue<QosAction>();
+		this.oblEnforcer = new OutputBufferLatencyEnforcer();
 	}
 
 	public void setQosReportingListener(
@@ -107,12 +111,30 @@ public final class StreamOutputGate<T extends Record> extends
 		while ((action = this.qosActionQueue.poll()) != null) {
 			if (action instanceof LimitBufferSizeAction) {
 				this.limitBufferSize((LimitBufferSizeAction) action);
+			} else if (action instanceof SetOutputLatencyTargetAction) {
+				this.setOutputBufferLatencyTarget((SetOutputLatencyTargetAction) action);
 			} else if (action instanceof EstablishNewChainAction) {
 				this.establishChain((EstablishNewChainAction) action);
 			} else if (action instanceof DropCurrentChainAction) {
 				dropCurrentChain();
 			}
 		}
+	}
+
+	private void setOutputBufferLatencyTarget(SetOutputLatencyTargetAction action) {
+		ChannelID channelID = action.getSourceChannelID();
+
+		AbstractByteBufferedOutputChannel<T> channel = (AbstractByteBufferedOutputChannel<T>) this.outputChannels
+				.get(channelID);
+
+		if (channel == null) {
+			LOG.error("Cannot find output channel with ID " + channelID);
+			return;
+		}
+		
+		this.oblEnforcer.setTargetOutputBufferLatency(
+				channel.getChannelIndex(),
+				action.getOutputBufferLatencyTarget());
 	}
 
 	private void dropCurrentChain() {
@@ -161,6 +183,8 @@ public final class StreamOutputGate<T extends Record> extends
 		int outputChannel = this.streamChannelSelector
 				.invokeWrappedChannelSelector(record,
 						this.getNumberOfActiveOutputChannels())[0];
+		
+		oblEnforcer.reportRecordEmitted(outputChannel);
 
 		if (this.qosCallback != null) {
 			AbstractTaggableRecord taggableRecord = (AbstractTaggableRecord) record;
@@ -173,6 +197,8 @@ public final class StreamOutputGate<T extends Record> extends
 	 */
 	@Override
 	public void outputBufferSent(final int channelIndex) {
+		oblEnforcer.outputBufferSent(channelIndex);
+		
 		if (this.qosCallback != null) {
 			this.qosCallback.outputBufferSent(channelIndex, this
 					.getOutputChannel(channelIndex)
@@ -194,9 +220,9 @@ public final class StreamOutputGate<T extends Record> extends
 						connectedChannelID);
 
 		this.outputChannels.put(channelID, channel);
+		this.oblEnforcer.addOutputChannel(channel);
 
 		return channel;
-
 	}
 
 	/**
@@ -212,6 +238,7 @@ public final class StreamOutputGate<T extends Record> extends
 						connectedChannelID);
 
 		this.outputChannels.put(channelID, channel);
+		this.oblEnforcer.addOutputChannel(channel);
 		return channel;
 	}
 	
