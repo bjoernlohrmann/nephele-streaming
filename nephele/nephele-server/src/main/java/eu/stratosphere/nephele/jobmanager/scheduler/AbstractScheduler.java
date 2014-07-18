@@ -16,6 +16,7 @@
 package eu.stratosphere.nephele.jobmanager.scheduler;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -509,7 +510,6 @@ public abstract class AbstractScheduler implements InstanceListener {
 								vertex.updateExecutionState(ExecutionState.SUSPENDED);
 							}
 						}
-						groupVertex.setCurrentElasticNumberOfRunningSubtasks(initialElasticSubtasks);
 					}
 				}
 			}
@@ -703,43 +703,97 @@ public abstract class AbstractScheduler implements InstanceListener {
 		eg.executeCommand(command);
 	}
 	
+
+	/**
+	 * Assigns the next vertex in SUSPEND state and recursive at least the first vertex on each gate.
+	 */
 	public void scaleUpElasticTask(JobID jobID, JobVertexID jobVertexID,
 			final int noOfSubtasksToStart) throws Exception {
 
 		final ExecutionGraph graph = getExecutionGraphByID(jobID);
-		final ExecutionGroupVertex groupVertex = getExecutionGroupVertex(
-				jobVertexID, graph);
+		final ExecutionGroupVertex startGroupVertex = getExecutionGroupVertex(jobVertexID, graph);
+
 
 		Runnable command = new Runnable() {
 
 			@Override
 			public void run() {
-				// FIXME: ensure there are no currently SUSPENDING subtasks	
-				// FIXME: propagate switching SUSPENDED->ASSIGNED to subsequent group vertices
+				List<ExecutionVertex> verticesToBeDeployed = new ArrayList<ExecutionVertex>();
 				
-				if (groupVertex.getCurrentElasticNumberOfRunningSubtasks()
-						+ noOfSubtasksToStart > groupVertex
-						.getCurrentNumberOfGroupMembers()) {
-					throw new RuntimeException(
-							"Not enough SUSPENDED subtasks found. This is a bug.");
+				if (startGroupVertex.getCurrentElasticNumberOfRunningSubtasks()
+						+ noOfSubtasksToStart > startGroupVertex.getCurrentNumberOfGroupMembers()) {
+					throw new RuntimeException("Not enough SUSPENDED subtasks found. This is a bug.");
 				}
 				
-				List<ExecutionVertex> verticesToBeDeployed = new ArrayList<ExecutionVertex>(); 
+				// Ensure there are no currently SUSPENDING subtasks
+				if (hasSuspendingVertices(graph)) {
+					throw new RuntimeException("Subtasks in SUSPENDING state found. This is a bug.");
+				}
 
-				int offset = groupVertex
-						.getCurrentElasticNumberOfRunningSubtasks();
+				// switch vertices in this group from SUSPENDED to ASSIGNED
+				// TODO: choose a better candidate if necessary
+				int offset = startGroupVertex.getCurrentElasticNumberOfRunningSubtasks();
 				for (int i = 0; i < noOfSubtasksToStart; i++) {
-					ExecutionVertex vertexToStart = groupVertex
-							.getGroupMember(offset + i);
-					vertexToStart.compareAndUpdateExecutionState(
-							ExecutionState.SUSPENDED, ExecutionState.ASSIGNED);
-					
-					verticesToBeDeployed.add(vertexToStart);
+				    ExecutionVertex vertexToStart = startGroupVertex.getGroupMember(offset + i);
+				    vertexToStart.compareAndUpdateExecutionState(ExecutionState.SUSPENDED, ExecutionState.ASSIGNED);
+				    verticesToBeDeployed.add(vertexToStart);
 				}
 				
-				
+				// now activate neighbor vertices
+				List<ExecutionVertex> nextVertices = new ArrayList<ExecutionVertex>(verticesToBeDeployed);
+				while(nextVertices.size() > 0) {
+					List<ExecutionVertex> current = nextVertices;
+					nextVertices = new ArrayList<ExecutionVertex>();
+					for(ExecutionVertex vertex : current) {
+						nextVertices.addAll(scaleUpElasticNeighbors(vertex));
+					}
+					verticesToBeDeployed.addAll(nextVertices);
+				}
+
+				LOG.info("Scaling up groupVertex " + startGroupVertex.getName()
+						+ " by activating vertices: " + Arrays.toString(verticesToBeDeployed.toArray()));
+
 				deployAssignedVertices(verticesToBeDeployed);
 			}
+
+			private List<ExecutionVertex> scaleUpElasticNeighbors(ExecutionVertex vertex) {
+				List<ExecutionVertex> verticesToBeDeployed = new ArrayList<ExecutionVertex>();
+
+				// activate one input vertex on each gate
+				for(int gate = 0; gate < vertex.getNumberOfInputGates(); gate++) {
+					ExecutionGate inputGate = vertex.getInputGate(gate);
+					ExecutionVertex inputVertex = inputGate.getEdge(0).getOutputGate().getVertex();
+
+					if (inputVertex.getExecutionState() == ExecutionState.SUSPENDED) {
+						inputVertex.compareAndUpdateExecutionState(ExecutionState.SUSPENDED, ExecutionState.ASSIGNED);
+						verticesToBeDeployed.add(inputVertex);
+
+					} else if (inputVertex.getExecutionState() != ExecutionState.RUNNING
+							&& inputVertex.getExecutionState() != ExecutionState.ASSIGNED) {
+						throw new RuntimeException("Unexpected input vertex state "
+								+ inputVertex.getExecutionState() + " on vertex " + inputVertex + ".");
+					}
+				}
+
+				// activate all output vertices
+				for(int gate = 0; gate < vertex.getNumberOfOutputGates(); gate++) {
+					ExecutionGate outputGate = vertex.getOutputGate(gate);
+					ExecutionVertex outputVertex = outputGate.getEdge(0).getInputGate().getVertex();
+
+					if (outputVertex.getExecutionState() == ExecutionState.SUSPENDED) {
+						outputVertex.compareAndUpdateExecutionState(ExecutionState.SUSPENDED, ExecutionState.ASSIGNED);
+						verticesToBeDeployed.add(outputVertex);
+
+					} else if (outputVertex.getExecutionState() != ExecutionState.RUNNING
+							&& outputVertex.getExecutionState() != ExecutionState.ASSIGNED) {
+						throw new RuntimeException("Unexpected output vertex state "
+								+ outputVertex.getExecutionState() + " on vertex " + outputVertex + ".");
+					}
+				}
+
+				return verticesToBeDeployed;
+			}
+
 		};
 
 		try {
@@ -749,10 +803,7 @@ public abstract class AbstractScheduler implements InstanceListener {
 			throw cause;
 		}
 
-		waitForStableState(groupVertex);
-		groupVertex.setCurrentElasticNumberOfRunningSubtasks(groupVertex
-				.getCurrentElasticNumberOfRunningSubtasks()
-				+ noOfSubtasksToStart);
+		waitForStableState(startGroupVertex);
 	}
 
 	private ExecutionGroupVertex getExecutionGroupVertex(
@@ -770,6 +821,22 @@ public abstract class AbstractScheduler implements InstanceListener {
 		return groupVertex;
 	}
 
+	/**
+	 * @return true if graph contains a vertex with state SUSPENDING
+	 */
+	private boolean hasSuspendingVertices(final ExecutionGraph graph) {
+		ExecutionStage stage = graph.getCurrentExecutionStage();
+		for (int i = 0; i < stage.getNumberOfStageMembers(); i++) {
+			ExecutionGroupVertex groupVertex = stage.getStageMember(i);
+			for (int j = 0; j < groupVertex.getCurrentNumberOfGroupMembers(); j++) {
+				ExecutionVertex vertex = groupVertex.getGroupMember(j);
+				if (vertex.getExecutionState() == ExecutionState.SUSPENDING)
+					return true;
+			}
+		}
+		return false;
+	}
+
 	public void scaleDownElasticTask(JobID jobID, JobVertexID jobVertexID,
 			final int noOfSubtasksToSuspend) throws Exception {
 
@@ -785,6 +852,7 @@ public abstract class AbstractScheduler implements InstanceListener {
 		}
 
 		for (int i = 0; i < noOfSubtasksToSuspend; i++) {
+			// TODO: choose a better candidate if necessary
 			int idxToSuspend = groupVertex
 					.getCurrentElasticNumberOfRunningSubtasks() - (i+1);
 			final ExecutionVertex toSuspend = groupVertex
@@ -814,10 +882,6 @@ public abstract class AbstractScheduler implements InstanceListener {
 			}
 			waitForStableState(groupVertex);
 		}
-		
-		groupVertex.setCurrentElasticNumberOfRunningSubtasks(groupVertex
-				.getCurrentElasticNumberOfRunningSubtasks()
-				- noOfSubtasksToSuspend);
 	}
 
 	private void waitForStableState(ExecutionGroupVertex groupVertex)

@@ -394,6 +394,8 @@ public final class ExecutionVertex {
 		// Check the transition
 		ExecutionStateTransition.checkTransition(true, toString(), previousState, newExecutionState);
 
+		updateCurrentElasticNumberOfRunningSubtasks(previousState, newExecutionState);
+
 		// Notify the listener objects
 		final Iterator<ExecutionListener> it = this.executionListeners.values().iterator();
 		while (it.hasNext()) {
@@ -420,6 +422,8 @@ public final class ExecutionVertex {
 		// Check the transition
 		ExecutionStateTransition.checkTransition(true, toString(), expected, update);
 
+		updateCurrentElasticNumberOfRunningSubtasks(expected, update);
+
 		// Notify the listener objects
 		final Iterator<ExecutionListener> it = this.executionListeners.values().iterator();
 		while (it.hasNext()) {
@@ -431,6 +435,20 @@ public final class ExecutionVertex {
 		checkCancelRequestedFlag();
 
 		return true;
+	}
+
+	public void updateCurrentElasticNumberOfRunningSubtasks(ExecutionState previousState, ExecutionState newExecutionState) {
+		if (newExecutionState == ExecutionState.RUNNING) {
+			ExecutionGroupVertex groupVertex = getGroupVertex();
+			groupVertex.setCurrentElasticNumberOfRunningSubtasks(
+					groupVertex.getCurrentElasticNumberOfRunningSubtasks() + 1);
+
+		} else if (previousState == ExecutionState.SUSPENDING
+				&& newExecutionState == ExecutionState.SUSPENDED) {
+			ExecutionGroupVertex groupVertex = getGroupVertex();
+			groupVertex.setCurrentElasticNumberOfRunningSubtasks(
+					groupVertex.getCurrentElasticNumberOfRunningSubtasks() - 1);
+		}
 	}
 
 	/**
