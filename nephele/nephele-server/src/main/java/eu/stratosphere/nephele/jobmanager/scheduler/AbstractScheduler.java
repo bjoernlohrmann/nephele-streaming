@@ -905,4 +905,21 @@ public abstract class AbstractScheduler implements InstanceListener {
 		} while (dirty);
 	}
 
+	public JobVertexID getJobVertexIdByName(JobID jobID, String jobVertexName) {
+		final ExecutionGraph graph = getExecutionGraphByID(jobID);
+		ExecutionStage stage = graph.getCurrentExecutionStage();
+		JobVertexID result = null;
+		for (int i = 0; i < stage.getNumberOfStageMembers(); i++) {
+			if (stage.getStageMember(i).getName().equals(jobVertexName)) {
+				if (result != null)
+					throw new RuntimeException("Found more than one vertex with given name.");
+				result = stage.getStageMember(i).getJobVertexID();
+			}
+		}
+
+		if (result == null)
+			throw new RuntimeException("Can't find vertex with given name.");
+		else
+			return result;
+	}
 }

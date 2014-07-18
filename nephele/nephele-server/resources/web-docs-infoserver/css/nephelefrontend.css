@@ -233,7 +233,7 @@ td {
     background-color: #CED8F6;
     padding: 3px;
 }
-td.starting, td.running, td.finished, td.canceled, td.failed {
+td.starting, td.running, td.suspending, td.suspended, td.finished, td.canceled, td.failed {
 	width: 120px;
 }
 
@@ -251,6 +251,22 @@ td.running {
 
 td.running .progressBar div  {
     background-color: #9BBB59;
+}
+
+td.suspending {
+    background-color: #CED7FC;
+}
+
+td.suspending .progressBar div  {
+    background-color: #5d79f6;
+}
+
+td.suepended {
+    background-color: #CED7FC;
+}
+
+td.suspended .progressBar div  {
+    background-color: #5d79f6;
 }
 
 td.finished {

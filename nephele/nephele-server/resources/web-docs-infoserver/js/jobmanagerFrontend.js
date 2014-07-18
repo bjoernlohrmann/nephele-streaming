@@ -4,7 +4,7 @@ var widthProgressbar = 120;
 // For coloring the dependency graph
 var colors = [ "#37485D", "#D9AADC", "#4F7C61", "#8F9C6A", "#BC8E88" ];
 
-(function poll() {
+function poll() {
 	$.ajax({ url : "/jobsInfo", type : "GET", success : function(json) {
 	    jsonGlobal = json
 	    // Fill Table	
@@ -13,7 +13,8 @@ var colors = [ "#37485D", "#D9AADC", "#4F7C61", "#8F9C6A", "#BC8E88" ];
 	//complete: setTimeout(function() {poll()}, 5000),
 	//timeout: 2000
 	});
-})();
+}
+(function initalPoll() { poll() })();
 
 (function pollArchive() {
 	$.ajax({ url : "/jobsInfo?get=archive", type : "GET",
@@ -48,10 +49,25 @@ $(".opensub").live("click", function() {
 $(".cancel").live("click", function() {
 	var id = $(this).attr("job");
 	$.ajax({ url : "/jobsInfo?get=cancel&job=" + id, type : "GET",
-	    success : function(json) {
-	    }
-	//complete: setTimeout(function() {poll()}, 5000),
-	//timeout: 2000
+        success: function() {setTimeout(function() {poll()}, 2000)}
+	});
+});
+
+$(".scaleUp").live("click", function() {
+	var jobid = $(this).attr("data-job");
+	var groupVertexName = $(this).attr("data-groupvertex-name");
+	$.ajax({ url : "/scale?mode=up&job=" + jobid + "&groupVertexName=" + groupVertexName, type : "GET",
+        success: function() { poll() },
+        error: function(data, msg, bla) { alert("failure: " + data.response); }
+	});
+});
+
+$(".scaleDown").live("click", function() {
+	var jobid = $(this).attr("data-job");
+	var groupVertexName = $(this).attr("data-groupvertex-name");
+	$.ajax({ url : "/scale?mode=down&job=" + jobid + "&groupVertexName=" + groupVertexName, type : "GET",
+        success: function() { poll() },
+        error: function(data, msg, bla) { alert("failure: " + data.response); }
 	});
 });
 
@@ -103,11 +119,16 @@ function drawDependencies() {
 function fillTable(table, json) {
 	$(table).html("");
 
+    // sort jobs by timestamp
+    json.sort(function(a, b) { return b.time - a.time; });
+
 	$.each(json, function(i, job) {
 		var countGroups = 0;
 		var countTasks = 0;
 		var countStarting = 0;
 		var countRunning = 0;
+		var countSuspending = 0;
+		var countSuspended = 0;
 		var countFinished = 0;
 		var countCanceled = 0;
 		var countFailed = 0;
@@ -123,6 +144,8 @@ function fillTable(table, json) {
 							<th>Tasks</th>\
 							<th>Starting</th>\
 							<th>Running</th>\
+							<th>Suspending</th>\
+							<th>Suspended</th>\
 							<th>Finished</th>\
 							<th>Canceled</th>\
 							<th>Failed</th>\
@@ -133,6 +156,8 @@ function fillTable(table, json) {
 			countTasks += groupvertex.numberofgroupmembers;
 			countStarting += (groupvertex.CREATED + groupvertex.SCHEDULED + groupvertex.ASSIGNED + groupvertex.READY + groupvertex.STARTING);
 			countRunning += groupvertex.RUNNING;
+			countSuspending += groupvertex.SUSPENDING;
+			countSuspended += groupvertex.SUSPENDED;
 			countFinished += groupvertex.FINISHING + groupvertex.FINISHED;
 			countCanceled += groupvertex.CANCELING + groupvertex.CANCELED;
 			countFailed += groupvertex.FAILED;
@@ -150,6 +175,12 @@ function fillTable(table, json) {
 							<td class=\"running\"><div class=\"progressBar\"><div style=\"width:"+ (groupvertex.RUNNING / groupvertex.numberofgroupmembers) * widthProgressbar + "px\">"
 							+ groupvertex.RUNNING
 							+ "</div></div></td>\
+							<td class=\"suspended\"><div class=\"progressBar\"><div style=\"width:"+ (groupvertex.SUSPENDING / groupvertex.numberofgroupmembers) * widthProgressbar + "px\">"
+							+ groupvertex.SUSPENDING
+							+ "</div></div></td>\
+							<td class=\"suspended\"><div class=\"progressBar\"><div style=\"width:"+ (groupvertex.SUSPENDED / groupvertex.numberofgroupmembers) * widthProgressbar + "px\">"
+							+ groupvertex.SUSPENDED
+							+ "</div></div></td>\
 							<td class=\"finished\"><div class=\"progressBar\"><div style=\"width:" + ((groupvertex.FINISHING + groupvertex.FINISHED) / groupvertex.numberofgroupmembers) * widthProgressbar + "px\">"
 							+ (groupvertex.FINISHING + groupvertex.FINISHED)
 							+ "</div></div></td>\
@@ -161,7 +192,7 @@ function fillTable(table, json) {
 							+ groupvertex.FAILED
 							+ "</div></div></td>\
 						</tr><tr>\
-						<td colspan=8 id=\"_"+groupvertex.groupvertexid+"\" style=\"display:none\">\
+						<td colspan=9 id=\"_"+groupvertex.groupvertexid+"\" style=\"display:none\">\
 							<table class=\"subtable\">\
 							  	<tr>\
 							  		<th>Name</th>\
@@ -178,6 +209,10 @@ function fillTable(table, json) {
        							</tr>";
 							});
 							jobtable += "</table>\
+                            <center>\
+								<a class=\"scaleUp btn\" href=\"#\" data-job=\""+job.jobid+"\" data-groupvertex=\""+groupvertex.groupvertexid+"\" data-groupvertex-name=\""+groupvertex.groupvertexname+"\">scale up</a>\
+								<a class=\"scaleDown btn\" href=\"#\" data-job=\""+job.jobid+"\" data-groupvertex=\""+groupvertex.groupvertexid+"\" data-groupvertex-name=\""+groupvertex.groupvertexname+"\">scale down</a>\
+                            </center>\
 						</td></tr>";
 						});
 
@@ -189,6 +224,12 @@ function fillTable(table, json) {
 						+ "</div></div></td>\
 						<td class=\"running\"><div class=\"progressBar\"><div style=\"width:" + (countRunning / countTasks) * widthProgressbar + "px\">"
 							+ countRunning
+						+ "</div></div></td>\
+						<td class=\"suspending\"><div class=\"progressBar\"><div style=\"width:" + (countSuspending / countTasks) * widthProgressbar + "px\">"
+							+ countSuspending
+						+ "</div></div></td>\
+						<td class=\"suspended\"><div class=\"progressBar\"><div style=\"width:" + (countSuspended / countTasks) * widthProgressbar + "px\">"
+							+ countSuspended
 						+ "</div></div></td>\
 						<td class=\"finished\"><div class=\"progressBar\"><div style=\"width:"+ (countFinished / countTasks) * widthProgressbar + "px\">"
 							+ countFinished

@@ -102,6 +102,7 @@ import eu.stratosphere.nephele.ipc.Server;
 import eu.stratosphere.nephele.jobgraph.AbstractJobVertex;
 import eu.stratosphere.nephele.jobgraph.JobGraph;
 import eu.stratosphere.nephele.jobgraph.JobID;
+import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.jobmanager.archive.ArchiveListener;
 import eu.stratosphere.nephele.jobmanager.archive.MemoryArchivist;
 import eu.stratosphere.nephele.jobmanager.scheduler.AbstractScheduler;
@@ -1387,5 +1388,17 @@ public class JobManager implements DeploymentManager, ExtendedManagementProtocol
 		}
 
 		return jmp.requestData(data);
+	}
+
+	public void scaleUpElasticTask(JobID jobID, JobVertexID jobVertexID, int noOfSubtasksToStart) throws Exception {
+		this.scheduler.scaleUpElasticTask(jobID, jobVertexID, noOfSubtasksToStart);
+	}
+
+	public void scaleDownElasticTask(JobID jobID, JobVertexID jobVertexID, final int noOfSubtasksToStart) throws Exception {
+		this.scheduler.scaleDownElasticTask(jobID, jobVertexID, noOfSubtasksToStart);
+	}
+
+	public JobVertexID getJobVertexIdByName(JobID jobID, String jobVertexName) {
+		return this.scheduler.getJobVertexIdByName(jobID, jobVertexName);
 	}
 }
