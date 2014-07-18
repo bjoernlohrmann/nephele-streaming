@@ -37,6 +37,7 @@ import eu.stratosphere.nephele.fs.FSDataInputStream;
 import eu.stratosphere.nephele.fs.FileStatus;
 import eu.stratosphere.nephele.fs.FileSystem;
 import eu.stratosphere.nephele.fs.Path;
+import eu.stratosphere.nephele.io.DistributionPattern;
 import eu.stratosphere.nephele.io.IOReadableWritable;
 import eu.stratosphere.nephele.types.StringRecord;
 import eu.stratosphere.nephele.util.ClassUtils;
@@ -535,6 +536,153 @@ public class JobGraph implements IOReadableWritable {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Checks for all registered job vertices if their elastic number of substasks is correct.
+	 *
+	 * @return <code>null</code> if the min/max/initial number of all vertices is correct or the first job vertex whose
+	 *         numbers is incorrect.
+	 * @throws JobGraphDefinitionException if failure description present
+	 */
+	public AbstractJobVertex areEleasticNumberOfSubtasksCorrect() throws JobGraphDefinitionException {
+
+		// Check input vertices
+		final Iterator<AbstractJobInputVertex> inputIterator = getInputVertices();
+		while (inputIterator.hasNext()) {
+			final AbstractJobVertex jv = inputIterator.next();
+
+			if (!areEleasticNumberOfSubtasksValid(jv))
+				return jv;
+		}
+
+		// Check task vertices
+		final Iterator<JobTaskVertex> taskIterator = getTaskVertices();
+		while (taskIterator.hasNext()) {
+			final AbstractJobVertex jv = taskIterator.next();
+
+			if (!areEleasticNumberOfSubtasksValid(jv))
+				return jv;
+		}
+
+		// Check output vertices
+		final Iterator<AbstractJobOutputVertex> outputIterator = getOutputVertices();
+		while (outputIterator.hasNext()) {
+			final AbstractJobVertex jv = outputIterator.next();
+
+			if (!areEleasticNumberOfSubtasksValid(jv))
+				return jv;
+		}
+
+		return null;
+	}
+
+	/**
+	 * Validates elastic number of substasks if present.
+	 *
+	 * @param vertex
+	 * @return true if min/max/initial combinations valid
+	 * @throws JobGraphDefinitionException if failure description present
+	 */
+	private boolean areEleasticNumberOfSubtasksValid(AbstractJobVertex vertex) throws JobGraphDefinitionException {
+
+		if (vertex.hasElasticNumberOfSubtasks()) {
+			if (vertex.getElasticMinNumberOfSubtasks() < 1)
+				return false;
+
+			if (vertex.getElasticMinNumberOfSubtasks() > vertex.getElasticMaxNumberOfSubtasks())
+				return false;
+
+			if (vertex.getElasticMinNumberOfSubtasks() > vertex.getElasticInitialNumberOfSubtasks())
+				return false;
+
+			if (vertex.getElasticMaxNumberOfSubtasks() < vertex.getElasticInitialNumberOfSubtasks())
+				return false;
+
+			// valid, but useless elastic parameters:
+			if (vertex.getElasticMinNumberOfSubtasks() == vertex.getElasticInitialNumberOfSubtasks()
+					&& vertex.getElasticMaxNumberOfSubtasks() == vertex.getElasticInitialNumberOfSubtasks())
+				throw new JobGraphDefinitionException("Usless elastic scaling parameters detected: min = max = initial.");
+		}
+
+		return true;
+	}
+
+	/**
+	 * Checks if subtasks contains empty input or output gates after elastic scaling.
+	 *
+	 * @throws JobGraphDefinitionException  if invalid (elastic) subtask settings detected
+	 */
+	public void areTasksWithEmptyGates() throws JobGraphDefinitionException {
+		// Check input vertices
+		final Iterator<AbstractJobInputVertex> inputIterator = getInputVertices();
+		while (inputIterator.hasNext()) {
+			areTasksWithEmptyGateForwardConnections(inputIterator.next());
+		}
+
+		// Check task vertices
+		final Iterator<JobTaskVertex> taskIterator = getTaskVertices();
+		while (taskIterator.hasNext()) {
+			areTasksWithEmptyGateForwardConnections(taskIterator.next());
+		}
+
+		// Check output vertices
+		// we already checked the gates via forward connections
+	}
+
+	/**
+	 * Checks input/output gate combinations on forward point wise connections.
+	 *
+	 * @throws JobGraphDefinitionException  if invalid (elastic) subtask settings detected
+	 */
+	public void areTasksWithEmptyGateForwardConnections(AbstractJobVertex cv) throws JobGraphDefinitionException {
+
+		for (int i = 0; i < cv.getNumberOfForwardConnections(); i++) {
+			if (cv.getForwardConnection(i).getDistributionPattern() == DistributionPattern.POINTWISE) {
+				areTasksWithEmptyGates(cv, cv.getForwardConnection(i).getConnectedVertex());
+			}
+		}
+	}
+
+	/**
+	 * Validates that elastic min/max/initial subtask counts are equal between two vertices.
+	 *
+	 * @param first point wise connected task
+	 * @param second point wise connected task
+	 * @throws JobGraphDefinitionException  if invalid (elastic) subtask settings detected
+	 */
+	public void areTasksWithEmptyGates(AbstractJobVertex first, AbstractJobVertex second) throws JobGraphDefinitionException {
+		if (first.hasElasticNumberOfSubtasks() && second.hasElasticNumberOfSubtasks()) {
+			if (first.getElasticMinNumberOfSubtasks() != second.getElasticMinNumberOfSubtasks()) {
+				throw new JobGraphDefinitionException(
+						"Min elastic subtask definition on point wise connected tasks "
+						+ first.getName() + " and " + second.getName() + " does not match."
+						+ " Scaling impossible. Please adjust min elastic subtasks settings.");
+
+			} else if (first.getElasticInitialNumberOfSubtasks() != second.getElasticInitialNumberOfSubtasks()) {
+					throw new JobGraphDefinitionException(
+							"Initial elastic subtask definition on point wise connected tasks "
+							+ first.getName() + " and " + second.getName() + " does not match."
+							+ " Scaling impossible. Please adjust initial elastic subtasks settings.");
+
+			} else if (first.getElasticMaxNumberOfSubtasks() != second.getElasticMaxNumberOfSubtasks()) {
+				throw new JobGraphDefinitionException(
+						"Max elastic subtask definition on point wise connected tasks "
+						+ first.getName() + " and " + second.getName() + " does not match."
+						+ " Scaling impossible. Please adjust max elastic subtasks settings.");
+			}
+		} else if (first.hasElasticNumberOfSubtasks() && !second.hasElasticNumberOfSubtasks()) {
+			throw new JobGraphDefinitionException(
+					"Pointwise connection between elastic task " + first.getName()
+					+ " and non elastic subtask " + second.getName() + " found."
+					+ " Scaling " + first.getName() + " impossible.");
+
+		} else if (!first.hasElasticNumberOfSubtasks() && second.hasElasticNumberOfSubtasks()) {
+			throw new JobGraphDefinitionException(
+					"Pointwise connection between elastic task " + second.getName()
+					+ " and non elastic subtask " + first.getName() + " found."
+					+ " Scaling " + second.getName() + " impossible.");
+		}
 	}
 
 	/**

@@ -101,6 +101,7 @@ import eu.stratosphere.nephele.ipc.RPC;
 import eu.stratosphere.nephele.ipc.Server;
 import eu.stratosphere.nephele.jobgraph.AbstractJobVertex;
 import eu.stratosphere.nephele.jobgraph.JobGraph;
+import eu.stratosphere.nephele.jobgraph.JobGraphDefinitionException;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.jobmanager.archive.ArchiveListener;
@@ -551,6 +552,21 @@ public class JobManager implements DeploymentManager, ExtendedManagementProtocol
 
 		if (LOG.isDebugEnabled()) {
 			LOG.debug("The dependency chain for instance sharing is acyclic");
+		}
+
+		// Validate elastic scaling settings
+		try {
+			jv = job.areEleasticNumberOfSubtasksCorrect();
+			if (jv != null) {
+				return new JobSubmissionResult(AbstractJobResult.ReturnCode.ERROR,
+						"Elastic number of substasks are invalid on vertex " + jv.getName() + ".");
+			}
+
+			job.areTasksWithEmptyGates();
+
+		} catch (JobGraphDefinitionException e) {
+			return new JobSubmissionResult(AbstractJobResult.ReturnCode.ERROR,
+					"Invalid elastic parameters detected: " + e.getMessage());
 		}
 
 		// Check if the job will be executed with profiling enabled
