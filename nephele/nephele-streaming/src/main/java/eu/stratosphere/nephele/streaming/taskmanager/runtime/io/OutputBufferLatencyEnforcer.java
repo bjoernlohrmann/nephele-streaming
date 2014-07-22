@@ -20,7 +20,7 @@ public class OutputBufferLatencyEnforcer {
 	
 	private static final String INITIAL_TARGET_OBL_KEY = "plugins.streaming.taskmanager.io.initialTargetOutputBufferLatencyMillis";
 
-	private static final int INITIAL_TARGET_OBL_DEFAULT = 40;
+	private static final int INITIAL_TARGET_OBL_DEFAULT = 10;
 
 	private static final String ADJUSTMENT_INTERVAL_KEY = "plugins.streaming.taskmanager.io.outputBufferSizeAdjustmentIntervalMillis";
 
@@ -39,8 +39,12 @@ public class OutputBufferLatencyEnforcer {
 		int outputBuffersSentSinceLastAdjust = 0;
 
 		int recordsEmittedSinceLastAdjust = 0;
+		
+		public long totalBytesTransmitted = 0;
+		
+		public long totalBytesTransmittedAtLastAdjust = 0;
 
-		private int targetOutputBufferLatency = 40;
+		private int targetOutputBufferLatency;
 
 		private long timeOfLastAdjust = -1;
 
@@ -76,6 +80,7 @@ public class OutputBufferLatencyEnforcer {
 
 			this.outputBuffersSentSinceLastAdjust = 0;
 			this.recordsEmittedSinceLastAdjust = 0;
+			this.totalBytesTransmittedAtLastAdjust = totalBytesTransmitted;
 			this.timeOfLastAdjust = now;
 		}
 
@@ -87,9 +92,9 @@ public class OutputBufferLatencyEnforcer {
 			int newOutputBufferSize = (int) (outputBufferSize * (targetOutputBufferLatency / oblStatistic
 					.getArithmeticMean()));
 			
-			double recordsPerBuffer = ((double) recordsEmittedSinceLastAdjust)
-					/ outputBuffersSentSinceLastAdjust;
-			double avgRecordSize = outputBufferSize / recordsPerBuffer;
+			
+			long bytesTransmittedSinceLastAdjust = totalBytesTransmitted - totalBytesTransmittedAtLastAdjust; 
+			double avgRecordSize = ((double) bytesTransmittedSinceLastAdjust) / recordsEmittedSinceLastAdjust;
 
 			return (int) Math.max(avgRecordSize,
 					Math.min(newOutputBufferSize, maxOutputBufferSize));
@@ -129,9 +134,11 @@ public class OutputBufferLatencyEnforcer {
 		this.channelStats.add(new ChannelStatistics(channel));
 	}
 
-	public void outputBufferSent(int channelIndex) {
-		this.channelStats.get(channelIndex).outputBuffersSentSinceLastAdjust++;
-		this.channelStats.get(channelIndex).adjustOutputBufferSizeIfDue();
+	public void outputBufferSent(int channelIndex, long currAmountTransmitted) {
+		ChannelStatistics stats = this.channelStats.get(channelIndex); 
+		stats.outputBuffersSentSinceLastAdjust++;
+		stats.totalBytesTransmitted =  currAmountTransmitted;
+		stats.adjustOutputBufferSizeIfDue();
 	}
 
 	public void reportRecordEmitted(int channelIndex) {
