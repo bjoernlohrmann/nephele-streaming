@@ -110,7 +110,7 @@ public final class StreamMessagingThread extends Thread {
 		this.interrupt();
 	}
 
-	public void sendToTaskManagerAsynchronously(
+	public void sendAsynchronously(
 			final InstanceConnectionInfo connectionInfo,
 			final AbstractSerializableQosMessage data)
 			throws InterruptedException {

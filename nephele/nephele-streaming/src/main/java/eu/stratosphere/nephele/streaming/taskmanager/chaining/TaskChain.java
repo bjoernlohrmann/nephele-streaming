@@ -23,6 +23,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.Logger;
 
 import eu.stratosphere.nephele.jobgraph.JobID;
+import eu.stratosphere.nephele.streaming.taskmanager.profiling.TaskInfo;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosStatistic;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosValue;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.QosReporterConfigCenter;

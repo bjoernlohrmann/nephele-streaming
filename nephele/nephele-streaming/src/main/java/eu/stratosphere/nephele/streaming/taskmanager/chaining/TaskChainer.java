@@ -20,6 +20,7 @@ import java.util.concurrent.ExecutorService;
 
 import org.apache.commons.lang3.tuple.Pair;
 
+import eu.stratosphere.nephele.streaming.taskmanager.profiling.TaskInfo;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.QosReporterConfigCenter;
 
 /**

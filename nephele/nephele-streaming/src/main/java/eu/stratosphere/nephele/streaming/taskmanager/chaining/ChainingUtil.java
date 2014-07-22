@@ -83,7 +83,7 @@ public class ChainingUtil {
 
 		StreamMessagingThread msgThread = StreamMessagingThread.getInstance();
 		for (InstanceConnectionInfo qosManager : updatesByQosManager.keySet()) {
-			msgThread.sendToTaskManagerAsynchronously(qosManager,
+			msgThread.sendAsynchronously(qosManager,
 					updatesByQosManager.get(qosManager));
 		}
 	}

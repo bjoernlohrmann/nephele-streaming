@@ -12,7 +12,7 @@
  * specific language governing permissions and limitations under the License.
  *
  **********************************************************************************************************************/
-package eu.stratosphere.nephele.streaming.taskmanager.chaining;
+package eu.stratosphere.nephele.streaming.taskmanager.profiling;
 
 import java.lang.management.ThreadMXBean;
 
@@ -103,7 +103,7 @@ public class TaskInfo implements ExecutionListener {
 		return this.task.getExecutionState();
 	}
 
-	public void measureCpuUtilization() {
+	public  synchronized void measureCpuUtilization() {
 
 		if (this.environmentThreadSet != null) {
 
@@ -135,11 +135,11 @@ public class TaskInfo implements ExecutionListener {
 		return this.cpuUtilization.hasValues();
 	}
 
-	public double getCPUUtilization() {
+	public synchronized double getCPUUtilization() {
 		return this.cpuUtilization.getArithmeticMean();
 	}
 
-	public double getUnchainedCpuUtilization() {
+	public  synchronized double getUnchainedCpuUtilization() {
 		return this.unchainedCpuUtilization;
 	}
 
@@ -230,7 +230,7 @@ public class TaskInfo implements ExecutionListener {
 		this.task.unregisterExecutionListener(this);
 	}
 
-	public void setIsChained(boolean isChained) {
+	public synchronized void setIsChained(boolean isChained) {
 		if (!this.isChained && this.hasCPUUtilizationMeasurements()) {
 			this.unchainedCpuUtilization = this.getCPUUtilization();
 		}
@@ -242,15 +242,15 @@ public class TaskInfo implements ExecutionListener {
 		this.isChained = isChained;
 	}
 
-	public void setNextInChain(TaskInfo nextInChain) {
+	public synchronized void setNextInChain(TaskInfo nextInChain) {
 		this.nextInChain = nextInChain;
 	}
 
-	public TaskInfo getNextInChain() {
+	public synchronized TaskInfo getNextInChain() {
 		return this.nextInChain;
 	}
 
-	public boolean isChained() {
+	public synchronized boolean isChained() {
 		return this.isChained;
 	}
 }

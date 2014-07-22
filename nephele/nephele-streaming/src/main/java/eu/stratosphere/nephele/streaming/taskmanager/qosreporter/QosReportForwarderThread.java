@@ -194,7 +194,7 @@ public class QosReportForwarderThread extends Thread {
 
 	private void sendToRemote(AggregatedReport currentReport)
 			throws InterruptedException {
-		this.messagingThread.sendToTaskManagerAsynchronously(
+		this.messagingThread.sendAsynchronously(
 				currentReport.getQosManager(), currentReport.getReport());
 	}
 
