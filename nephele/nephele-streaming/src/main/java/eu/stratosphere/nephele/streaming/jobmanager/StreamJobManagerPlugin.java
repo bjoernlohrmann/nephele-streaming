@@ -142,6 +142,13 @@ public class StreamJobManagerPlugin implements JobManagerPlugin,
 			if (qosSetupManager != null) {
 				qosSetupManager.shutdown();
 			}
+		} else if (newJobStatus == InternalJobStatus.RUNNING) {
+			QosSetupManager qosSetupManager = this.qosSetupManagers
+					.remove(executionGraph.getJobID());
+
+			if (qosSetupManager != null) {
+				qosSetupManager.startElasticTaskAutoScaler();
+			}
 		}
 	}
 

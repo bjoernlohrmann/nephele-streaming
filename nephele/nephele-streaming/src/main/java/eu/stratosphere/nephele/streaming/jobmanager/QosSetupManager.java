@@ -1,5 +1,6 @@
 package eu.stratosphere.nephele.streaming.jobmanager;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -25,6 +26,9 @@ import eu.stratosphere.nephele.jobgraph.JobOutputVertex;
 import eu.stratosphere.nephele.jobgraph.JobTaskVertex;
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
+import eu.stratosphere.nephele.streaming.LatencyConstraintID;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraph;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphFactory;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.WrapperUtils;
 import eu.stratosphere.nephele.streaming.util.StreamUtil;
 
@@ -51,16 +55,34 @@ public class QosSetupManager implements VertexAssignmentListener {
 	private JobID jobID;
 
 	private List<JobGraphLatencyConstraint> constraints;
+	
+	private HashMap<LatencyConstraintID, QosGraph> qosGraphs;
 
 	private HashSet<JobVertexID> constrainedJobVertices;
 
 	private HashSet<ExecutionVertexID> verticesWithPendingAllocation;
+	
+	private ElasticTaskQosAutoScalingThread autoscalingThread;
+	
+	private QosSetup qosSetup;
 
 	public QosSetupManager(JobID jobID,
 			List<JobGraphLatencyConstraint> constraints) {
 		this.jobID = jobID;
 		this.constraints = constraints;
 		this.constrainedJobVertices = this.computeJobVerticesToRewrite();
+	}
+	
+	private HashMap<LatencyConstraintID, QosGraph> createQosGraphs() {
+		HashMap<LatencyConstraintID, QosGraph> qosGraphs = new HashMap<LatencyConstraintID, QosGraph>();
+		
+		for (JobGraphLatencyConstraint constraint : this.constraints) {
+			qosGraphs.put(constraint.getID(),
+					QosGraphFactory.createConstrainedQosGraph(this.executionGraph,
+									constraint));
+		}
+		
+		return qosGraphs;
 	}
 
 	public void registerOnExecutionGraph(ExecutionGraph executionGraph) {
@@ -107,7 +129,16 @@ public class QosSetupManager implements VertexAssignmentListener {
 
 	public void shutdown() {
 		this.taskManagers.clear();
+
 		this.executionGraph = null;
+
+		if (this.autoscalingThread != null) {
+			this.autoscalingThread.shutdown();
+			this.autoscalingThread = null;
+		}
+
+		this.qosSetup = null;
+		this.qosGraphs = null;
 	}
 
 	public JobID getJobID() {
@@ -228,11 +259,14 @@ public class QosSetupManager implements VertexAssignmentListener {
 	}
 
 	private void computeAndDistributeQosSetup() {
-		QosSetup qosSetup = new QosSetup(this.executionGraph, this.constraints);
-		qosSetup.computeQosRoles();
-		qosSetup.computeCandidateChains();
-		qosSetup.attachRolesToExecutionGraph();
+		this.qosGraphs = createQosGraphs();
+		this.qosSetup = new QosSetup(this.qosGraphs);
+		this.qosSetup.computeQosRoles();
+		this.qosSetup.computeCandidateChains(this.executionGraph);
+		this.qosSetup.attachRolesToExecutionGraph(this.executionGraph);
+	}
 
-		// FIXME: continue here: distribute QoS setup
+	public void startElasticTaskAutoScaler() {
+		this.autoscalingThread = new  ElasticTaskQosAutoScalingThread(qosGraphs);
 	}
 }

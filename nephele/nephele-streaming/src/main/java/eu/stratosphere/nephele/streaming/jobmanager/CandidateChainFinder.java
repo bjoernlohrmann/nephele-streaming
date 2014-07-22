@@ -75,7 +75,7 @@ public class CandidateChainFinder implements QosGraphTraversalListener {
 	private void appendToOrRestartChain(QosVertex vertex,
 			SequenceElement<JobVertexID> sequenceElem) {
 
-		int noOfInputGatesInExecutionGraph = CandidateChainFinder.this.executionGraph
+		int noOfInputGatesInExecutionGraph = this.executionGraph
 				.getVertexByID(vertex.getID()).getNumberOfInputGates();
 
 		QosGate inputGate = vertex.getInputGate(sequenceElem
@@ -110,7 +110,7 @@ public class CandidateChainFinder implements QosGraphTraversalListener {
 
 		int noOfEdgesInOutputGate = outputGate.getNumberOfEdges();
 
-		int noOfOutputGatesInExecutionGraph = CandidateChainFinder.this.executionGraph
+		int noOfOutputGatesInExecutionGraph = this.executionGraph
 				.getVertexByID(vertex.getID()).getNumberOfOutputGates();
 
 		if (noOfEdgesInOutputGate == 1 && noOfOutputGatesInExecutionGraph == 1) {

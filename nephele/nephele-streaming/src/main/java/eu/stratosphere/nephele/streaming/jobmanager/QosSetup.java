@@ -31,7 +31,6 @@ import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
 import eu.stratosphere.nephele.instance.InstanceConnectionInfo;
 import eu.stratosphere.nephele.io.DistributionPattern;
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
-import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.JobGraphSequence;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
 import eu.stratosphere.nephele.streaming.SequenceElement;
@@ -39,7 +38,6 @@ import eu.stratosphere.nephele.streaming.StreamingPluginLoader;
 import eu.stratosphere.nephele.streaming.message.action.DeployInstanceQosRolesAction;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosEdge;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraph;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphFactory;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphTraversal;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphTraversalListener;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGroupVertex;
@@ -58,25 +56,16 @@ public class QosSetup {
 
 	private static final Logger LOG = Logger.getLogger(QosSetup.class);
 
-	private ExecutionGraph executionGraph;
-
-	private List<JobGraphLatencyConstraint> constraints;
-
 	private HashMap<LatencyConstraintID, QosGraph> qosGraphs;
 
 	private HashMap<InstanceConnectionInfo, TaskManagerQosSetup> taskManagerQosSetups;
 
-	public QosSetup(ExecutionGraph executionGraph,
-			List<JobGraphLatencyConstraint> constraints) {
-
-		this.executionGraph = executionGraph;
-		this.constraints = constraints;
-		this.qosGraphs = new HashMap<LatencyConstraintID, QosGraph>();
+	public QosSetup(HashMap<LatencyConstraintID, QosGraph> qosGraphs) {
+		this.qosGraphs = qosGraphs;
 		this.taskManagerQosSetups = new HashMap<InstanceConnectionInfo, TaskManagerQosSetup>();
 	}
 
 	public void computeQosRoles() {
-		this.createQosGraphs();
 		this.computeQosManagerRoles();
 		this.computeQosReporterRoles();
 	}
@@ -174,14 +163,6 @@ public class QosSetup {
 		}
 	}
 
-	private void createQosGraphs() {
-		for (JobGraphLatencyConstraint constraint : this.constraints) {
-			this.qosGraphs
-					.put(constraint.getID(), QosGraphFactory
-							.createConstrainedQosGraph(this.executionGraph,
-									constraint));
-		}
-	}
 
 	/**
 	 * Computes which instances shall run QosManagers.
@@ -400,20 +381,20 @@ public class QosSetup {
 		return anchorCandidates;
 	}
 
-	public void attachRolesToExecutionGraph() {
+	public void attachRolesToExecutionGraph(ExecutionGraph executionGraph) {
 		for (TaskManagerQosSetup instanceQosRoles : this.taskManagerQosSetups
 				.values()) {
 			DeployInstanceQosRolesAction rolesDeployment = instanceQosRoles
-					.toDeploymentAction(this.executionGraph.getJobID());
+					.toDeploymentAction(executionGraph.getJobID());
 
 			if (!rolesDeployment.getVertexQosReporters().isEmpty()) {
-				this.executionGraph.getVertexByID(
+				executionGraph.getVertexByID(
 						rolesDeployment.getVertexQosReporters().get(0)
 								.getVertexID()).setPluginData(
 						StreamingPluginLoader.STREAMING_PLUGIN_ID,
 						rolesDeployment);
 			} else {
-				ExecutionVertex sourceVertex = this.executionGraph
+				ExecutionVertex sourceVertex = executionGraph
 						.getVertexByChannelID(rolesDeployment
 								.getEdgeQosReporters().get(0)
 								.getSourceChannelID());
@@ -426,7 +407,7 @@ public class QosSetup {
 							StreamingPluginLoader.STREAMING_PLUGIN_ID,
 							rolesDeployment);
 				} else {
-					ExecutionVertex targetVertex = this.executionGraph
+					ExecutionVertex targetVertex = executionGraph
 							.getVertexByChannelID(rolesDeployment
 									.getEdgeQosReporters().get(0)
 									.getTargetChannelID());
@@ -439,7 +420,7 @@ public class QosSetup {
 		}
 	}
 
-	public void computeCandidateChains() {
+	public void computeCandidateChains(ExecutionGraph executionGraph) {
 		// gets called whenever a candidate chain is found
 		CandidateChainListener chainListener = new CandidateChainListener() {
 			@Override
@@ -452,8 +433,7 @@ public class QosSetup {
 			}
 		};
 
-		CandidateChainFinder chainFinder = new CandidateChainFinder(
-				chainListener, this.executionGraph);
+		CandidateChainFinder chainFinder = new CandidateChainFinder(chainListener, executionGraph);
 
 		for (Entry<LatencyConstraintID, QosGraph> entry : this.qosGraphs
 				.entrySet()) {
