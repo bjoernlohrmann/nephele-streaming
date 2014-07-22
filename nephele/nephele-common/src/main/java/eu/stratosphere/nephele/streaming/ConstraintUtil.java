@@ -230,7 +230,7 @@ public class ConstraintUtil {
 
 		for (int i = 0; i < begin.getNumberOfForwardConnections(); i++) {
 			if (includeBeginVertex) {
-				stack.addVertex(begin.getID(), beginVertexInputGate, i);
+				stack.addVertex(begin.getID(), begin.getName(), beginVertexInputGate, i);
 			}
 
 			depthFirstSequenceEnumerate(begin.getForwardConnection(i), stack,
@@ -243,7 +243,7 @@ public class ConstraintUtil {
 
 		if (includeEndVertex) {
 			for (JobGraphSequence sequence : toReturn) {
-				sequence.addVertex(end.getID(), sequence.getLast()
+				sequence.addVertex(end.getID(), end.getName(), sequence.getLast()
 						.getInputGateIndex(), endVertexOutputGate);
 			}
 		}
@@ -279,7 +279,7 @@ public class ConstraintUtil {
 			for (int i = 0; i < edgeTarget.getNumberOfForwardConnections(); i++) {
 				JobEdge nextEdge = edgeTarget.getForwardConnection(i);
 
-				stack.addVertex(edgeTarget.getID(),
+				stack.addVertex(edgeTarget.getID(), edgeTarget.getName(),
 						forwardEdge.getIndexOfInputGate(), i);
 				depthFirstSequenceEnumerate(nextEdge, stack, resultAccumulator,
 						end);

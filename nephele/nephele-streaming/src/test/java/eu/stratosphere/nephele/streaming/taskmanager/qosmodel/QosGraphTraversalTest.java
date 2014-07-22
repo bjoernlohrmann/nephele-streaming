@@ -465,9 +465,9 @@ public class QosGraphTraversalTest {
 		JobGraph jobGraph = this.createSimpleJobGraph();
 		JobGraphSequence seq = new JobGraphSequence();
 		seq.addEdge(this.input.getID(), 0, this.task1.getID(), 0);
-		seq.addVertex(this.task1.getID(), 0, 0);
+		seq.addVertex(this.task1.getID(), this.task1.getName(), 0, 0);
 		seq.addEdge(this.task1.getID(), 0, this.task2.getID(), 0);
-		seq.addVertex(this.task2.getID(), 0, 0);
+		seq.addVertex(this.task2.getID(), this.task2.getName(), 0, 0);
 		seq.addEdge(this.task2.getID(), 0, this.output.getID(), 0);
 		JobGraphLatencyConstraint constraint = new JobGraphLatencyConstraint(
 				seq, 2000);
@@ -538,7 +538,6 @@ public class QosGraphTraversalTest {
 		 * eu.stratosphere.nephele.template.AbstractInvokable#registerInputOutput
 		 * ()
 		 */
-		@SuppressWarnings("unused")
 		@Override
 		public void registerInputOutput() {
 			new RecordWriter<DummyRecord>(this, DummyRecord.class);
@@ -565,7 +564,6 @@ public class QosGraphTraversalTest {
 		 * eu.stratosphere.nephele.template.AbstractInvokable#registerInputOutput
 		 * ()
 		 */
-		@SuppressWarnings("unused")
 		@Override
 		public void registerInputOutput() {
 			new RecordReader<DummyRecord>(this, DummyRecord.class);
@@ -591,7 +589,6 @@ public class QosGraphTraversalTest {
 		 * eu.stratosphere.nephele.template.AbstractInvokable#registerInputOutput
 		 * ()
 		 */
-		@SuppressWarnings("unused")
 		@Override
 		public void registerInputOutput() {
 			new RecordReader<DummyRecord>(this, DummyRecord.class);

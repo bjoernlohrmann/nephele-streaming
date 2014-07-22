@@ -22,6 +22,7 @@ import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.JobGraphSequence;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
 import eu.stratosphere.nephele.streaming.SequenceElement;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.QosConstraintSummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosEdge;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraph;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphMember;
@@ -57,7 +58,7 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 
 	private QosConstraintViolationListener constraintViolationListener;
 
-	private QosLogger logger;
+	private QosConstraintSummary constraintSummary;
 
 	public QosConstraintViolationFinder(LatencyConstraintID constraintID,
 			QosGraph qosGraph,
@@ -73,8 +74,8 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 
 		this.qosGraph = qosGraph;
 		this.constraint = qosGraph.getConstraintByID(constraintID);
+		this.constraintSummary = new QosConstraintSummary(this.constraint);
 		this.constraintViolationListener = constraintViolationListener;
-		this.logger = logger;
 
 		this.graphTraversal = new QosGraphTraversal(null,
 				this.constraint.getSequence(), this, this);
@@ -90,7 +91,7 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 
 	}
 
-	public void findSequencesWithViolatedQosConstraint() {
+	public QosConstraintSummary findSequencesWithViolatedQosConstraint() {
 
 		JobGraphSequence sequence = this.constraint.getSequence();
 		QosGroupVertex startGroupVertex;
@@ -106,6 +107,8 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 			this.graphTraversal.setStartVertex(startMemberVertex);
 			this.graphTraversal.traverseForwardConditional();
 		}
+		
+		return this.constraintSummary;
 	}
 
 	/*
@@ -165,9 +168,7 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 	private void handleFullSequence() {
 		sequenceSummary.update(this.currentSequenceMembers);
 		
-		if (this.logger != null) {
-			this.logger.addMemberSequenceToLog(this.sequenceSummary);
-		}
+		constraintSummary.addMemberSequenceSummary(sequenceSummary);
 
 		double constraintViolatedByMillis = this.sequenceSummary.getSequenceLatency()
 				- this.constraint.getLatencyConstraintInMillis();

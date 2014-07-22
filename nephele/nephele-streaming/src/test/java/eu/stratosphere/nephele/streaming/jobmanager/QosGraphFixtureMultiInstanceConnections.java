@@ -9,6 +9,7 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.HashMap;
 
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
@@ -37,11 +38,13 @@ import eu.stratosphere.nephele.jobgraph.JobOutputVertex;
 import eu.stratosphere.nephele.jobgraph.JobTaskVertex;
 import eu.stratosphere.nephele.streaming.ConstraintUtil;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
+import eu.stratosphere.nephele.streaming.LatencyConstraintID;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraph;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphFactory;
 import eu.stratosphere.nephele.template.AbstractGenericInputTask;
 import eu.stratosphere.nephele.template.AbstractOutputTask;
 import eu.stratosphere.nephele.template.AbstractTask;
 import eu.stratosphere.nephele.types.Record;
-import eu.stratosphere.nephele.util.SerializableArrayList;
 
 /**
  * TODO refactoring when issue-1999 is merged with master to avoid code
@@ -73,7 +76,7 @@ public class QosGraphFixtureMultiInstanceConnections {
 	public InstanceConnectionInfo[][] instanceConnectionInfos;
 
 	public JobGraphLatencyConstraint constraintFull;
-	public SerializableArrayList<JobGraphLatencyConstraint> constraints;
+	public HashMap<LatencyConstraintID, QosGraph> constraints;
 
 	/**
 	 * Looks like this I(1) ->(B) T(2) ->(B) O(1)
@@ -88,7 +91,7 @@ public class QosGraphFixtureMultiInstanceConnections {
 	public ExecutionGroupVertex execTaskVertex2;
 	public ExecutionGroupVertex execOutputVertex2;
 	public InstanceConnectionInfo[][] instanceConnectionInfos2;
-	public SerializableArrayList<JobGraphLatencyConstraint> constraints2;
+	public HashMap<LatencyConstraintID, QosGraph> constraints2;
 
 	public QosGraphFixtureMultiInstanceConnections()
 			throws JobGraphDefinitionException, GraphConversionException,
@@ -229,13 +232,27 @@ public class QosGraphFixtureMultiInstanceConnections {
 				this.jobOutputVertex, 2000l);
 		this.constraintFull = ConstraintUtil.getConstraints(
 				this.jobGraph.getJobConfiguration()).get(0);
-		this.constraints = ConstraintUtil.getConstraints(this.jobGraph
-				.getJobConfiguration());
+		this.constraints = new HashMap<LatencyConstraintID, QosGraph>();
+		for (JobGraphLatencyConstraint constraint : ConstraintUtil
+				.getConstraints(this.jobGraph.getJobConfiguration())) {
+
+			this.constraints
+					.put(constraint.getID(), QosGraphFactory
+							.createConstrainedQosGraph(this.executionGraph,
+									constraint));
+		}
 
 		ConstraintUtil.defineAllLatencyConstraintsBetween(this.jobInputVertex2,
 				this.jobOutputVertex2, 2000l);
-		this.constraints2 = ConstraintUtil.getConstraints(this.jobGraph2
-				.getJobConfiguration());
+		this.constraints2 = new HashMap<LatencyConstraintID, QosGraph>();
+		for (JobGraphLatencyConstraint constraint : ConstraintUtil
+				.getConstraints(this.jobGraph2.getJobConfiguration())) {
+
+			this.constraints2
+					.put(constraint.getID(), QosGraphFactory
+							.createConstrainedQosGraph(this.executionGraph2,
+									constraint));
+		}
 	}
 
 	/**

@@ -78,10 +78,9 @@ public class QosSetupTest {
 	 */
 	@Test
 	public void testManagerAssignment() throws Exception {
-		QosSetup qosSetup = new QosSetup(this.fix.executionGraph,
-				this.fix.constraints);
+		QosSetup qosSetup = new QosSetup(this.fix.constraints);
 		qosSetup.computeQosRoles();
-		qosSetup.attachRolesToExecutionGraph();
+		qosSetup.attachRolesToExecutionGraph(this.fix.executionGraph);
 		ExecutionStage stage = this.fix.executionGraph.getStage(0);
 		Map<ExecutionVertex, DeployInstanceQosRolesAction> vertexToRole = new HashMap<ExecutionVertex, DeployInstanceQosRolesAction>();
 
@@ -123,10 +122,9 @@ public class QosSetupTest {
 	 */
 	@Test
 	public void testManagerAssignmentGraph2() throws Exception {
-		QosSetup qosSetup = new QosSetup(this.fix.executionGraph2,
-				this.fix.constraints2);
+		QosSetup qosSetup = new QosSetup(this.fix.constraints2);
 		qosSetup.computeQosRoles();
-		qosSetup.attachRolesToExecutionGraph();
+		qosSetup.attachRolesToExecutionGraph(this.fix.executionGraph2);
 		ExecutionStage stage = this.fix.executionGraph2.getStage(0);
 		Map<ExecutionVertex, DeployInstanceQosRolesAction> vertexToRole = new HashMap<ExecutionVertex, DeployInstanceQosRolesAction>();
 

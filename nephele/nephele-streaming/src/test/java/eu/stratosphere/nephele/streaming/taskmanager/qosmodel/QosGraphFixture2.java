@@ -230,44 +230,44 @@ public class QosGraphFixture2 {
     private void createConstaints() {
         // Full
         JobGraphSequence fullSequence = new JobGraphSequence();
-        fullSequence.addVertex(jobInputVertex.getID(), 0, 0);
+        fullSequence.addVertex(jobInputVertex.getID(), jobInputVertex.getName(), 0, 0);
         fullSequence.addEdge(jobInputVertex.getID(), 0, jobTaskVertex1.getID(), 0);
-        fullSequence.addVertex(jobTaskVertex1.getID(),0, 0);
+        fullSequence.addVertex(jobTaskVertex1.getID(), jobTaskVertex1.getName(), 0, 0);
         fullSequence.addEdge(jobTaskVertex1.getID(), 0, jobTaskVertex2.getID(), 0);
-        fullSequence.addVertex(jobTaskVertex2.getID(), 0, 0);
+        fullSequence.addVertex(jobTaskVertex2.getID(), jobTaskVertex2.getName(), 0, 0);
         fullSequence.addEdge(jobTaskVertex2.getID(), 0, jobTaskVertex3.getID(), 0);
-        fullSequence.addVertex(jobTaskVertex3.getID(), 0, 0);
+        fullSequence.addVertex(jobTaskVertex3.getID(), jobTaskVertex3.getName(), 0, 0);
         fullSequence.addEdge(jobTaskVertex3.getID(), 0, jobOutputVertex.getID(), 0);
-        fullSequence.addVertex(jobOutputVertex.getID(), 0, 0);
+        fullSequence.addVertex(jobOutputVertex.getID(), jobOutputVertex.getName(), 0, 0);
         constraintFull = new JobGraphLatencyConstraint(fullSequence, 2000l);
 
         // -> t2 ->
         JobGraphSequence edgeVertexEdge = new JobGraphSequence();
         edgeVertexEdge.addEdge(jobTaskVertex1.getID(), 0, jobTaskVertex2.getID(), 0);
-        edgeVertexEdge.addVertex(jobTaskVertex2.getID(), 0, 0);
+        edgeVertexEdge.addVertex(jobTaskVertex2.getID(), jobTaskVertex2.getName(), 0, 0);
         edgeVertexEdge.addEdge(jobTaskVertex2.getID(), 0, jobTaskVertex3.getID(), 0);
         constraintEdgeVertexEdge = new JobGraphLatencyConstraint(edgeVertexEdge, 2000l);
 
         // t1 -> t2 ->
         JobGraphSequence vertexEdgeVertexEdge = new JobGraphSequence();
-        vertexEdgeVertexEdge.addVertex(jobTaskVertex1.getID(), 0, 0);
+        vertexEdgeVertexEdge.addVertex(jobTaskVertex1.getID(), jobTaskVertex1.getName(), 0, 0);
         vertexEdgeVertexEdge.addEdge(jobTaskVertex1.getID(), 0, jobTaskVertex2.getID(), 0);
-        vertexEdgeVertexEdge.addVertex(jobTaskVertex2.getID(), 0, 0);
+        vertexEdgeVertexEdge.addVertex(jobTaskVertex2.getID(), jobTaskVertex2.getName(), 0, 0);
         vertexEdgeVertexEdge.addEdge(jobTaskVertex2.getID(), 0, jobTaskVertex3.getID(), 0);
         constraintVertexEdgeVertexEdge = new JobGraphLatencyConstraint(vertexEdgeVertexEdge, 2000l);
 
         JobGraphSequence inputVertexEdgeVertex = new JobGraphSequence();
-        inputVertexEdgeVertex.addVertex(jobInputVertex.getID(), 0, 0);
+        inputVertexEdgeVertex.addVertex(jobInputVertex.getID(), jobInputVertex.getName(), 0, 0);
         inputVertexEdgeVertex.addEdge(jobInputVertex.getID(), 0, jobTaskVertex1.getID(), 0);
-        inputVertexEdgeVertex.addVertex(jobTaskVertex1.getID(),0, 0);
+        inputVertexEdgeVertex.addVertex(jobTaskVertex1.getID(),jobTaskVertex1.getName(), 0, 0);
         constraintInputVertexEdgeVertex = new JobGraphLatencyConstraint(inputVertexEdgeVertex, 2000l);
 
         JobGraphSequence middle = new JobGraphSequence();
-        middle.addVertex(jobTaskVertex1.getID(), 0, 0);
+        middle.addVertex(jobTaskVertex1.getID(), jobTaskVertex1.getName(), 0, 0);
         middle.addEdge(jobTaskVertex1.getID(), 0, jobTaskVertex2.getID(), 0);
-        middle.addVertex(jobTaskVertex2.getID(), 0, 0);
+        middle.addVertex(jobTaskVertex2.getID(), jobTaskVertex2.getName(), 0, 0);
         middle.addEdge(jobTaskVertex2.getID(), 0, jobTaskVertex3.getID(), 0);
-        middle.addVertex(jobTaskVertex3.getID(), 0, 0);
+        middle.addVertex(jobTaskVertex3.getID(), jobTaskVertex3.getName(), 0, 0);
         constraintMiddleOfGraph = new JobGraphLatencyConstraint(middle, 2000l);
     }
 

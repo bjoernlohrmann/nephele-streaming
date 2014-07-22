@@ -78,7 +78,8 @@ public class BufferSizeManager {
 
 	HashSet<ChannelID> staleEdges = new HashSet<ChannelID>();
 
-	public void adjustBufferSizes() throws InterruptedException {
+	public List<QosConstraintSummary> adjustBufferSizes()
+			throws InterruptedException {
 
 		final HashMap<QosEdge, Integer> edgesToAdjust = new HashMap<QosEdge, Integer>();
 
@@ -100,7 +101,8 @@ public class BufferSizeManager {
 			}
 		};
 
-		this.qosModel.findQosConstraintViolations(listener);
+		List<QosConstraintSummary> constraintSummaries = this.qosModel
+				.findQosConstraintViolations(listener);
 
 		this.doAdjust(edgesToAdjust);
 
@@ -109,6 +111,7 @@ public class BufferSizeManager {
 				edgesToAdjust.size(), this.staleEdges.size()));
 
 		this.refreshTimeOfNextAdjustment();
+		return constraintSummaries;
 	}
 
 	private void doAdjust(HashMap<QosEdge, Integer> edgesToAdjust)
@@ -163,9 +166,9 @@ public class BufferSizeManager {
 			} else {
 				// overload case (nonOutputBufferLatency >= constraint): we
 				// don't have a chance of meeting the constraint by
-				// adjusting output buffer sizes . in this case just pick a
-				// sensible output buffer size for each edge
-				newTargetObl = 10;
+				// adjusting output buffer sizes. in this case just make
+				// buffers as large as possible for maximum throughput
+				newTargetObl = 100;
 			}
 
 			// do nothing if change is very small
@@ -214,6 +217,6 @@ public class BufferSizeManager {
 
 		InstanceConnectionInfo receiver = edge.getOutputGate().getVertex()
 				.getExecutingInstance();
-		this.messagingThread.sendToTaskManagerAsynchronously(receiver, action);
+		this.messagingThread.sendAsynchronously(receiver, action);
 	}
 }

@@ -42,23 +42,25 @@ public class SequenceElement<T extends AbstractID> implements
 	private boolean isVertex;
 	private Class<T> idClass;
 	private int indexInSequence;
+	private String name;
 
 	public SequenceElement() {
 	}
 
 	@SuppressWarnings("unchecked")
-	public SequenceElement(T vertexID, int inputGateIndex, int outputGateIndex, int indexInSequence) {
+	public SequenceElement(T vertexID, int inputGateIndex, int outputGateIndex, int indexInSequence, String name) {
 		this.idClass = (Class<T>) vertexID.getClass();
 		this.sourceVertexID = vertexID;
 		this.inputGateIndex = inputGateIndex;
 		this.outputGateIndex = outputGateIndex;
 		this.isVertex = true;
 		this.indexInSequence = indexInSequence;
+		this.name = name;
 	}
 
 	@SuppressWarnings("unchecked")
 	public SequenceElement(T sourceVertexID, int outputGateIndex,
-			T targetVertexID, int inputGateIndex, int indexInSequence) {
+			T targetVertexID, int inputGateIndex, int indexInSequence, String name) {
 		this.idClass = (Class<T>) sourceVertexID.getClass();
 		this.sourceVertexID = sourceVertexID;
 		this.targetVertexID = targetVertexID;
@@ -66,6 +68,7 @@ public class SequenceElement<T extends AbstractID> implements
 		this.outputGateIndex = outputGateIndex;
 		this.isVertex = false;
 		this.indexInSequence = indexInSequence;
+		this.name = name;
 	}
 
 	public T getVertexID() {
@@ -88,6 +91,10 @@ public class SequenceElement<T extends AbstractID> implements
 		return this.outputGateIndex;
 	}
 
+	public String getName() {
+		return name;
+	}
+
 	public boolean isVertex() {
 		return this.isVertex;
 	}
@@ -98,10 +105,6 @@ public class SequenceElement<T extends AbstractID> implements
 
 	public int getIndexInSequence() {
 		return this.indexInSequence;
-	}
-
-	public void setIndexInSequence(int indexInSequence) {	
-		this.indexInSequence = indexInSequence;
 	}
 
 	/*
@@ -121,6 +124,7 @@ public class SequenceElement<T extends AbstractID> implements
 		out.writeInt(this.inputGateIndex);
 		out.writeInt(this.outputGateIndex);
 		out.writeInt(this.indexInSequence);
+		out.writeUTF(this.name);
 	}
 
 	/*
@@ -144,6 +148,7 @@ public class SequenceElement<T extends AbstractID> implements
 			this.inputGateIndex = in.readInt();
 			this.outputGateIndex = in.readInt();
 			this.indexInSequence = in.readInt();
+			this.name = in.readUTF();
 		} catch (Exception e) {
 			throw new IOException("Error while deserializing SequenceElement",
 					e);

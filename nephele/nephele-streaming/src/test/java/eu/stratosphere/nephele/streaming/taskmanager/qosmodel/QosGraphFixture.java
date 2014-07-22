@@ -284,10 +284,10 @@ public class QosGraphFixture {
 		JobGraphSequence sequence1 = new JobGraphSequence();
 		sequence1.addEdge(this.jobVertex1.getID(), 1, this.jobVertex3.getID(),
 				0);
-		sequence1.addVertex(this.jobVertex3.getID(), 0, 0);
+		sequence1.addVertex(this.jobVertex3.getID(), this.jobVertex3.getName(), 0, 0);
 		sequence1.addEdge(this.jobVertex3.getID(), 0, this.jobVertex4.getID(),
 				1);
-		sequence1.addVertex(this.jobVertex4.getID(), 1, 0);
+		sequence1.addVertex(this.jobVertex4.getID(), this.jobVertex4.getName(), 1, 0);
 		sequence1.addEdge(this.jobVertex4.getID(), 0, this.jobVertex5.getID(),
 				0);
 		this.constraint1 = new JobGraphLatencyConstraint(sequence1, 2000);
@@ -298,20 +298,20 @@ public class QosGraphFixture {
 		JobGraphSequence sequence2 = new JobGraphSequence();
 		sequence2.addEdge(this.jobVertex1.getID(), 0, this.jobVertex2.getID(),
 				0);
-		sequence2.addVertex(this.jobVertex2.getID(), 0, 0);
+		sequence2.addVertex(this.jobVertex2.getID(), this.jobVertex2.getName(), 0, 0);
 		sequence2.addEdge(this.jobVertex2.getID(), 0, this.jobVertex4.getID(),
 				0);
-		sequence2.addVertex(this.jobVertex4.getID(), 0, 0);
+		sequence2.addVertex(this.jobVertex4.getID(), this.jobVertex4.getName(), 0, 0);
 		this.constraint2 = new JobGraphLatencyConstraint(sequence2, 2000);
 
 		/**
 		 * Covers v2,e24,v4,e45
 		 */
 		JobGraphSequence sequence3 = new JobGraphSequence();
-		sequence3.addVertex(this.jobVertex2.getID(), 0, 0);
+		sequence3.addVertex(this.jobVertex2.getID(), this.jobVertex2.getName(), 0, 0);
 		sequence3.addEdge(this.jobVertex2.getID(), 0, this.jobVertex4.getID(),
 				0);
-		sequence3.addVertex(this.jobVertex4.getID(), 0, 0);
+		sequence3.addVertex(this.jobVertex4.getID(), this.jobVertex4.getName(), 0, 0);
 		sequence3.addEdge(this.jobVertex4.getID(), 0, this.jobVertex5.getID(),
 				0);
 		this.constraint3 = new JobGraphLatencyConstraint(sequence3, 2000);
@@ -320,10 +320,10 @@ public class QosGraphFixture {
 		 * Covers v2,e24,v4
 		 */
 		JobGraphSequence sequence4 = new JobGraphSequence();
-		sequence4.addVertex(this.jobVertex2.getID(), 0, 0);
+		sequence4.addVertex(this.jobVertex2.getID(), this.jobVertex2.getName(), 0, 0);
 		sequence4.addEdge(this.jobVertex2.getID(), 0, this.jobVertex4.getID(),
 				0);
-		sequence4.addVertex(this.jobVertex4.getID(), 0, 0);
+		sequence4.addVertex(this.jobVertex4.getID(), this.jobVertex4.getName(), 0, 0);
 		this.constraint4 = new JobGraphLatencyConstraint(sequence4, 2000);
 
 		/**
@@ -332,10 +332,10 @@ public class QosGraphFixture {
 		JobGraphSequence sequence5 = new JobGraphSequence();
 		sequence5.addEdge(this.vertex10.getJobVertexID(), 0,
 				this.vertex11.getJobVertexID(), 0);
-		sequence5.addVertex(this.vertex11.getJobVertexID(), 0, 0);
+		sequence5.addVertex(this.vertex11.getJobVertexID(), this.vertex11.getName(), 0, 0);
 		sequence5.addEdge(this.vertex11.getJobVertexID(), 0,
 				this.vertex12.getJobVertexID(), 0);
-		sequence5.addVertex(this.vertex12.getJobVertexID(), 0, 0);
+		sequence5.addVertex(this.vertex12.getJobVertexID(), this.vertex12.getName(), 0, 0);
 		sequence5.addEdge(this.vertex12.getJobVertexID(), 0,
 				this.vertex13.getJobVertexID(), 0);
 		this.constraint5 = new JobGraphLatencyConstraint(sequence5, 2000);
@@ -531,7 +531,6 @@ public class QosGraphFixture {
 
 	public static class DummyInputTask extends AbstractGenericInputTask {
 
-		@SuppressWarnings("unused")
 		@Override
 		public void registerInputOutput() {
 			new RecordWriter<DummyRecord>(this, DummyRecord.class);
@@ -550,7 +549,6 @@ public class QosGraphFixture {
 
 	public static class DummyOutputTask extends AbstractOutputTask {
 
-		@SuppressWarnings("unused")
 		@Override
 		public void registerInputOutput() {
 			new RecordReader<DummyRecord>(this, DummyRecord.class);
@@ -563,7 +561,6 @@ public class QosGraphFixture {
 
 	public static class DummyTask23 extends AbstractTask {
 
-		@SuppressWarnings("unused")
 		@Override
 		public void registerInputOutput() {
 			new RecordReader<DummyRecord>(this, DummyRecord.class);
@@ -577,7 +574,6 @@ public class QosGraphFixture {
 
 	public static class DummyTask4 extends AbstractTask {
 
-		@SuppressWarnings("unused")
 		@Override
 		public void registerInputOutput() {
 			new RecordReader<DummyRecord>(this, DummyRecord.class);

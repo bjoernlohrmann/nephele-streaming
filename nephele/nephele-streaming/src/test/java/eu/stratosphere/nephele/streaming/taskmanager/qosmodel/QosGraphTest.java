@@ -267,7 +267,6 @@ public class QosGraphTest {
 	 * 
 	 * @throws Exception
 	 */
-	@SuppressWarnings("null")
 	@Test
 	public void testSimpleQosGraphMergeEdgesAndGates() throws Exception {
 		QosGraph graph1 = this.createQosGraphWithConstraint(this.fix.jobGraph,
@@ -373,10 +372,10 @@ public class QosGraphTest {
 		JobGraphSequence jobGraphSequence1 = new JobGraphSequence();
 		jobGraphSequence1.addEdge(this.fix.jobVertex1.getID(), 0,
 				this.fix.jobVertex2.getID(), 0);
-		jobGraphSequence1.addVertex(this.fix.jobVertex2.getID(), 0, 0);
+		jobGraphSequence1.addVertex(this.fix.jobVertex2.getID(), this.fix.jobVertex2.getName(), 0, 0);
 		jobGraphSequence1.addEdge(this.fix.jobVertex2.getID(), 0,
 				this.fix.jobVertex4.getID(), 0);
-		jobGraphSequence1.addVertex(this.fix.jobVertex4.getID(), 0, 0);
+		jobGraphSequence1.addVertex(this.fix.jobVertex4.getID(), this.fix.jobVertex4.getName(), 0, 0);
 		JobGraphLatencyConstraint jobGraphLatencyConstraint1 = new JobGraphLatencyConstraint(
 				jobGraphSequence1, 2000l);
 
@@ -384,10 +383,10 @@ public class QosGraphTest {
 		JobGraphSequence jobGraphSequence2 = new JobGraphSequence();
 		jobGraphSequence2.addEdge(this.fix.jobVertex1.getID(), 1,
 				this.fix.jobVertex3.getID(), 0);
-		jobGraphSequence2.addVertex(this.fix.jobVertex3.getID(), 0, 0);
+		jobGraphSequence2.addVertex(this.fix.jobVertex3.getID(), this.fix.jobVertex3.getName(), 0, 0);
 		jobGraphSequence2.addEdge(this.fix.jobVertex3.getID(), 0,
 				this.fix.jobVertex4.getID(), 1);
-		jobGraphSequence2.addVertex(this.fix.jobVertex4.getID(), 1, 0);
+		jobGraphSequence2.addVertex(this.fix.jobVertex4.getID(), this.fix.jobVertex4.getName(), 1, 0);
 		JobGraphLatencyConstraint jobGraphLatencyConstraint2 = new JobGraphLatencyConstraint(
 				jobGraphSequence2, 2000L);
 
@@ -412,10 +411,10 @@ public class QosGraphTest {
 		JobGraphSequence jobGraphSequence1 = new JobGraphSequence();
 		jobGraphSequence1.addEdge(this.fix.jobVertex1.getID(), 0,
 				this.fix.jobVertex2.getID(), 0);
-		jobGraphSequence1.addVertex(this.fix.jobVertex2.getID(), 0, 0);
+		jobGraphSequence1.addVertex(this.fix.jobVertex2.getID(), this.fix.jobVertex2.getName(), 0, 0);
 		jobGraphSequence1.addEdge(this.fix.jobVertex2.getID(), 0,
 				this.fix.jobVertex4.getID(), 0);
-		jobGraphSequence1.addVertex(this.fix.jobVertex4.getID(), 0, 0);
+		jobGraphSequence1.addVertex(this.fix.jobVertex4.getID(), this.fix.jobVertex4.getName(), 0, 0);
 		JobGraphLatencyConstraint jobGraphLatencyConstraint1 = new JobGraphLatencyConstraint(
 				jobGraphSequence1, 2000l);
 
@@ -423,10 +422,10 @@ public class QosGraphTest {
 		JobGraphSequence jobGraphSequence2 = new JobGraphSequence();
 		jobGraphSequence2.addEdge(this.fix.jobVertex1.getID(), 0,
 				this.fix.jobVertex3.getID(), 0);
-		jobGraphSequence2.addVertex(this.fix.jobVertex3.getID(), 0, 0);
+		jobGraphSequence2.addVertex(this.fix.jobVertex3.getID(), this.fix.jobVertex3.getName(), 0, 0);
 		jobGraphSequence2.addEdge(this.fix.jobVertex3.getID(), 0,
 				this.fix.jobVertex4.getID(), 0);
-		jobGraphSequence2.addVertex(this.fix.jobVertex4.getID(), 1, 0);
+		jobGraphSequence2.addVertex(this.fix.jobVertex4.getID(), this.fix.jobVertex4.getName(), 1, 0);
 		JobGraphLatencyConstraint jobGraphLatencyConstraint2 = new JobGraphLatencyConstraint(
 				jobGraphSequence2, 2000L);
 

@@ -47,19 +47,19 @@ public class JobGraphSequence extends LinkedList<SequenceElement<JobVertexID>>
 		this.verticesInSequence = new HashSet<JobVertexID>();
 	}
 
-	public void addVertex(JobVertexID vertexID, int inputGateIndex,
+	public void addVertex(JobVertexID vertexID, String vertexName, int inputGateIndex,
 			int outputGateIndex) {
 
 		this.add(new SequenceElement<JobVertexID>(
-				vertexID, inputGateIndex, outputGateIndex, this.size()));
+				vertexID, inputGateIndex, outputGateIndex, this.size(), vertexName));
 		this.verticesInSequence.add(vertexID);
 	}
 
 	public void addEdge(JobVertexID sourceVertexID, int outputGateIndex,
 			JobVertexID targetVertexID, int inputGateIndex) {
-
+		
 		this.add(new SequenceElement<JobVertexID>(sourceVertexID,
-				outputGateIndex, targetVertexID, inputGateIndex, this.size()));
+				outputGateIndex, targetVertexID, inputGateIndex, this.size(), "edge"));
 	}
 
 	public boolean isInSequence(JobVertexID vertexID) {

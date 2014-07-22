@@ -14,21 +14,19 @@
  **********************************************************************************************************************/
 package eu.stratosphere.nephele.streaming.taskmanager.qosmanager;
 
-import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 
 import org.apache.log4j.Logger;
 
-import eu.stratosphere.nephele.configuration.GlobalConfiguration;
 import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
 import eu.stratosphere.nephele.io.GateID;
 import eu.stratosphere.nephele.io.channels.ChannelID;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
-import eu.stratosphere.nephele.streaming.LatencyConstraintID;
 import eu.stratosphere.nephele.streaming.message.ChainUpdates;
 import eu.stratosphere.nephele.streaming.message.action.EdgeQosReporterConfig;
 import eu.stratosphere.nephele.streaming.message.action.VertexQosReporterConfig;
@@ -36,7 +34,7 @@ import eu.stratosphere.nephele.streaming.message.qosreport.EdgeLatency;
 import eu.stratosphere.nephele.streaming.message.qosreport.EdgeStatistics;
 import eu.stratosphere.nephele.streaming.message.qosreport.QosReport;
 import eu.stratosphere.nephele.streaming.message.qosreport.VertexLatency;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.BufferSizeManager;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.QosConstraintSummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.EdgeQosData;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosEdge;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGate;
@@ -121,8 +119,6 @@ public class QosModel {
 	 */
 	private HashMap<ChannelID, QosEdge> edgeBySourceChannelID;
 
-	private HashMap<LatencyConstraintID, QosLogger> qosLoggers;
-
 	public QosModel(JobID jobID) {
 		this.state = State.EMPTY;
 		this.announcementBuffer = new QosReport(jobID);
@@ -130,7 +126,6 @@ public class QosModel {
 		this.gatesByGateId = new HashMap<GateID, QosGate>();
 		this.vertexByID = new HashMap<ExecutionVertexID, QosVertex>();
 		this.edgeBySourceChannelID = new HashMap<ChannelID, QosEdge>();
-		this.qosLoggers = new HashMap<LatencyConstraintID, QosLogger>();
 	}
 
 	public void mergeShallowQosGraph(QosGraph shallowQosGraph) {
@@ -426,35 +421,18 @@ public class QosModel {
 		}
 	}
 
-	public void findQosConstraintViolations(
+	public List<QosConstraintSummary> findQosConstraintViolations(
 			QosConstraintViolationListener listener) {
 
-		for (JobGraphLatencyConstraint constraint : this.qosGraph
-				.getConstraints()) {
-			QosLogger logger = this.qosLoggers.get(constraint.getID());
-			if (logger == null) {
-				try {
-					logger = new QosLogger(
-							constraint.getID(),
-							this.qosGraph,
-							GlobalConfiguration
-									.getLong(
-											BufferSizeManager.QOSMANAGER_ADJUSTMENTINTERVAL_KEY,
-											BufferSizeManager.DEFAULT_ADJUSTMENTINTERVAL));
-					this.qosLoggers.put(constraint.getID(), logger);
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-			}
+		List<QosConstraintSummary> constraintSummaries = new LinkedList<QosConstraintSummary>();
+
+		for (JobGraphLatencyConstraint constraint : this.qosGraph.getConstraints()) {
 
 			QosConstraintViolationFinder constraintViolationFinder = new QosConstraintViolationFinder(
-					constraint.getID(), this.qosGraph, listener, logger);
-			constraintViolationFinder.findSequencesWithViolatedQosConstraint();
-			try {
-				logger.logLatencies();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+					constraint.getID(), this.qosGraph, listener);
+			constraintSummaries.add(constraintViolationFinder.findSequencesWithViolatedQosConstraint());
 		}
+
+		return constraintSummaries;
 	}
 }

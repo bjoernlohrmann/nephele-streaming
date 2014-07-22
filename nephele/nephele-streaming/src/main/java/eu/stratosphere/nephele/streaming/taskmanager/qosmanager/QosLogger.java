@@ -21,10 +21,10 @@ import java.io.IOException;
 import eu.stratosphere.nephele.configuration.GlobalConfiguration;
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.plugins.PluginManager;
+import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.JobGraphSequence;
-import eu.stratosphere.nephele.streaming.LatencyConstraintID;
 import eu.stratosphere.nephele.streaming.SequenceElement;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraph;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.QosConstraintSummary;
 
 /**
  * This class is used by Qos managers to log aggregated Qos report data for a
@@ -44,130 +44,48 @@ public class QosLogger {
 
 	private BufferedWriter writer;
 
-	private double[][] aggregatedMemberLatencies;
-
-	private double minTotalLatency;
-
-	private double aggregatedTotalLatency;
-
-	private double maxTotalLatency;
-
-	private int activeMemberSequences;
-
 	private long loggingInterval;
 
-	public QosLogger(LatencyConstraintID constraintID, QosGraph qosGraph,
-			long loggingInterval) throws IOException {
-
-		JobGraphSequence jobGraphSequence = qosGraph.getConstraintByID(
-				constraintID).getSequence();
-
-		this.aggregatedMemberLatencies = new double[jobGraphSequence.size()][];
-		for (SequenceElement<JobVertexID> sequenceElement : jobGraphSequence) {
-			int index = sequenceElement.getIndexInSequence();
-			if (sequenceElement.isVertex()) {
-				this.aggregatedMemberLatencies[index] = new double[1];
-			} else {
-				this.aggregatedMemberLatencies[index] = new double[2];
-			}
-		}
-		this.resetCounters();
-
+	public QosLogger(JobGraphLatencyConstraint constraint, long loggingInterval) throws IOException {
 		this.loggingInterval = loggingInterval;
 
 		String logFile = GlobalConfiguration.getString(LOGFILE_PATTERN_KEY, DEFAULT_LOGFILE_PATTERN);
 		if (logFile.contains("%s")) {
-			logFile = String.format(logFile, constraintID.toString());
+			logFile = String.format(logFile, constraint.getID().toString());
 		}
 		this.writer = new BufferedWriter(new FileWriter(logFile));
-		this.writeHeaders(jobGraphSequence, qosGraph);
+		this.writeHeaders(constraint.getSequence());
 	}
 
-	private void resetCounters() {
-		this.activeMemberSequences = 0;
-		this.aggregatedTotalLatency = 0;
-		this.minTotalLatency = Double.MAX_VALUE;
-		this.maxTotalLatency = Double.MIN_VALUE;
 
-		for (int i = 0; i < this.aggregatedMemberLatencies.length; i++) {
-			for (int j = 0; j < this.aggregatedMemberLatencies[i].length; j++) {
-				this.aggregatedMemberLatencies[i][j] = 0;
-			}
-		}
-	}
-
-	public void addMemberSequenceToLog(SequenceQosSummary sequenceSummary) {
-		double[][] memberLatencies = sequenceSummary.getMemberLatencies();
-		for (int i = 0; i < memberLatencies.length; i++) {
-			for(int j=0; j<memberLatencies[i].length; j++) {
-				this.aggregatedMemberLatencies[i][j] += memberLatencies[i][j];
-			}
-		}
-
-		double sequenceLatency = sequenceSummary.getSequenceLatency();
-		this.aggregatedTotalLatency += sequenceLatency;
-
-		if (sequenceLatency < this.minTotalLatency) {
-			this.minTotalLatency = sequenceLatency;
-		}
-
-		if (sequenceLatency > this.maxTotalLatency) {
-			this.maxTotalLatency = sequenceLatency;
-		}
-
-		this.activeMemberSequences++;
-	}
-
-	public void logLatencies() throws IOException {
+	public void logSummary(QosConstraintSummary summary) throws IOException {
 
 		StringBuilder builder = new StringBuilder();
 		builder.append(this.getLogTimestamp());
 		builder.append(';');
-		builder.append(this.activeMemberSequences);
+		builder.append(summary.getNoOfActiveSequences());
 		builder.append(';');
 
-		if (this.activeMemberSequences == 0) {
-			this.appendDummyLine(builder);
-		} else {
-			this.appendSummaryLine(builder);
-		}
+		this.appendSummaryLine(builder, summary);
 
 		builder.append('\n');
 		this.writer.write(builder.toString());
 		this.writer.flush();
-
-		this.resetCounters();
 	}
 
-	private void appendSummaryLine(StringBuilder builder) {
-		builder.append(this.formatDouble(this.aggregatedTotalLatency
-				/ this.activeMemberSequences));
+	private void appendSummaryLine(StringBuilder builder, QosConstraintSummary summary) {
+		builder.append(this.formatDouble(summary.getAvgSequenceLatency()));
 		builder.append(';');
-		builder.append(this.formatDouble(this.minTotalLatency));
+		builder.append(this.formatDouble(summary.getMinSequenceLatency()));
 		builder.append(';');
-		builder.append(this.formatDouble(this.maxTotalLatency));
+		builder.append(this.formatDouble(summary.getMaxSequenceLatency()));
+		
+		double[][] avgMemberLatencies = summary.getAvgSequenceMemberLatencies();
 
-		for (int i = 0; i < this.aggregatedMemberLatencies.length; i++) {
-			for (int j = 0; j < this.aggregatedMemberLatencies[i].length; j++) {
+		for (int i = 0; i < avgMemberLatencies.length; i++) {
+			for (int j = 0; j < avgMemberLatencies[i].length; j++) {
 				builder.append(';');
-				builder.append(this
-						.formatDouble(this.aggregatedMemberLatencies[i][j]
-								/ this.activeMemberSequences));
-			}
-		}
-	}
-
-	private void appendDummyLine(StringBuilder builder) {
-		builder.append(this.formatDouble(0));
-		builder.append(';');
-		builder.append(this.formatDouble(0));
-		builder.append(';');
-		builder.append(this.formatDouble(0));
-
-		for (int i = 0; i < this.aggregatedMemberLatencies.length; i++) {
-			for (int j = 0; j < this.aggregatedMemberLatencies[i].length; j++) {
-				builder.append(';');
-				builder.append(this.formatDouble(0));
+				builder.append(this.formatDouble(avgMemberLatencies[i][j]));
 			}
 		}
 	}
@@ -181,8 +99,7 @@ public class QosLogger {
 				this.loggingInterval) / 1000;
 	}
 
-	private void writeHeaders(JobGraphSequence jobGraphSequence,
-			QosGraph qosGraph) throws IOException {
+	private void writeHeaders(JobGraphSequence jobGraphSequence) throws IOException {
 
 		StringBuilder builder = new StringBuilder();
 		builder.append("timestamp;");
@@ -196,8 +113,7 @@ public class QosLogger {
 		for (SequenceElement<JobVertexID> sequenceElement : jobGraphSequence) {
 			if (sequenceElement.isVertex()) {
 				builder.append(';');
-				builder.append(qosGraph.getGroupVertexByID(
-						sequenceElement.getVertexID()).getName());
+				builder.append(sequenceElement.getName());
 			} else {
 				builder.append(';');
 				builder.append("edge" + edgeIndex + "obl");
