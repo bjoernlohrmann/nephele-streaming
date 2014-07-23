@@ -853,8 +853,7 @@ public abstract class AbstractScheduler implements InstanceListener {
 
 		for (int i = 0; i < noOfSubtasksToSuspend; i++) {
 			// TODO: choose a better candidate if necessary
-			int idxToSuspend = groupVertex
-					.getCurrentElasticNumberOfRunningSubtasks() - (i+1);
+			int idxToSuspend = groupVertex.getCurrentElasticNumberOfRunningSubtasks() - 1;
 			final ExecutionVertex toSuspend = groupVertex
 					.getGroupMember(idxToSuspend);
 
