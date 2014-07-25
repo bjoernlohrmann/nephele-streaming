@@ -221,15 +221,14 @@ final class RuntimeOutputChannelBroker extends AbstractOutputChannelForwarder im
 	public void transferEventToInputChannel(final AbstractEvent event) throws IOException, InterruptedException {
 
 		if (this.outgoingTransferEnvelope != null) {
-			this.outgoingTransferEnvelope.addEvent(event);
-		} else {
-
-			final TransferEnvelope ephemeralTransferEnvelope = createNewOutgoingTransferEnvelope();
-			ephemeralTransferEnvelope.addEvent(event);
-
-			this.forwardingChain.pushEnvelope(ephemeralTransferEnvelope);
+			throw new IOException("Invalid attempt to transfer event without releasing write buffer first. This is a bug");
 		}
-		
+
+		final TransferEnvelope ephemeralTransferEnvelope = createNewOutgoingTransferEnvelope();
+		ephemeralTransferEnvelope.addEvent(event);
+
+		this.forwardingChain.pushEnvelope(ephemeralTransferEnvelope);
+
 		if (event instanceof ChannelSuspendConfirmEvent) {
 			this.sequenceNumber = 0;
 		}

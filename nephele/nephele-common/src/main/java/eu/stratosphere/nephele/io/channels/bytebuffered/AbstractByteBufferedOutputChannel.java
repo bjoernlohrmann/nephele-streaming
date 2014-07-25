@@ -188,7 +188,8 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 
 		flushSerializationBuffer();
 		
-		if (this.dataBuffer.position() >= this.bufferSizeLimit) {
+		if (this.dataBuffer != null
+				&& this.dataBuffer.position() >= this.bufferSizeLimit) {
 			releaseWriteBuffer();
 		}
 		
@@ -201,17 +202,15 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 		}
 	}
 
-	private void flushSerializationBuffer() throws InterruptedException, IOException {
-		// Get a write buffer from the broker
-		if (this.dataBuffer == null) {
-			requestWriteBufferFromBroker();
-		}
-		
+	private void flushSerializationBuffer() throws InterruptedException, IOException {	
 		while (this.serializationBuffer.dataLeftFromPreviousSerialization()) {
+			if (this.dataBuffer == null) {
+				requestWriteBufferFromBroker();
+			}
+			
 			this.serializationBuffer.read(this.dataBuffer);
 			if (this.dataBuffer.remaining() == 0) {
 				releaseWriteBuffer();
-				requestWriteBufferFromBroker();
 			}
 		}
 	}
@@ -264,18 +263,10 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 	@Override
 	public void flush() throws IOException, InterruptedException {
 
-		// Get rid of remaining data in the serialization buffer igoring
-		// interrupt signals
-		while (this.serializationBuffer.dataLeftFromPreviousSerialization()) {
-				try {
-					flushSerializationBuffer();
-				} catch (InterruptedException e) {
-					LOG.error(e);
-				}
-		}
+		flushSerializationBuffer();
 
 		// Get rid of the leased write buffer
-		if (this.dataBuffer != null && this.dataBuffer.position() > 0) {
+		if (this.dataBuffer != null) {
 			releaseWriteBuffer();
 		}
 	}
