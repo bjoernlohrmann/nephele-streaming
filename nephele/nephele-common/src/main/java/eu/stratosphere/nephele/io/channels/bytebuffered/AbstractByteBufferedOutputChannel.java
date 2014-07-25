@@ -192,14 +192,6 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 				&& this.dataBuffer.position() >= this.bufferSizeLimit) {
 			releaseWriteBuffer();
 		}
-		
-		if (this.receivedChannelSuspendEvent) {
-			getOutputGate().setOutputChannelSuspended(this.getChannelIndex(),
-					true);
-			// send confirmation
-			transferEvent(new ChannelSuspendConfirmEvent());
-			this.receivedChannelSuspendEvent = false;
-		}
 	}
 
 	private void flushSerializationBuffer() throws InterruptedException, IOException {	
@@ -239,7 +231,11 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 				LOG.error("Received unsolicited ChannelSuspendConfirmEvent");
 			}
 		} else if (event instanceof ChannelSuspendEvent) {
+			// ChannelSuspendEvent needs to be confirmed by task thread
+			// otherwise we risk a race condition where task thread writes
+			// to the channel after confirmation has been sent.
 			this.receivedChannelSuspendEvent = true;
+			getOutputGate().notifyPendingEvent(getChannelIndex());
 		} else if (event instanceof ChannelUnsuspendEvent) {
 			getOutputGate().setOutputChannelSuspended(this.getChannelIndex(),
 					false);
@@ -306,5 +302,17 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 	 */
 	public void limitBufferSize(final int bufferSize) {
 		this.bufferSizeLimit = bufferSize;
+	}
+	
+	public void processPendingEvents() throws IOException, InterruptedException {
+		// channel suspends need to be confirmed by the task thread
+		// but we cannot do that in channel.write() because the channel
+		// may never be written to (hence no confirmation is sent ever)
+		if (this.receivedChannelSuspendEvent) {
+			getOutputGate().setOutputChannelSuspended(this.getChannelIndex(), true);
+			// send confirmation
+			transferEvent(new ChannelSuspendConfirmEvent());
+			this.receivedChannelSuspendEvent = false;
+		}
 	}
 }

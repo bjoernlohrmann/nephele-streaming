@@ -116,4 +116,6 @@ public abstract class AbstractOutputChannel<T extends Record> extends AbstractCh
 
 		return this.outputGate.isBroadcast();
 	}
+
+	public abstract void processPendingEvents() throws IOException, InterruptedException;
 }

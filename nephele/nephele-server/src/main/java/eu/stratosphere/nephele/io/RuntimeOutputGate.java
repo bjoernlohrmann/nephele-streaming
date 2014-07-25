@@ -19,6 +19,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import eu.stratosphere.nephele.event.task.AbstractTaskEvent;
 import eu.stratosphere.nephele.execution.Environment;
@@ -64,6 +66,11 @@ public class RuntimeOutputGate<T extends Record> extends AbstractGate<T> impleme
 	 * Stores whether all records passed to this output gate shall be transmitted through all connected output channels.
 	 */
 	private final boolean isBroadcast;
+	
+	/**
+	 * Queue with indices of channels that have pending events.
+	 */
+	private final BlockingQueue<Integer> channelsWithPendingEvents = new LinkedBlockingQueue<Integer>();
 
 	/**
 	 * Constructs a new runtime output gate.
@@ -221,6 +228,8 @@ public class RuntimeOutputGate<T extends Record> extends AbstractGate<T> impleme
 	 */
 	@Override
 	public void writeRecord(final T record) throws IOException, InterruptedException {
+		
+		processPendingChannelEvents();
 
 		if (this.isBroadcast) {
 
@@ -254,6 +263,13 @@ public class RuntimeOutputGate<T extends Record> extends AbstractGate<T> impleme
 					outputChannel.writeRecord(record);
 				}
 			}
+		}
+	}
+
+	private void processPendingChannelEvents() throws IOException, InterruptedException {
+		while(!this.channelsWithPendingEvents.isEmpty()) {
+			int channelIndex = this.channelsWithPendingEvents.poll().intValue();
+			this.outputChannels.get(channelIndex).processPendingEvents();
 		}
 	}
 
@@ -408,5 +424,10 @@ public class RuntimeOutputGate<T extends Record> extends AbstractGate<T> impleme
 				outputChannel.requestSuspend();
 			}
 		}
+	}
+
+	@Override
+	public void notifyPendingEvent(int channelIndex) {
+		this.channelsWithPendingEvents.add(channelIndex);
 	}
 }

@@ -158,4 +158,6 @@ public interface OutputGate<T extends Record> extends Gate<T> {
 	int getNumberOfActiveOutputChannels();
 	
 	void setOutputChannelSuspended(int index, boolean isSuspended);
+
+	void notifyPendingEvent(int channelIndex);
 }

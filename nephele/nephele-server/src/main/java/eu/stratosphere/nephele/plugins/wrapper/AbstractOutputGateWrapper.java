@@ -325,4 +325,9 @@ public abstract class AbstractOutputGateWrapper<T extends Record> implements Out
 	public boolean updateGateState(GateState oldState, GateState newState) {
 		return this.getWrappedOutputGate().updateGateState(oldState, newState);
 	}
+	
+	@Override
+	public void notifyPendingEvent(int channelIndex) {
+		this.getWrappedOutputGate().notifyPendingEvent(channelIndex);
+	}
 }
