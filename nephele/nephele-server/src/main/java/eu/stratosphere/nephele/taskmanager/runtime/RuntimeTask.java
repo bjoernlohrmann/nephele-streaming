@@ -391,12 +391,6 @@ public final class RuntimeTask implements Task, ExecutionObserver {
 	@Override
 	public void suspendExecution() {
 
-		final Thread executingThread = this.environment.getExecutingThread();
-
-		if (executingThread == null) {
-			return;
-		}
-
 		if (this.executionState != ExecutionState.RUNNING) {
 			return;
 		}
