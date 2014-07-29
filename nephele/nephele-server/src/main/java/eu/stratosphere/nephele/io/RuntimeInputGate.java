@@ -383,6 +383,12 @@ public class RuntimeInputGate<T extends Record> extends AbstractGate<T>
 	@Override
 	public void handleGateState() throws InterruptedException, IOException {
 		switch (this.getGateState()) {
+		case RUNNING:
+			if (this.activeInputChannels == 0) {
+				this.updateGateState(GateState.RUNNING, GateState.SUSPENDED);
+				this.isClosed = true;
+			}
+			break;
 		case SUSPENDING:
 			for (AbstractInputChannel<?> inputChannel : this.inputChannels) {
 				if (!inputChannel.isSuspended()) {

@@ -55,5 +55,5 @@ public interface ExecutionObserver {
 	 * 
 	 * @return <code>true</code> if the task has been suspended, <code>false</code> otherwise
 	 */
-	boolean isSuspended();
+	boolean isSuspending();
 }

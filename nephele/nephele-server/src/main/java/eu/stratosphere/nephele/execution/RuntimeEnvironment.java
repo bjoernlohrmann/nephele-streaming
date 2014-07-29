@@ -376,7 +376,15 @@ public class RuntimeEnvironment implements Environment, Runnable {
 		}
 		
 		try {
-			if (this.executionObserver.isSuspended()) {
+			// FIXME: Handle more than one input gate (wait for DRAINNING gates)
+
+			// suspend this task if all input gates already suspended
+			if (countSuspendedInputGates() == this.inputGates.size() && !this.executionObserver.isSuspending()) {
+				LOG.warn("SUspending task, because of no running input gates available");
+				changeExecutionState(ExecutionState.SUSPENDING, null);
+			}
+
+			if (this.executionObserver.isSuspending()) {
 				finalizeSuspend();
 			} else {
 				finalizeFinish();
@@ -448,6 +456,17 @@ public class RuntimeEnvironment implements Environment, Runnable {
 				gate.getInputChannel(i).transferEvent(new ChannelUnsuspendEvent());
 			}
 		}
+	}
+
+	private int countSuspendedInputGates() {
+		int count = 0;
+
+		for (InputGate<?> gate : this.inputGates) {
+			if (gate.getGateState() == GateState.SUSPENDED)
+				count++;
+		}
+
+		return count;
 	}
 
 	/**

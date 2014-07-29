@@ -443,7 +443,7 @@ public final class ExecutionVertex {
 			groupVertex.setCurrentElasticNumberOfRunningSubtasks(
 					groupVertex.getCurrentElasticNumberOfRunningSubtasks() + 1);
 
-		} else if (previousState == ExecutionState.SUSPENDING
+		} else if ((previousState == ExecutionState.SUSPENDING || previousState == ExecutionState.RUNNING)
 				&& newExecutionState == ExecutionState.SUSPENDED) {
 			ExecutionGroupVertex groupVertex = getGroupVertex();
 			groupVertex.setCurrentElasticNumberOfRunningSubtasks(

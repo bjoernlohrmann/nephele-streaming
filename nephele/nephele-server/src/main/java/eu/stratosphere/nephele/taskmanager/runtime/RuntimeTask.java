@@ -59,8 +59,6 @@ public final class RuntimeTask implements Task, ExecutionObserver {
 	 */
 	private volatile boolean isCanceled = false;
 	
-	private volatile boolean isSuspended = false;
-
 	/**
 	 * The current execution state of the task
 	 */
@@ -279,8 +277,8 @@ public final class RuntimeTask implements Task, ExecutionObserver {
 	 * {@inheritDoc}
 	 */
 	@Override
-	public boolean isSuspended() {
-		return this.isSuspended;
+	public boolean isSuspending() {
+		return this.executionState == ExecutionState.SUSPENDING;
 	}
 
 	/**
@@ -396,8 +394,6 @@ public final class RuntimeTask implements Task, ExecutionObserver {
 		}
 
 		LOG.info("Suspending " + this.environment.getTaskNameWithIndex());
-		this.isSuspended = true;
-
 		executionStateChanged(ExecutionState.SUSPENDING, null);
 
 		// Request user code to suspend

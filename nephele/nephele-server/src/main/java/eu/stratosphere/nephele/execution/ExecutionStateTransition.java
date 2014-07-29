@@ -98,6 +98,9 @@ public final class ExecutionStateTransition {
 		if (oldState == ExecutionState.SUSPENDING && newState == ExecutionState.SUSPENDED) {
 			unexpectedStateChange = false;
 		}
+		if (oldState == ExecutionState.RUNNING && newState == ExecutionState.SUSPENDED) {
+			unexpectedStateChange = false;
+		}
 		if (oldState == ExecutionState.SUSPENDING && newState == ExecutionState.FAILED) {
 			unexpectedStateChange = false;
 		}
