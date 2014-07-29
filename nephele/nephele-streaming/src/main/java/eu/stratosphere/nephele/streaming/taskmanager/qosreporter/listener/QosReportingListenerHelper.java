@@ -17,7 +17,7 @@ package eu.stratosphere.nephele.streaming.taskmanager.qosreporter.listener;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.InputGateReporterManager;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.OutputGateReporterManager;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.TimestampTag;
-import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.VertexLatencyReportManager;
+import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.VertexStatisticsReportManager;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.io.StreamInputGate;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.io.StreamOutputGate;
 import eu.stratosphere.nephele.types.AbstractTaggableRecord;
@@ -35,7 +35,7 @@ public class QosReportingListenerHelper {
 
 	public static void listenToVertexLatencyOnInputGate(
 			StreamInputGate<? extends Record> inputGate,
-			final VertexLatencyReportManager vertexLatencyManager) {
+			final VertexStatisticsReportManager vertexStatsManager) {
 
 		final int gateIndex = inputGate.getIndex();
 
@@ -43,7 +43,7 @@ public class QosReportingListenerHelper {
 			@Override
 			public void recordReceived(int inputChannelIndex,
 					AbstractTaggableRecord record) {
-				vertexLatencyManager.recordReceived(gateIndex);
+				vertexStatsManager.recordReceived(gateIndex);
 			}
 		};
 		InputGateQosReportingListener oldListener = inputGate
@@ -58,7 +58,7 @@ public class QosReportingListenerHelper {
 
 	public static void listenToVertexLatencyOnOutputGate(
 			StreamOutputGate<? extends Record> outputGate,
-			final VertexLatencyReportManager vertexLatencyManager) {
+			final VertexStatisticsReportManager vertexStatsManager) {
 
 		final int gateIndex = outputGate.getIndex();
 
@@ -66,7 +66,7 @@ public class QosReportingListenerHelper {
 			@Override
 			public void recordEmitted(int outputChannelIndex,
 					AbstractTaggableRecord record) {
-				vertexLatencyManager.recordEmitted(gateIndex);
+				vertexStatsManager.recordEmitted(gateIndex);
 			}
 
 			@Override

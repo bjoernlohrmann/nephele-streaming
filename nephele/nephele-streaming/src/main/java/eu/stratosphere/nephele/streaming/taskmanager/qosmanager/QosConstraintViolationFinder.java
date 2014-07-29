@@ -48,7 +48,7 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 
 	private QosGraphTraversal graphTraversal;
 
-	private SequenceQosSummary sequenceSummary;
+	private QosSequenceSummary sequenceSummary;
 
 	private int sequenceLength;
 
@@ -79,7 +79,7 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 
 		this.graphTraversal = new QosGraphTraversal(null,
 				this.constraint.getSequence(), this, this);
-		this.sequenceSummary = new SequenceQosSummary(this.constraint.getSequence());
+		this.sequenceSummary = new QosSequenceSummary(this.constraint.getSequence());
 		this.sequenceLength = this.constraint.getSequence().size();
 
 		// init sequence with nulls so that during graph traversal we can

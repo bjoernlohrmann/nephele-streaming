@@ -30,7 +30,7 @@ public class QosReport extends AbstractSerializableQosMessage {
 
 	private HashMap<QosReporterID.Edge, EdgeStatistics> edgeStatistics;
 
-	private HashMap<QosReporterID.Vertex, VertexLatency> vertexLatencies;
+	private HashMap<QosReporterID.Vertex, VertexStatistics> vertexStatistics;
 
 	private LinkedList<VertexQosReporterConfig> vertexReporterAnnouncements;
 
@@ -68,11 +68,11 @@ public class QosReport extends AbstractSerializableQosMessage {
 		return this.edgeStatistics;
 	}
 
-	private HashMap<QosReporterID.Vertex, VertexLatency> getOrCreateVertexLatencyMap() {
-		if (this.vertexLatencies == null) {
-			this.vertexLatencies = new HashMap<QosReporterID.Vertex, VertexLatency>();
+	private HashMap<QosReporterID.Vertex, VertexStatistics> getOrCreateVertexStatisticsMap() {
+		if (this.vertexStatistics == null) {
+			this.vertexStatistics = new HashMap<QosReporterID.Vertex, VertexStatistics>();
 		}
-		return this.vertexLatencies;
+		return this.vertexStatistics;
 	}
 
 	public void addEdgeLatency(EdgeLatency edgeLatency) {
@@ -142,22 +142,22 @@ public class QosReport extends AbstractSerializableQosMessage {
 		return this.edgeStatistics.values();
 	}
 
-	public void addVertexLatency(VertexLatency vertexLatency) {
-		QosReporterID.Vertex reporterID = vertexLatency.getReporterID();
-		VertexLatency existing = this.getOrCreateVertexLatencyMap().get(
+	public void addVertexStaistics(VertexStatistics vertexStats) {
+		QosReporterID.Vertex reporterID = vertexStats.getReporterID();
+		VertexStatistics existing = this.getOrCreateVertexStatisticsMap().get(
 				reporterID);
 		if (existing == null) {
-			this.getOrCreateVertexLatencyMap().put(reporterID, vertexLatency);
+			this.getOrCreateVertexStatisticsMap().put(reporterID, vertexStats);
 		} else {
-			existing.add(vertexLatency);
+			existing.add(vertexStats);
 		}
 	}
 
-	public Collection<VertexLatency> getVertexLatencies() {
-		if (this.vertexLatencies == null) {
+	public Collection<VertexStatistics> getVertexStatistics() {
+		if (this.vertexStatistics == null) {
 			return Collections.emptyList();
 		}
-		return this.vertexLatencies.values();
+		return this.vertexStatistics.values();
 	}
 
 	/**
@@ -227,12 +227,10 @@ public class QosReport extends AbstractSerializableQosMessage {
 	}
 
 	private void writeVertexLatencies(DataOutput out) throws IOException {
-		if (this.vertexLatencies != null) {
-			out.writeInt(this.vertexLatencies.size());
-			for (Entry<QosReporterID.Vertex, VertexLatency> entry : this.vertexLatencies
-					.entrySet()) {
-				entry.getKey().write(out);
-				out.writeDouble(entry.getValue().getVertexLatency());
+		if (this.vertexStatistics != null) {
+			out.writeInt(this.vertexStatistics.size());
+			for (VertexStatistics vertexStat: this.vertexStatistics.values()) {
+				vertexStat.write(out);
 			}
 		} else {
 			out.writeInt(0);
@@ -247,7 +245,7 @@ public class QosReport extends AbstractSerializableQosMessage {
 		super.read(in);
 		this.readEdgeLatencies(in);
 		this.readOutputEdgeStatistics(in);
-		this.readVertexLatencies(in);
+		this.readVertexStatistics(in);
 		this.readVertexReporterAnnouncements(in);
 		this.readEdgeReporterAnnouncements(in);
 	}
@@ -298,21 +296,18 @@ public class QosReport extends AbstractSerializableQosMessage {
 		}
 	}
 
-	private void readVertexLatencies(DataInput in) throws IOException {
+	private void readVertexStatistics(DataInput in) throws IOException {
 		int toRead = in.readInt();
 		for (int i = 0; i < toRead; i++) {
-			QosReporterID.Vertex reporterID = new QosReporterID.Vertex();
-			reporterID.read(in);
-
-			VertexLatency vertexLatency = new VertexLatency(reporterID,
-					in.readDouble());
-			this.getOrCreateVertexLatencyMap().put(reporterID, vertexLatency);
+			VertexStatistics vertexStat = new VertexStatistics();
+			vertexStat.read(in);
+			this.getOrCreateVertexStatisticsMap().put(vertexStat.getReporterID(), vertexStat);
 		}
 	}
 
 	public boolean isEmpty() {
 		return this.edgeLatencies == null && this.edgeStatistics == null
-				&& this.vertexLatencies == null
+				&& this.vertexStatistics == null
 				&& this.vertexReporterAnnouncements == null
 				&& this.edgeReporterAnnouncements == null;
 	}

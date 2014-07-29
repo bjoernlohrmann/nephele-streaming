@@ -79,9 +79,9 @@ public class StreamTaskQosCoordinator implements QosReporterConfigListener {
 
 	/**
 	 * For each input/output gate combination for which Qos reports are
-	 * required, this VertexLatencyReportManager creates the reports.
+	 * required, this {@link VertexStatisticsReportManager} creates the reports.
 	 */
-	private VertexLatencyReportManager vertexLatencyManager;
+	private VertexStatisticsReportManager vertexStatisticsManager;
 
 	private boolean isShutdown;
 
@@ -94,7 +94,7 @@ public class StreamTaskQosCoordinator implements QosReporterConfigListener {
 		this.reporterThread = reportForwarder;
 		this.reporterConfigCenter = reportForwarder.getConfigCenter();
 
-		this.vertexLatencyManager = new VertexLatencyReportManager(
+		this.vertexStatisticsManager = new VertexStatisticsReportManager(
 				this.reporterThread,
 				this.taskEnvironment.getNumberOfInputGates(),
 				this.taskEnvironment.getNumberOfOutputGates());
@@ -139,7 +139,7 @@ public class StreamTaskQosCoordinator implements QosReporterConfigListener {
 
 		QosReporterID.Vertex reporterID = reporterConfig.getReporterID();
 
-		if (this.vertexLatencyManager.containsReporter(reporterID)) {
+		if (this.vertexStatisticsManager.containsReporter(reporterID)) {
 			return;
 		}
 
@@ -149,13 +149,13 @@ public class StreamTaskQosCoordinator implements QosReporterConfigListener {
 		StreamOutputGate<? extends Record> outputGate = this.taskEnvironment
 				.getOutputGate(reporterConfig.getOutputGateID());
 
-		this.vertexLatencyManager.addReporter(inputGate.getIndex(),
+		this.vertexStatisticsManager.addReporter(inputGate.getIndex(),
 				outputGate.getIndex(), reporterID);
 
 		QosReportingListenerHelper.listenToVertexLatencyOnInputGate(inputGate,
-				this.vertexLatencyManager);
+				this.vertexStatisticsManager);
 		QosReportingListenerHelper.listenToVertexLatencyOnOutputGate(
-				outputGate, this.vertexLatencyManager);
+				outputGate, this.vertexStatisticsManager);
 	}
 
 	private void installInputGateListeners() {
@@ -398,7 +398,7 @@ public class StreamTaskQosCoordinator implements QosReporterConfigListener {
 		this.isShutdown = true;
 		shutdownInputGateReporters();
 		shutdownOutputGateReporters();
-		this.vertexLatencyManager = null;
+		this.vertexStatisticsManager = null;
 		this.reporterConfigCenter.unsetQosReporterConfigListener(this.task.getVertexID());
 	}
 

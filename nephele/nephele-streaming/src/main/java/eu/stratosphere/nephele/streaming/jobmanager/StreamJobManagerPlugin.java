@@ -33,6 +33,7 @@ import eu.stratosphere.nephele.plugins.PluginID;
 import eu.stratosphere.nephele.profiling.ProfilingListener;
 import eu.stratosphere.nephele.streaming.ConstraintUtil;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
+import eu.stratosphere.nephele.streaming.message.AbstractSerializableQosMessage;
 
 /**
  * Job manager plugin that analyzes the constraints attached to a Nephele job
@@ -113,8 +114,19 @@ public class StreamJobManagerPlugin implements JobManagerPlugin,
 	 */
 	@Override
 	public void sendData(final IOReadableWritable data) throws IOException {
-		LOG.error("Job manger streaming plugin received unexpected data of type "
-				+ data);
+		if (data instanceof AbstractSerializableQosMessage) {
+			AbstractSerializableQosMessage qosMessage = (AbstractSerializableQosMessage) data;
+
+			QosSetupManager qosSetupManager = this.qosSetupManagers
+					.get(qosMessage.getJobID());
+			if (qosSetupManager != null) {
+				qosSetupManager.handleMessage(qosMessage);
+			}
+		} else {
+			LOG.error("Job manger streaming plugin received unexpected data of type "
+					+ data);
+
+		}
 	}
 
 	/**
@@ -141,13 +153,6 @@ public class StreamJobManagerPlugin implements JobManagerPlugin,
 
 			if (qosSetupManager != null) {
 				qosSetupManager.shutdown();
-			}
-		} else if (newJobStatus == InternalJobStatus.RUNNING) {
-			QosSetupManager qosSetupManager = this.qosSetupManagers
-					.remove(executionGraph.getJobID());
-
-			if (qosSetupManager != null) {
-				qosSetupManager.startElasticTaskAutoScaler();
 			}
 		}
 	}

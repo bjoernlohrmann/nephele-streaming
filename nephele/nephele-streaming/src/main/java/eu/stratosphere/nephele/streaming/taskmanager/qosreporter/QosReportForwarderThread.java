@@ -22,7 +22,7 @@ import eu.stratosphere.nephele.streaming.message.qosreport.DummyVertexReporterAc
 import eu.stratosphere.nephele.streaming.message.qosreport.EdgeLatency;
 import eu.stratosphere.nephele.streaming.message.qosreport.EdgeStatistics;
 import eu.stratosphere.nephele.streaming.message.qosreport.QosReport;
-import eu.stratosphere.nephele.streaming.message.qosreport.VertexLatency;
+import eu.stratosphere.nephele.streaming.message.qosreport.VertexStatistics;
 import eu.stratosphere.nephele.streaming.taskmanager.StreamMessagingThread;
 import eu.stratosphere.nephele.streaming.taskmanager.StreamTaskManagerPlugin;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
@@ -254,8 +254,8 @@ public class QosReportForwarderThread extends Thread {
 				this.processEdgeLatency((EdgeLatency) record);
 			} else if (record instanceof EdgeStatistics) {
 				this.processEdgeStatistics((EdgeStatistics) record);
-			} else if (record instanceof VertexLatency) {
-				this.processTaskLatency((VertexLatency) record);
+			} else if (record instanceof VertexStatistics) {
+				this.processTaskLatency((VertexStatistics) record);
 			} else if (record instanceof DummyVertexReporterActivity) {
 				this.processDummyVertexReporterActivity((DummyVertexReporterActivity) record);
 			}
@@ -280,7 +280,7 @@ public class QosReportForwarderThread extends Thread {
 		return toReturn;
 	}
 
-	private void processTaskLatency(VertexLatency taskLatency) {
+	private void processTaskLatency(VertexStatistics taskLatency) {
 
 		QosReporterID.Vertex reporterID = taskLatency.getReporterID();
 
@@ -290,7 +290,7 @@ public class QosReportForwarderThread extends Thread {
 
 		Set<AggregatedReport> reports = this.getReports(reporterID);
 		for (AggregatedReport report : reports) {
-			report.getReport().addVertexLatency(taskLatency);
+			report.getReport().addVertexStaistics(taskLatency);
 		}
 	}
 

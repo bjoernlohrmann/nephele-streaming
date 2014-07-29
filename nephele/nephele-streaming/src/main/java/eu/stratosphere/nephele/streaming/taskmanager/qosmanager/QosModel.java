@@ -27,13 +27,14 @@ import eu.stratosphere.nephele.io.GateID;
 import eu.stratosphere.nephele.io.channels.ChannelID;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
+import eu.stratosphere.nephele.streaming.LatencyConstraintID;
 import eu.stratosphere.nephele.streaming.message.ChainUpdates;
 import eu.stratosphere.nephele.streaming.message.action.EdgeQosReporterConfig;
 import eu.stratosphere.nephele.streaming.message.action.VertexQosReporterConfig;
 import eu.stratosphere.nephele.streaming.message.qosreport.EdgeLatency;
 import eu.stratosphere.nephele.streaming.message.qosreport.EdgeStatistics;
 import eu.stratosphere.nephele.streaming.message.qosreport.QosReport;
-import eu.stratosphere.nephele.streaming.message.qosreport.VertexLatency;
+import eu.stratosphere.nephele.streaming.message.qosreport.VertexStatistics;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.QosConstraintSummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.EdgeQosData;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosEdge;
@@ -223,16 +224,16 @@ public class QosModel {
 
 	private void processQosRecords(QosReport report) {
 		long now = System.currentTimeMillis();
-		this.processVertexLatencies(report.getVertexLatencies(), now);
+		this.processVertexStatistics(report.getVertexStatistics(), now);
 		this.processEdgeStatistics(report.getEdgeStatistics(), now);
 		this.processEdgeLatencies(report.getEdgeLatencies(), now);
 	}
 
-	private void processVertexLatencies(
-			Collection<VertexLatency> vertexLatencies, long now) {
+	private void processVertexStatistics(
+			Collection<VertexStatistics> vertexLatencies, long now) {
 
-		for (VertexLatency vertexLatency : vertexLatencies) {
-			QosReporterID.Vertex reporterID = vertexLatency.getReporterID();
+		for (VertexStatistics vertexStats : vertexLatencies) {
+			QosReporterID.Vertex reporterID = vertexStats.getReporterID();
 
 			QosGate inputGate = this.gatesByGateId.get(reporterID
 					.getInputGateID());
@@ -241,9 +242,9 @@ public class QosModel {
 
 			if (inputGate != null) {
 				VertexQosData qosData = inputGate.getVertex().getQosData();
-				qosData.addLatencyMeasurement(inputGate.getGateIndex(),
+				qosData.addVertexStatisticsMeasurement(inputGate.getGateIndex(),
 						outputGate.getGateIndex(), now,
-						vertexLatency.getVertexLatency());
+						vertexStats);
 			}
 		}
 	}
@@ -434,5 +435,9 @@ public class QosModel {
 		}
 
 		return constraintSummaries;
+	}
+	
+	public JobGraphLatencyConstraint getJobGraphLatencyConstraint(LatencyConstraintID constraintID) {
+		return this.qosGraph.getConstraintByID(constraintID);
 	}
 }

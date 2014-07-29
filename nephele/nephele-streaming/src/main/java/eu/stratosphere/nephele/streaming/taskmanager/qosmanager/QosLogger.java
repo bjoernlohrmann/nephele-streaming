@@ -63,7 +63,7 @@ public class QosLogger {
 		StringBuilder builder = new StringBuilder();
 		builder.append(this.getLogTimestamp());
 		builder.append(';');
-		builder.append(summary.getNoOfActiveSequences());
+		builder.append(summary.getNoOfSequences());
 		builder.append(';');
 
 		this.appendSummaryLine(builder, summary);

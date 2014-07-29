@@ -10,8 +10,9 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosEdge;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphMember;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosVertex;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.VertexQosData;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.VertexQosData.GateCombinationStatistics;
 
-public class SequenceQosSummary {
+public class QosSequenceSummary {
 	
 	private int[][] inputOutputGateCombinations;
 	
@@ -19,7 +20,7 @@ public class SequenceQosSummary {
 	
 	private int noOfVertices;
 	
-	private double memberLatencies[][];
+	private double memberStats[][];
 	
 	private double sequenceLatency;
 	
@@ -27,29 +28,26 @@ public class SequenceQosSummary {
 	
 	private boolean isMemberQosDataFresh;
 
-	private JobGraphSequence jobGraphSequence;
-
-	public SequenceQosSummary(JobGraphSequence jobGraphSequence) {
-		this.jobGraphSequence = jobGraphSequence;
+	public QosSequenceSummary(JobGraphSequence jobGraphSequence) {
 		this.inputOutputGateCombinations = new int[jobGraphSequence.size()][];
 		this.noOfEdges = 0;
 		this.noOfVertices = 0;
 		
-		this.memberLatencies = new double[this.jobGraphSequence.size()][];
+		this.memberStats = new double[jobGraphSequence.size()][];
 		for (SequenceElement<JobVertexID> sequenceElement : jobGraphSequence) {
 			int index = sequenceElement.getIndexInSequence();
 
 			this.inputOutputGateCombinations[index] = new int[2];
 			if (sequenceElement.isVertex()) {
 				this.noOfVertices++;
-				this.memberLatencies[index] = new double[1];
+				this.memberStats[index] = new double[3];
 				this.inputOutputGateCombinations[index][0] = sequenceElement
 						.getInputGateIndex();
 				this.inputOutputGateCombinations[index][1] = sequenceElement
 						.getOutputGateIndex();
 			} else {
 				this.noOfEdges++;
-				this.memberLatencies[index] = new double[2];
+				this.memberStats[index] = new double[2];
 				this.inputOutputGateCombinations[index][0] = sequenceElement
 						.getOutputGateIndex();
 				this.inputOutputGateCombinations[index][1] = sequenceElement
@@ -71,16 +69,18 @@ public class SequenceQosSummary {
 				int inputGateIndex = this.inputOutputGateCombinations[index][0];
 				int outputGateIndex = this.inputOutputGateCombinations[index][1];
 
-				double vertexLatency = vertexQos.getLatencyInMillis(inputGateIndex, outputGateIndex);
-				this.memberLatencies[index][0] = vertexLatency;
-				sequenceLatency += vertexLatency;
+				GateCombinationStatistics stats = vertexQos.getGateCombinationStatistics(inputGateIndex, outputGateIndex);
+				this.memberStats[index][0] = stats.getLatencyInMillis();
+				this.memberStats[index][1] = stats.getRecordsConsumedPerSec();
+				this.memberStats[index][2] = stats.getRecordsEmittedPerSec();
+				sequenceLatency += this.memberStats[index][0];
 			} else {
 				EdgeQosData edgeQos = ((QosEdge) member).getQosData();
 				double channelLatency = edgeQos.getChannelLatencyInMillis();
 				double outputBufferLatency = Math.min(channelLatency, edgeQos.getOutputBufferLifetimeInMillis() / 2);
 				
-				this.memberLatencies[index][0] = outputBufferLatency;
-				this.memberLatencies[index][1] = channelLatency - outputBufferLatency;
+				this.memberStats[index][0] = outputBufferLatency;
+				this.memberStats[index][1] = channelLatency - outputBufferLatency;
 				sequenceLatency += channelLatency;
 				outputBufferLatencySum += outputBufferLatency;
 				this.isMemberQosDataFresh = this.isMemberQosDataFresh && hasFreshValues(edgeQos);
@@ -97,8 +97,8 @@ public class SequenceQosSummary {
 				&& qosData.isOutputBufferLifetimeFresherThan(freshnessThreshold);
 	}
 
-	public double[][] getMemberLatencies() {
-		return memberLatencies;
+	public double[][] getMemberStatistics() {
+		return memberStats;
 	}
 
 	public double getSequenceLatency() {
@@ -107,10 +107,6 @@ public class SequenceQosSummary {
 
 	public double getOutputBufferLatencySum() {
 		return outputBufferLatencySum;
-	}
-
-	public JobGraphSequence getJobGraphSequence() {
-		return jobGraphSequence;
 	}
 	
 	public boolean isMemberQosDataFresh() {

@@ -3,26 +3,27 @@ package eu.stratosphere.nephele.streaming.taskmanager.qosreporter;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
-import eu.stratosphere.nephele.streaming.message.qosreport.VertexLatency;
+import eu.stratosphere.nephele.streaming.message.qosreport.VertexStatistics;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
 
 /**
- * Handles the measurement and reporting of latencies for a particular vertex.
- * Such a latency is defined as the timespan between record receptions and emits
- * on a particular input/output gate combination of the vertex. Thus one vertex
- * may have multiple associated latencies, one for each input/output gate
- * combination. Which gate combination is measured and reported on must be
- * configured by calling {@link #addReporterConfig(int, int, QosReporterID)}.
+ * Handles the measurement and reporting of latencies and record
+ * consumption/emission rates for a particular vertex. Such a latency is defined
+ * as the timespan between record receptions and emits on a particular
+ * input/output gate combination of the vertex. Thus one vertex may have
+ * multiple associated latencies, one for each input/output gate combination.
+ * Which gate combination is measured and reported on must be configured by
+ * calling {@link #addReporterConfig(int, int, QosReporterID)}.
  * 
- * An {@link VertexLatency} record per configured input/output gate combination
- * will be handed to the provided {@link QosReportForwarderThread} approximately
- * once per aggregation interval (see {@link QosReporterConfigCenter}).
- * "Approximately" because if no records have been received/emitted, nothing
- * will be reported.
+ * An {@link VertexStatistics} record per configured input/output gate
+ * combination will be handed to the provided {@link QosReportForwarderThread}
+ * approximately once per aggregation interval (see
+ * {@link QosReporterConfigCenter}). "Approximately" because if no records have
+ * been received/emitted, nothing will be reported.
  * 
  * @author Bjoern Lohrmann
  */
-public class VertexLatencyReportManager {
+public class VertexStatisticsReportManager {
 
 	// private static final Log LOG =
 	// LogFactory.getLog(TaskLatencyReporter.class);
@@ -53,7 +54,7 @@ public class VertexLatencyReportManager {
 
 		public VertexQosReporter(QosReporterID.Vertex reporterID) {
 			this.reporterID = reporterID;
-			this.reportingProbeInterval = VertexLatencyReportManager.this.reportForwarder
+			this.reportingProbeInterval = VertexStatisticsReportManager.this.reportForwarder
 					.getConfigCenter().getTaggingInterval();
 		}
 
@@ -68,11 +69,21 @@ public class VertexLatencyReportManager {
 
 						double avgLatencyPerReceivedRecord = (now - this.inputGateTimeOfFirstReceive)
 								/ (1.0 * this.inputGateReceiveCounter);
+						
+						double secsPassed = (reportForwarder.getConfigCenter()
+								.getAggregationInterval()
+								+ now
+								- this.timeOfNextReport) / 1000.0;
+						
+						double consumptionRate = inputGateReceiveCounter / secsPassed;
+						double emissionRate = outputGateEmitCounter / secsPassed;
 
-						VertexLatencyReportManager.this.reportForwarder
-								.addToNextReport(new VertexLatency(
+						VertexStatisticsReportManager.this.reportForwarder
+								.addToNextReport(new VertexStatistics(
 										this.reporterID,
-										avgLatencyPerReceivedRecord));
+										avgLatencyPerReceivedRecord,
+										consumptionRate,
+										emissionRate));
 
 						this.prepareNextReport(now);
 					}
@@ -85,8 +96,7 @@ public class VertexLatencyReportManager {
 			this.outputGateEmitCounter = 0;
 			this.inputGateTimeOfFirstReceive = -1;
 			this.timeOfNextReport = now
-					+ VertexLatencyReportManager.this.reportForwarder
-							.getConfigCenter().getAggregationInterval();
+					+ reportForwarder.getConfigCenter().getAggregationInterval();
 		}
 
 		public boolean hasData() {
@@ -107,7 +117,7 @@ public class VertexLatencyReportManager {
 		}
 	}
 
-	public VertexLatencyReportManager(QosReportForwarderThread qosReporter,
+	public VertexStatisticsReportManager(QosReportForwarderThread qosReporter,
 			int noOfInputGates, int noOfOutputGates) {
 
 		this.reportForwarder = qosReporter;

@@ -18,7 +18,7 @@ import eu.stratosphere.nephele.streaming.taskmanager.StreamMessagingThread;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosConstraintViolationListener;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosModel;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosUtils;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.SequenceQosSummary;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosSequenceSummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.EdgeQosData;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosEdge;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphMember;
@@ -90,7 +90,7 @@ public class BufferSizeManager {
 			public void handleViolatedConstraint(
 					JobGraphLatencyConstraint constraint,
 					List<QosGraphMember> sequenceMembers,
-					SequenceQosSummary qosSummary) {
+					QosSequenceSummary qosSummary) {
 
 				if (qosSummary.isMemberQosDataFresh()) {
 					BufferSizeManager.this.collectEdgesToAdjust(constraint,
@@ -137,7 +137,7 @@ public class BufferSizeManager {
 
 	private void collectEdgesToAdjust(JobGraphLatencyConstraint constraint,
 			List<QosGraphMember> sequenceMembers,
-			SequenceQosSummary qosSummary,
+			QosSequenceSummary qosSummary,
 			HashMap<QosEdge, Integer> edgesToAdjust) {
 
 		int targetOutputBufferLatency = (int) computeBufferSizeAdjustmentFactor(
@@ -191,7 +191,7 @@ public class BufferSizeManager {
 	}
 
 	private double computeBufferSizeAdjustmentFactor(
-			JobGraphLatencyConstraint constraint, SequenceQosSummary qosSummary) {
+			JobGraphLatencyConstraint constraint, QosSequenceSummary qosSummary) {
 
 		if (constraint.getLatencyConstraintInMillis() > qosSummary
 				.getNonOutputBufferLatency()) {

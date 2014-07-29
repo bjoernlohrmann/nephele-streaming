@@ -27,6 +27,7 @@ import eu.stratosphere.nephele.jobgraph.JobTaskVertex;
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
+import eu.stratosphere.nephele.streaming.message.AbstractSerializableQosMessage;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraph;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphFactory;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.WrapperUtils;
@@ -266,7 +267,14 @@ public class QosSetupManager implements VertexAssignmentListener {
 		this.qosSetup.attachRolesToExecutionGraph(this.executionGraph);
 	}
 
-	public void startElasticTaskAutoScaler() {
-		this.autoscalingThread = new  ElasticTaskQosAutoScalingThread(qosGraphs);
+	private void ensureElasticTaskAutoScalerIsRunning() {
+		if (this.autoscalingThread == null) {
+			this.autoscalingThread = new ElasticTaskQosAutoScalingThread(qosGraphs);
+		}
+	}
+
+	public void handleMessage(AbstractSerializableQosMessage qosMessage) {
+		ensureElasticTaskAutoScalerIsRunning();
+		this.autoscalingThread.enqueueMessage(qosMessage);
 	}
 }

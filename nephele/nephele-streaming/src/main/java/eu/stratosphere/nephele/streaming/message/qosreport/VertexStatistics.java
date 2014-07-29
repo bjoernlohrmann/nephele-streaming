@@ -24,17 +24,22 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
 
 /**
- * This class stores information about the latency of a vertex (task).
+ * This class stores information about the latency as well as record
+ * consumption and emission rate of a vertex (task).
  * 
  * @author warneke, Bjoern Lohrmann
  */
-public final class VertexLatency extends AbstractQosReportRecord {
+public final class VertexStatistics extends AbstractQosReportRecord {
 
 	private QosReporterID.Vertex reporterID;
 
 	private int counter;
 
 	private double vertexLatency;
+
+	private double recordsConsumedPerSec;
+
+	private double recordsEmittedPerSec;
 
 	/**
 	 * Constructs a new task latency object.
@@ -46,18 +51,20 @@ public final class VertexLatency extends AbstractQosReportRecord {
 	 * @param taskLatency
 	 *            the task latency in milliseconds
 	 */
-	public VertexLatency(final QosReporterID.Vertex reporterID,
-			final double vertexLatency) {
+	public VertexStatistics(final QosReporterID.Vertex reporterID,
+			final double vertexLatency, double recordsConsumedPerSec, double recordEmittedPerSec) {
 
 		this.reporterID = reporterID;
 		this.vertexLatency = vertexLatency;
+		this.recordsConsumedPerSec = recordsConsumedPerSec;
+		this.recordsEmittedPerSec = recordEmittedPerSec;
 		this.counter = 1;
 	}
 
 	/**
 	 * Default constructor for the deserialization of the object.
 	 */
-	public VertexLatency() {
+	public VertexStatistics() {
 	}
 
 	public QosReporterID.Vertex getReporterID() {
@@ -73,16 +80,26 @@ public final class VertexLatency extends AbstractQosReportRecord {
 		return this.vertexLatency / this.counter;
 	}
 
-	public void add(VertexLatency taskLatency) {
+	public double getRecordsConsumedPerSec() {
+		return recordsConsumedPerSec;
+	}
+
+	public double getRecordsEmittedPerSec() {
+		return recordsEmittedPerSec;
+	}
+
+	public void add(VertexStatistics vertexStats) {
 		this.counter++;
-		this.vertexLatency += taskLatency.getVertexLatency();
+		this.vertexLatency += vertexStats.getVertexLatency();
+		this.recordsConsumedPerSec += vertexStats.getRecordsConsumedPerSec();
+		this.recordsEmittedPerSec += vertexStats.getRecordsEmittedPerSec();
 	}
 
 	@Override
 	public boolean equals(Object otherObj) {
 		boolean isEqual = false;
-		if (otherObj instanceof VertexLatency) {
-			VertexLatency other = (VertexLatency) otherObj;
+		if (otherObj instanceof VertexStatistics) {
+			VertexStatistics other = (VertexStatistics) otherObj;
 			isEqual = other.getReporterID().equals(this.getReporterID())
 					&& other.getVertexLatency() == this.getVertexLatency();
 		}
@@ -108,6 +125,8 @@ public final class VertexLatency extends AbstractQosReportRecord {
 	public void write(final DataOutput out) throws IOException {
 		this.reporterID.write(out);
 		out.writeDouble(this.getVertexLatency());
+		out.writeDouble(this.getRecordsConsumedPerSec());
+		out.writeDouble(this.getRecordsEmittedPerSec());
 	}
 
 	/**
@@ -118,5 +137,7 @@ public final class VertexLatency extends AbstractQosReportRecord {
 		this.reporterID = new QosReporterID.Vertex();
 		this.reporterID.read(in);
 		this.vertexLatency = in.readDouble();
+		this.recordsConsumedPerSec = in.readDouble();
+		this.recordsEmittedPerSec = in.readDouble();
 	}
 }

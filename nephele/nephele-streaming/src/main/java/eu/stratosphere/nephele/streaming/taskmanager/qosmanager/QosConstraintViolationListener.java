@@ -30,6 +30,6 @@ public interface QosConstraintViolationListener {
 
 	public void handleViolatedConstraint(JobGraphLatencyConstraint constraint,
 			List<QosGraphMember> currentSequenceMembers,
-			SequenceQosSummary qosSummary);
+			QosSequenceSummary qosSummary);
 
 }

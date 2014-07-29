@@ -1,6 +1,8 @@
 package eu.stratosphere.nephele.streaming.taskmanager.qosmanager;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -8,14 +10,17 @@ import java.util.concurrent.LinkedBlockingQueue;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import eu.stratosphere.nephele.configuration.ConfigConstants;
 import eu.stratosphere.nephele.configuration.GlobalConfiguration;
+import eu.stratosphere.nephele.instance.InstanceConnectionInfo;
 import eu.stratosphere.nephele.jobgraph.JobID;
-import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
 import eu.stratosphere.nephele.streaming.message.AbstractQosMessage;
 import eu.stratosphere.nephele.streaming.message.ChainUpdates;
+import eu.stratosphere.nephele.streaming.message.QosManagerConstraintSummaries;
 import eu.stratosphere.nephele.streaming.message.action.DeployInstanceQosRolesAction;
 import eu.stratosphere.nephele.streaming.message.qosreport.QosReport;
+import eu.stratosphere.nephele.streaming.taskmanager.StreamMessagingThread;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.BufferSizeManager;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.QosConstraintSummary;
 
@@ -34,6 +39,8 @@ public class QosManagerThread extends Thread {
 
 	private static final Log LOG = LogFactory.getLog(QosManagerThread.class);
 
+	private JobID jobID;
+
 	private final LinkedBlockingQueue<AbstractQosMessage> streamingDataQueue;
 
 	private BufferSizeManager bufferSizeManager;
@@ -42,13 +49,30 @@ public class QosManagerThread extends Thread {
 	
 	private HashMap<LatencyConstraintID, QosLogger> qosLoggers;
 
+	private InstanceConnectionInfo jmConnectionInfo;
+
 	public QosManagerThread(JobID jobID) {
+		this.jobID = jobID;
 		this.qosModel = new QosModel(jobID);
 		this.streamingDataQueue = new LinkedBlockingQueue<AbstractQosMessage>();
 		this.bufferSizeManager = new BufferSizeManager(jobID, this.qosModel);
 		this.qosLoggers = new HashMap<LatencyConstraintID, QosLogger>();
 		this.setName(String.format("QosManagerThread (JobID: %s)",
 				jobID.toString()));
+
+		// Determine interface address that is announced to the job manager
+		String jmHost = GlobalConfiguration.getString(
+				ConfigConstants.JOB_MANAGER_IPC_ADDRESS_KEY, null);
+		int jmIpcPort = GlobalConfiguration.getInteger(
+				ConfigConstants.JOB_MANAGER_IPC_PORT_KEY,
+				ConfigConstants.DEFAULT_JOB_MANAGER_IPC_PORT);
+
+		try {
+			this.jmConnectionInfo = new InstanceConnectionInfo(
+					InetAddress.getByName(jmHost), jmIpcPort, jmIpcPort);
+		} catch (UnknownHostException e) {
+			LOG.error("Error when resolving job manager hostname", e);
+		}
 	}
 
 	@Override
@@ -73,7 +97,7 @@ public class QosManagerThread extends Thread {
 					QosReport qosReport = (QosReport) streamingData;
 					this.qosModel.processQosReport(qosReport);
 					noOfEdgeLatencies += qosReport.getEdgeLatencies().size();
-					noOfVertexLatencies += qosReport.getVertexLatencies()
+					noOfVertexLatencies += qosReport.getVertexStatistics()
 							.size();
 					noOfEdgeStatistics += qosReport.getEdgeStatistics().size();
 					noOfVertexAnnounces += qosReport
@@ -98,7 +122,7 @@ public class QosManagerThread extends Thread {
 							.adjustBufferSizes();
 					
 					logConstraintSummaries(constraintSummaries);
-					
+					sendConstraintSummariesToJm(constraintSummaries);
 
 					long buffersizeAdjustmentOverhead = System
 							.currentTimeMillis() - now;
@@ -126,27 +150,39 @@ public class QosManagerThread extends Thread {
 
 		LOG.info("Stopped Qos Manager thread");
 	}
-	
+
+	private void sendConstraintSummariesToJm(
+			List<QosConstraintSummary> constraintSummaries)
+			throws InterruptedException {
+
+		StreamMessagingThread.getInstance().sendAsynchronously(
+				this.jmConnectionInfo,
+				new QosManagerConstraintSummaries(jobID, constraintSummaries));
+	}
+
 	private void logConstraintSummaries(
 			List<QosConstraintSummary> constraintSummaries) {
 
 		for (QosConstraintSummary constraintSummary : constraintSummaries) {
-			logConstraintSummary(constraintSummary);		
+			logConstraintSummary(constraintSummary);
 		}
-	}	
+	}
 
 	private void logConstraintSummary(QosConstraintSummary constraintSummary) {
-		JobGraphLatencyConstraint constraint = constraintSummary
-				.getConstraint();
-		
-		QosLogger logger = this.qosLoggers.get(constraint.getID());
+		LatencyConstraintID constraintID = constraintSummary
+				.getLatencyConstraintID();
+
+		QosLogger logger = this.qosLoggers.get(constraintID);
 
 		try {
 			if (logger == null) {
-				logger = new QosLogger(constraint, GlobalConfiguration.getLong(
-						BufferSizeManager.QOSMANAGER_ADJUSTMENTINTERVAL_KEY,
-						BufferSizeManager.DEFAULT_ADJUSTMENTINTERVAL));
-				this.qosLoggers.put(constraint.getID(), logger);
+				logger = new QosLogger(
+						qosModel.getJobGraphLatencyConstraint(constraintID),
+						GlobalConfiguration
+								.getLong(
+										BufferSizeManager.QOSMANAGER_ADJUSTMENTINTERVAL_KEY,
+										BufferSizeManager.DEFAULT_ADJUSTMENTINTERVAL));
+				this.qosLoggers.put(constraintID, logger);
 			}
 			logger.logSummary(constraintSummary);
 		} catch (IOException e) {
