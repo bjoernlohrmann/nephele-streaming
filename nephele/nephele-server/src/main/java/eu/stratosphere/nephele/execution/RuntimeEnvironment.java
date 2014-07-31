@@ -379,8 +379,11 @@ public class RuntimeEnvironment implements Environment, Runnable {
 			// FIXME: Handle more than one input gate (wait for DRAINNING gates)
 
 			// suspend this task if all input gates already suspended
-			if (countSuspendedInputGates() == this.inputGates.size() && !this.executionObserver.isSuspending()) {
-				LOG.warn("SUspending task, because of no running input gates available");
+			if (this.inputGates.size() > 0
+					&& countSuspendedInputGates() == this.inputGates.size()
+					&& !this.executionObserver.isSuspending()) {
+
+				LOG.warn("All input gates are suspended. Supending this task too.");
 				changeExecutionState(ExecutionState.SUSPENDING, null);
 			}
 
