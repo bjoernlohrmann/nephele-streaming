@@ -20,7 +20,7 @@ public class OutputBufferLatencyEnforcer {
 	
 	private static final String INITIAL_TARGET_OBL_KEY = "plugins.streaming.taskmanager.io.initialTargetOutputBufferLatencyMillis";
 
-	private static final int INITIAL_TARGET_OBL_DEFAULT = 10;
+	private static final int INITIAL_TARGET_OBL_DEFAULT = 100;
 
 	private static final String ADJUSTMENT_INTERVAL_KEY = "plugins.streaming.taskmanager.io.outputBufferSizeAdjustmentIntervalMillis";
 

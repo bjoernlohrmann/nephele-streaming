@@ -23,6 +23,7 @@ import eu.stratosphere.nephele.streaming.JobGraphSequence;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
 import eu.stratosphere.nephele.streaming.SequenceElement;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.QosConstraintSummary;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.EdgeQosData;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosEdge;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraph;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphMember;
@@ -31,6 +32,7 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphTraversalC
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphTraversalListener;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGroupVertex;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosVertex;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.VertexQosData;
 
 /**
  * Instances of this class can be used by a Qos manager to look for violations
@@ -48,7 +50,7 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 
 	private QosGraphTraversal graphTraversal;
 
-	private QosSequenceSummary sequenceSummary;
+	private QosSequenceLatencySummary sequenceSummary;
 
 	private int sequenceLength;
 
@@ -59,27 +61,23 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 	private QosConstraintViolationListener constraintViolationListener;
 
 	private QosConstraintSummary constraintSummary;
-
-	public QosConstraintViolationFinder(LatencyConstraintID constraintID,
-			QosGraph qosGraph,
-			QosConstraintViolationListener constraintViolationListener) {
-
-		this(constraintID, qosGraph, constraintViolationListener, null);
-	}
+	
+	private long inactivityThresholdTime;
 
 	public QosConstraintViolationFinder(LatencyConstraintID constraintID,
 			QosGraph qosGraph,
 			QosConstraintViolationListener constraintViolationListener,
-			QosLogger logger) {
+			long inactivityThresholdTime) {
 
 		this.qosGraph = qosGraph;
 		this.constraint = qosGraph.getConstraintByID(constraintID);
 		this.constraintSummary = new QosConstraintSummary(this.constraint);
 		this.constraintViolationListener = constraintViolationListener;
+		this.inactivityThresholdTime = inactivityThresholdTime;
 
 		this.graphTraversal = new QosGraphTraversal(null,
 				this.constraint.getSequence(), this, this);
-		this.sequenceSummary = new QosSequenceSummary(this.constraint.getSequence());
+		this.sequenceSummary = new QosSequenceLatencySummary(this.constraint.getSequence());
 		this.sequenceLength = this.constraint.getSequence().size();
 
 		// init sequence with nulls so that during graph traversal we can
@@ -88,10 +86,9 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 				this.sequenceLength);
 		Collections.addAll(this.currentSequenceMembers,
 				new QosGraphMember[this.sequenceLength]);
-
 	}
 
-	public QosConstraintSummary findSequencesWithViolatedQosConstraint() {
+	public QosConstraintSummary scanSequencesForQosConstraintViolations() {
 
 		JobGraphSequence sequence = this.constraint.getSequence();
 		QosGroupVertex startGroupVertex;
@@ -122,9 +119,37 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 	 */
 	@Override
 	public boolean shallTraverseEdge(QosEdge edge,
-			SequenceElement<JobVertexID> sequenceElement) {
+			SequenceElement<JobVertexID> seqElem) {
 
-		return edge.getQosData().isActive();
+		boolean isActive = true;
+
+		if (seqElem.getIndexInSequence() == 0) {
+			int outputGateIndex = edge.getOutputGate().getGateIndex();
+			VertexQosData sourceVertexQosData = edge.getOutputGate()
+					.getVertex().getQosData();
+			sourceVertexQosData.dropOlderData(-1, outputGateIndex,
+					inactivityThresholdTime);
+			isActive = isActive
+					&& sourceVertexQosData.hasNewerData(-1, outputGateIndex,
+							inactivityThresholdTime);
+		}
+
+		if (seqElem.getIndexInSequence() == sequenceLength - 1) {
+			int inputGateIndex = edge.getInputGate().getGateIndex();
+			VertexQosData targetVertexQosData = edge.getInputGate().getVertex()
+					.getQosData();
+			targetVertexQosData.dropOlderData(inputGateIndex, -1,
+					inactivityThresholdTime);
+			isActive = isActive
+					&& targetVertexQosData.hasNewerData(inputGateIndex, -1,
+							inactivityThresholdTime);
+		}
+
+		EdgeQosData edgeQos = edge.getQosData();
+		edgeQos.dropOlderData(inactivityThresholdTime);
+		isActive = isActive && edgeQos.hasNewerData(inactivityThresholdTime);
+
+		return isActive;
 	}
 
 	/*
@@ -138,10 +163,15 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 	 */
 	@Override
 	public boolean shallTraverseVertex(QosVertex vertex,
-			SequenceElement<JobVertexID> sequenceElement) {
-		return vertex.getQosData().isActive(
-				sequenceElement.getInputGateIndex(),
-				sequenceElement.getOutputGateIndex());
+			SequenceElement<JobVertexID> seqElem) {
+
+		VertexQosData qosData = vertex.getQosData();
+
+		qosData.dropOlderData(seqElem.getInputGateIndex(),
+				seqElem.getOutputGateIndex(), inactivityThresholdTime);
+
+		return qosData.hasNewerData(seqElem.getInputGateIndex(),
+				seqElem.getOutputGateIndex(), inactivityThresholdTime);
 	}
 
 	/*
@@ -168,7 +198,7 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 	private void handleFullSequence() {
 		sequenceSummary.update(this.currentSequenceMembers);
 		
-		constraintSummary.addMemberSequenceSummary(sequenceSummary);
+		constraintSummary.addQosSequenceLatencySummary(sequenceSummary);
 
 		double constraintViolatedByMillis = this.sequenceSummary.getSequenceLatency()
 				- this.constraint.getLatencyConstraintInMillis();

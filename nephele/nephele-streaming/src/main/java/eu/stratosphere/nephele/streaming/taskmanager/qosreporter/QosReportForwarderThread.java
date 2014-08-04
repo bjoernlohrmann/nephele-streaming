@@ -18,7 +18,6 @@ import eu.stratosphere.nephele.streaming.message.action.DeployInstanceQosRolesAc
 import eu.stratosphere.nephele.streaming.message.action.EdgeQosReporterConfig;
 import eu.stratosphere.nephele.streaming.message.action.VertexQosReporterConfig;
 import eu.stratosphere.nephele.streaming.message.qosreport.AbstractQosReportRecord;
-import eu.stratosphere.nephele.streaming.message.qosreport.DummyVertexReporterActivity;
 import eu.stratosphere.nephele.streaming.message.qosreport.EdgeLatency;
 import eu.stratosphere.nephele.streaming.message.qosreport.EdgeStatistics;
 import eu.stratosphere.nephele.streaming.message.qosreport.QosReport;
@@ -255,21 +254,13 @@ public class QosReportForwarderThread extends Thread {
 			} else if (record instanceof EdgeStatistics) {
 				this.processEdgeStatistics((EdgeStatistics) record);
 			} else if (record instanceof VertexStatistics) {
-				this.processTaskLatency((VertexStatistics) record);
-			} else if (record instanceof DummyVertexReporterActivity) {
-				this.processDummyVertexReporterActivity((DummyVertexReporterActivity) record);
+				this.processVertexStatistics((VertexStatistics) record);
+			} else {
+				LOG.error(String.format("Cannot process report record: %s",
+						record.getClass().getSimpleName()));
 			}
 		}
 		this.tmpRecords.clear();
-	}
-
-	private void processDummyVertexReporterActivity(
-			DummyVertexReporterActivity record) {
-		QosReporterID.Vertex reporterID = record.getReporterID();
-
-		if (this.reporterActivityMap.get(reporterID) != Boolean.TRUE) {
-			this.activateReporter(reporterID);
-		}
 	}
 
 	private Set<AggregatedReport> getReports(QosReporterID reporterID) {
@@ -280,7 +271,7 @@ public class QosReportForwarderThread extends Thread {
 		return toReturn;
 	}
 
-	private void processTaskLatency(VertexStatistics taskLatency) {
+	private void processVertexStatistics(VertexStatistics taskLatency) {
 
 		QosReporterID.Vertex reporterID = taskLatency.getReporterID();
 
@@ -290,7 +281,7 @@ public class QosReportForwarderThread extends Thread {
 
 		Set<AggregatedReport> reports = this.getReports(reporterID);
 		for (AggregatedReport report : reports) {
-			report.getReport().addVertexStaistics(taskLatency);
+			report.getReport().addVertexStatistics(taskLatency);
 		}
 	}
 

@@ -80,12 +80,12 @@ public class QosLogger {
 		builder.append(';');
 		builder.append(this.formatDouble(summary.getMaxSequenceLatency()));
 		
-		double[][] avgMemberLatencies = summary.getAvgSequenceMemberLatencies();
+		double[][] memberStats = summary.getAggregatedMemberStatistics();
 
-		for (int i = 0; i < avgMemberLatencies.length; i++) {
-			for (int j = 0; j < avgMemberLatencies[i].length; j++) {
+		for (int i = 0; i < memberStats.length; i++) {
+			for (int j = 0; j < memberStats[i].length; j++) {
 				builder.append(';');
-				builder.append(this.formatDouble(avgMemberLatencies[i][j]));
+				builder.append(this.formatDouble(memberStats[i][j]));
 			}
 		}
 	}
@@ -119,6 +119,10 @@ public class QosLogger {
 				builder.append("edge" + edgeIndex + "obl");
 				builder.append(';');
 				builder.append("edge" + edgeIndex);
+				builder.append(';');
+				builder.append("edge" + edgeIndex + "Emit");
+				builder.append(';');
+				builder.append("edge" + edgeIndex + "Consume");
 				edgeIndex++;
 			}
 		}

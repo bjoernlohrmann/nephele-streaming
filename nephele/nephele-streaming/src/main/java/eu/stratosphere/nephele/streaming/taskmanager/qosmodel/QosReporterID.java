@@ -201,8 +201,10 @@ public abstract class QosReporterID implements IOReadableWritable {
 
 		@Override
 		public String toString() {
-			return String.format("Rep:%s-%s-%s", this.inputGateID.toString(),
-					this.vertexID.toString(), this.outputGateID.toString());
+			return String.format("Rep:%s-%s-%s", 
+					(inputGateID != null) ? inputGateID.toString() : "none",
+					this.vertexID.toString(), 
+					(outputGateID != null) ? outputGateID.toString() : "none");
 		}
 	}
 

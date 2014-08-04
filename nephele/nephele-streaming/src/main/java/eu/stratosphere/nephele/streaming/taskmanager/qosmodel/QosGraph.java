@@ -493,7 +493,6 @@ public class QosGraph implements IOReadableWritable {
 		}
 	}
 
-	@SuppressWarnings("unused")
 	private void readGroupEdges(DataInput in) throws IOException {
 		int noOfVertices = this.vertexByID.size();
 		for (int i = 0; i < noOfVertices; i++) {

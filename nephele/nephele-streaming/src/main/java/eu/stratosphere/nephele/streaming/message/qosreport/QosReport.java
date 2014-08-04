@@ -142,7 +142,7 @@ public class QosReport extends AbstractSerializableQosMessage {
 		return this.edgeStatistics.values();
 	}
 
-	public void addVertexStaistics(VertexStatistics vertexStats) {
+	public void addVertexStatistics(VertexStatistics vertexStats) {
 		QosReporterID.Vertex reporterID = vertexStats.getReporterID();
 		VertexStatistics existing = this.getOrCreateVertexStatisticsMap().get(
 				reporterID);

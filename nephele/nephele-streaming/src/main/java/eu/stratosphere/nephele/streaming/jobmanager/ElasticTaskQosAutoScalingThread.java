@@ -8,12 +8,14 @@ import org.apache.commons.logging.LogFactory;
 
 import eu.stratosphere.nephele.configuration.GlobalConfiguration;
 import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
+import eu.stratosphere.nephele.jobgraph.JobVertexID;
+import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
 import eu.stratosphere.nephele.streaming.message.AbstractQosMessage;
 import eu.stratosphere.nephele.streaming.message.AbstractSerializableQosMessage;
 import eu.stratosphere.nephele.streaming.message.QosManagerConstraintSummaries;
 import eu.stratosphere.nephele.streaming.message.TaskLoadStateChange;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.BufferSizeManager;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.OutputBufferLatencyManager;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.QosConstraintSummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraph;
 
@@ -24,7 +26,7 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 
 	private final LinkedBlockingQueue<AbstractSerializableQosMessage> qosMessages = new LinkedBlockingQueue<AbstractSerializableQosMessage>();
 
-	private final HashMap<LatencyConstraintID, QosGraph> qosGraphs;
+	private final HashMap<LatencyConstraintID, JobGraphLatencyConstraint> qosConstraints = new HashMap<LatencyConstraintID, JobGraphLatencyConstraint>();
 
 	/**
 	 * Each QosManager reports a {@link QosConstraintSummary} in regular time
@@ -44,9 +46,14 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 			HashMap<LatencyConstraintID, QosGraph> qosGraphs) {
 
 		this.setName("QosAutoScalingThread");
-		this.qosGraphs = qosGraphs;
 		this.timeOfLastScaling = 0;
 		this.timeOfNextScaling = 0;
+		
+		for (LatencyConstraintID constraintID : qosGraphs.keySet()) {
+			qosConstraints.put(constraintID, qosGraphs.get(constraintID)
+					.getConstraintByID(constraintID));
+		}
+		
 		this.start();
 	}
 
@@ -70,8 +77,8 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 					timeOfNextScaling = timeOfLastScaling
 							+ GlobalConfiguration
 									.getLong(
-											BufferSizeManager.QOSMANAGER_ADJUSTMENTINTERVAL_KEY,
-											BufferSizeManager.DEFAULT_ADJUSTMENTINTERVAL);
+											OutputBufferLatencyManager.QOSMANAGER_ADJUSTMENTINTERVAL_KEY,
+											OutputBufferLatencyManager.DEFAULT_ADJUSTMENTINTERVAL);
 				}
 			}
 		} catch (InterruptedException e) {
@@ -83,8 +90,15 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 		}
 	}
 
-	private void doAutoscale() {			
+	private void doAutoscale() {
+		
+		HashMap<JobVertexID, Integer> scalingActions = new HashMap<JobVertexID, Integer>();
+		
 		for(QosConstraintSummary constraintSummary : aggregatedConstraintSummaries.values()) {
+			
+			JobGraphLatencyConstraint constraint = this.qosConstraints.get(constraintSummary.getLatencyConstraintID());
+			collectScalingActionsForConstraint(constraint, constraintSummary, scalingActions);
+			
 			// FIXME implement autoscaling algorithm
 			// determine load state on constrained subgraph (LOW, MEDIUM or HIGH)
 			// if load state is LOW:
@@ -96,9 +110,18 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 		}		
 	}
 
+	private void collectScalingActionsForConstraint(
+			JobGraphLatencyConstraint constraint,
+			QosConstraintSummary constraintSummary,
+			HashMap<JobVertexID, Integer> scalingActions) {
+
+		// FIXME
+		
+	}
+
 	private void cleanUp() {
 		// clear large memory structures
-		this.qosGraphs.clear();
+		this.qosConstraints.clear();
 		this.aggregatedConstraintSummaries.clear();
 		this.currentTaskLoads.clear();
 	}
@@ -108,7 +131,7 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 			return false;
 		}
 
-		for (LatencyConstraintID constraintID : qosGraphs.keySet()) {
+		for (LatencyConstraintID constraintID : qosConstraints.keySet()) {
 			QosConstraintSummary constraintSummary = aggregatedConstraintSummaries
 					.get(constraintID);
 

@@ -1,9 +1,7 @@
 package eu.stratosphere.nephele.streaming.taskmanager.qosmodel;
 
-import eu.stratosphere.nephele.configuration.GlobalConfiguration;
 import eu.stratosphere.nephele.streaming.message.qosreport.EdgeStatistics;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.BufferSizeHistory;
-import eu.stratosphere.nephele.taskmanager.bufferprovider.GlobalBufferPool;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.ValueHistory;
 
 /**
  * Instances of this class hold Qos data (latency, throughput, ...) of a
@@ -26,34 +24,23 @@ public class EdgeQosData {
 
 	private QosStatistic recordsPerSecondStatistic;
 
-	private BufferSizeHistory bufferSizeHistory;
-
 	private final static int DEFAULT_NO_OF_STATISTICS_ENTRIES = 4;
 
 	private boolean isInChain;
 	
-	private int targetOutputBufferLatency;
+	private ValueHistory<Integer> targetOblHistory;
 
-	public EdgeQosData(QosEdge edge, int noOfStatisticsEntries) {
-		this.edge = edge;
-		this.isInChain = false;
-		this.latencyInMillisStatistic = new QosStatistic(noOfStatisticsEntries);
-		this.throughputInMbitStatistic = new QosStatistic(noOfStatisticsEntries);
-		this.outputBufferLifetimeStatistic = new QosStatistic(
-				noOfStatisticsEntries);
-		this.recordsPerBufferStatistic = new QosStatistic(noOfStatisticsEntries);
-		this.recordsPerSecondStatistic = new QosStatistic(noOfStatisticsEntries);
-		this.bufferSizeHistory = new BufferSizeHistory(2);
-		this.bufferSizeHistory.addToHistory(System.currentTimeMillis(),
-				GlobalConfiguration.getInteger(
-						"channel.network.bufferSizeInBytes",
-						GlobalBufferPool.DEFAULT_BUFFER_SIZE_IN_BYTES));
-		
-		this.targetOutputBufferLatency = -1; 
-	}
 
 	public EdgeQosData(QosEdge edge) {
-		this(edge, DEFAULT_NO_OF_STATISTICS_ENTRIES);
+		this.edge = edge;
+		this.isInChain = false;
+		this.latencyInMillisStatistic = new QosStatistic(DEFAULT_NO_OF_STATISTICS_ENTRIES);
+		this.throughputInMbitStatistic = new QosStatistic(DEFAULT_NO_OF_STATISTICS_ENTRIES);
+		this.outputBufferLifetimeStatistic = new QosStatistic(
+				DEFAULT_NO_OF_STATISTICS_ENTRIES);
+		this.recordsPerBufferStatistic = new QosStatistic(DEFAULT_NO_OF_STATISTICS_ENTRIES);
+		this.recordsPerSecondStatistic = new QosStatistic(DEFAULT_NO_OF_STATISTICS_ENTRIES);
+		this.targetOblHistory = new ValueHistory<Integer>(2);
 	}
 
 	public QosEdge getEdge() {
@@ -76,7 +63,7 @@ public class EdgeQosData {
 	}
 
 	public double getOutputBufferLifetimeInMillis() {
-		if (this.isInChain()) {
+		if (isInChain) {
 			return 0;
 		}
 		if (this.outputBufferLifetimeStatistic.hasValues()) {
@@ -123,45 +110,50 @@ public class EdgeQosData {
 		this.recordsPerSecondStatistic.addValue(recordsPerSecond);
 	}
 
-	public boolean isChannelLatencyFresherThan(long freshnessThreshold) {
-		return this.latencyInMillisStatistic.getOldestValue().getTimestamp() >= freshnessThreshold;
-	}
-
-	public boolean isOutputBufferLifetimeFresherThan(long freshnessThreshold) {
-		if (this.isInChain()) {
-			return true;
-		}
-		return this.outputBufferLifetimeStatistic.getOldestValue()
-				.getTimestamp() >= freshnessThreshold;
-	}
-
 	public void setIsInChain(boolean isInChain) {
 		this.isInChain = isInChain;
+		outputBufferLifetimeStatistic.clear();
+		recordsPerBufferStatistic.clear();
+		recordsPerSecondStatistic.clear();
 	}
 
 	public boolean isInChain() {
 		return this.isInChain;
 	}
-
-	public boolean isActive() {
-		return this.latencyInMillisStatistic.hasValues()
-				&& (this.isInChain() || this.outputBufferLifetimeStatistic
-						.hasValues());
+	
+	private boolean isChannelLatencyNewerThan(long thresholdTimestamp) {
+		return latencyInMillisStatistic.hasValues()
+				&& latencyInMillisStatistic.getOldestValue().getTimestamp() >= thresholdTimestamp;
 	}
 
-	public BufferSizeHistory getBufferSizeHistory() {
-		return this.bufferSizeHistory;
+	private boolean isOutputBufferLifetimeNewerThan(long thresholdTimestamp) {
+		if (isInChain) {
+			return true;
+		}
+		return outputBufferLifetimeStatistic.hasValues() 
+				&& outputBufferLifetimeStatistic.getOldestValue().getTimestamp() >= thresholdTimestamp;
 	}
 
-	public int getBufferSize() {
-		return this.bufferSizeHistory.getLastEntry().getBufferSize();
+	public boolean hasNewerData(long thresholdTimestamp) {
+		return isChannelLatencyNewerThan(thresholdTimestamp)
+			&& isOutputBufferLifetimeNewerThan(thresholdTimestamp);
 	}
+	
+	public void dropOlderData(long thresholdTimestamp) {
+		if (!isChannelLatencyNewerThan(thresholdTimestamp)) {
+			latencyInMillisStatistic.clear();
+		}
 
-	public int getTargetOutputBufferLatency() {
-		return targetOutputBufferLatency;
+		if (!isInChain()
+				&& !isOutputBufferLifetimeNewerThan(thresholdTimestamp)) {
+			throughputInMbitStatistic.clear();
+			outputBufferLifetimeStatistic.clear();
+			recordsPerBufferStatistic.clear();
+			recordsPerSecondStatistic.clear();
+		}
 	}
-
-	public void setTargetOutputBufferLatency(int targetOutputBufferLatency) {
-		this.targetOutputBufferLatency = targetOutputBufferLatency;
+	
+	public ValueHistory<Integer> getTargetOblHistory() {
+		return this.targetOblHistory;
 	}
 }

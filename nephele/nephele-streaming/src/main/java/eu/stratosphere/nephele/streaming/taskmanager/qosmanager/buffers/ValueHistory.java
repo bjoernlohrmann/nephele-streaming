@@ -1,27 +1,27 @@
 package eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers;
 
 /**
- * Stores a time-series of output buffer sizes (represented as ints). Instances
- * of this class are usually associated by the Qos data of a Qos edge.
+ * Stores a time-series of generic values. Instances of this class are usually
+ * associated by the Qos data of a Qos edge.
  * 
  * @author Bjoern Lohrmann
  * 
  */
-public class BufferSizeHistory {
+public class ValueHistory<T> {
 
-	private BufferSizeHistoryEntry[] entries;
+	private Object[] entries;
 
 	private int entriesInHistory;
 
-	public BufferSizeHistory(int noOfHistoryEntries) {
-		this.entries = new BufferSizeHistoryEntry[noOfHistoryEntries];
+	public ValueHistory(int noOfHistoryEntries) {
+		this.entries = new Object[noOfHistoryEntries];
 		this.entriesInHistory = 0;
 	}
 
-	public void addToHistory(long timestamp, int newBufferSize) {
-		BufferSizeHistoryEntry newEntry = new BufferSizeHistoryEntry(Math.min(
+	public void addToHistory(long timestamp, T newValue) {
+		HistoryEntry<T> newEntry = new HistoryEntry<T>(Math.min(
 				this.entriesInHistory, this.entries.length - 1), timestamp,
-				newBufferSize);
+				newValue);
 
 		if (this.entriesInHistory < this.entries.length) {
 			this.entries[this.entriesInHistory] = newEntry;
@@ -33,17 +33,15 @@ public class BufferSizeHistory {
 		}
 	}
 
-	public BufferSizeHistoryEntry[] getEntries() {
-		return this.entries;
+	@SuppressWarnings("unchecked")
+	public HistoryEntry<T> getFirstEntry() {
+		return (HistoryEntry<T> ) this.entries[0];
 	}
 
-	public BufferSizeHistoryEntry getFirstEntry() {
-		return this.entries[0];
-	}
-
-	public BufferSizeHistoryEntry getLastEntry() {
+	@SuppressWarnings("unchecked")
+	public HistoryEntry<T> getLastEntry() {
 		if (this.entriesInHistory > 0) {
-			return this.entries[this.entriesInHistory - 1];
+			return (HistoryEntry<T>) this.entries[this.entriesInHistory - 1];
 		}
 
 		return null;

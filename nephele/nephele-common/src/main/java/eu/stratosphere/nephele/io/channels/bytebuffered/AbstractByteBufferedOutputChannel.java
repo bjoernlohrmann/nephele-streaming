@@ -160,7 +160,7 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 	 */
 	private void releaseWriteBuffer() throws IOException, InterruptedException {
 		// Keep track of number of bytes transmitted through this channel
-		this.amountOfDataTransmitted += this.dataBuffer.size();
+		this.amountOfDataTransmitted += this.dataBuffer.position();
 
 		this.outputChannelBroker.releaseWriteBuffer(this.dataBuffer);
 		this.dataBuffer = null;

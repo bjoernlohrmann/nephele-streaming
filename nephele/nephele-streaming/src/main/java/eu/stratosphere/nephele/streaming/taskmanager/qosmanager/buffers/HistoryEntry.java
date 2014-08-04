@@ -1,22 +1,22 @@
 package eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers;
 
 /**
- * Models an entry in the time-series of buffer sizes in a Qos edge.
+ * Models an entry in a time-series of values.
  * 
  * @author Bjoern Lohrmann
  * 
  */
-public class BufferSizeHistoryEntry {
+public class HistoryEntry<T> {
 	private int entryIndex;
 
 	private long timestamp;
 
-	private int bufferSize;
+	private T value;
 
-	public BufferSizeHistoryEntry(int entryIndex, long timestamp, int bufferSize) {
+	public HistoryEntry(int entryIndex, long timestamp, T bufferSize) {
 		this.entryIndex = entryIndex;
 		this.timestamp = timestamp;
-		this.bufferSize = bufferSize;
+		this.value = bufferSize;
 	}
 
 	public int getEntryIndex() {
@@ -27,8 +27,8 @@ public class BufferSizeHistoryEntry {
 		return this.timestamp;
 	}
 
-	public int getBufferSize() {
-		return this.bufferSize;
+	public T getValue() {
+		return this.value;
 	}
 
 }

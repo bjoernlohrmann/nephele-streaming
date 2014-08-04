@@ -1,7 +1,6 @@
 package eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 
 import org.apache.commons.logging.Log;
@@ -9,36 +8,34 @@ import org.apache.commons.logging.LogFactory;
 
 import eu.stratosphere.nephele.configuration.GlobalConfiguration;
 import eu.stratosphere.nephele.instance.InstanceConnectionInfo;
-import eu.stratosphere.nephele.io.channels.ChannelID;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.plugins.PluginManager;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.message.action.SetOutputLatencyTargetAction;
 import eu.stratosphere.nephele.streaming.taskmanager.StreamMessagingThread;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosConstraintViolationListener;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosModel;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosSequenceLatencySummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosUtils;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosSequenceSummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.EdgeQosData;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosEdge;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphMember;
 
 /**
- * Used by the Qos manager to manage the output buffer sizes in a Qos graph. It
- * uses a Qos model to search for sequences of Qos edges and vertices that
- * violate a Qos constraint, and then increases/decreases output buffer sizes
+ * Used by the Qos manager to manage output latencies in a Qos graph. It uses a
+ * Qos model to search for sequences of Qos edges and vertices that violate a
+ * Qos constraint, and then redefines target output buffer latencies
  * accordingly.
  * 
  * @author Bjoern Lohrmann
  * 
  */
-public class BufferSizeManager {
+public class OutputBufferLatencyManager {
 
-	private static final Log LOG = LogFactory.getLog(BufferSizeManager.class);
+	private static final Log LOG = LogFactory.getLog(OutputBufferLatencyManager.class);
 
 	/**
-	 * Provides access to the configuration entry which defines the buffer size
-	 * adjustment interval-
+	 * Provides access to the configuration entry which defines the time interval
+	 * for adjusting target output buffer latencies.
 	 */
 	public static final String QOSMANAGER_ADJUSTMENTINTERVAL_KEY = PluginManager
 			.prefixWithPluginNamespace("streaming.qosmanager.adjustmentinterval");
@@ -49,19 +46,33 @@ public class BufferSizeManager {
 
 	public long adjustmentInterval;
 
-	private QosModel qosModel;
-
 	private StreamMessagingThread messagingThread;
 
 	private long timeOfNextAdjustment;
 
-//	private BufferSizeLogger bufferSizeLogger;
-
 	private JobID jobID;
+	
+	final HashMap<QosEdge, Integer> edgesToAdjust = new HashMap<QosEdge, Integer>();
+	
+	int staleSequencesCounter = 0;
+	
+	final QosConstraintViolationListener listener = new QosConstraintViolationListener() {
+		@Override
+		public void handleViolatedConstraint(
+				JobGraphLatencyConstraint constraint,
+				List<QosGraphMember> sequenceMembers,
+				QosSequenceLatencySummary qosSummary) {
 
-	public BufferSizeManager(JobID jobID, QosModel qosModel) {
+			if (qosSummary.isMemberQosDataFresh()) {
+				collectEdgesToAdjust(constraint, sequenceMembers, qosSummary, edgesToAdjust);
+			} else {
+				staleSequencesCounter++;
+			}
+		}
+	};
+
+	public OutputBufferLatencyManager(JobID jobID) {
 		this.jobID = jobID;
-		this.qosModel = qosModel;
 		this.messagingThread = StreamMessagingThread.getInstance();
 
 		this.adjustmentInterval = GlobalConfiguration.getLong(
@@ -76,42 +87,19 @@ public class BufferSizeManager {
 		return this.adjustmentInterval;
 	}
 
-	HashSet<ChannelID> staleEdges = new HashSet<ChannelID>();
-
-	public List<QosConstraintSummary> adjustBufferSizes()
-			throws InterruptedException {
-
-		final HashMap<QosEdge, Integer> edgesToAdjust = new HashMap<QosEdge, Integer>();
-
-		this.staleEdges.clear();
-
-		QosConstraintViolationListener listener = new QosConstraintViolationListener() {
-			@Override
-			public void handleViolatedConstraint(
-					JobGraphLatencyConstraint constraint,
-					List<QosGraphMember> sequenceMembers,
-					QosSequenceSummary qosSummary) {
-
-				if (qosSummary.isMemberQosDataFresh()) {
-					BufferSizeManager.this.collectEdgesToAdjust(constraint,
-							sequenceMembers, qosSummary, edgesToAdjust);
-				} else {
-					LOG.debug("Rejecting sequence: stale qos data");
-				}
-			}
-		};
-
-		List<QosConstraintSummary> constraintSummaries = this.qosModel
-				.findQosConstraintViolations(listener);
-
-		this.doAdjust(edgesToAdjust);
-
+	public void applyAndSendBufferAdjustments() throws InterruptedException {
+		doAdjust(edgesToAdjust);
+		
 		LOG.debug(String.format(
-				"Adjusted edges: %d | Edges with stale Qos data: %d",
-				edgesToAdjust.size(), this.staleEdges.size()));
-
+				"Adjusted edges: %d | Sequences with stale Qos data: %d",
+				edgesToAdjust.size(), staleSequencesCounter));
+		edgesToAdjust.clear();
+		staleSequencesCounter = 0;
 		this.refreshTimeOfNextAdjustment();
-		return constraintSummaries;
+	}
+	
+	public QosConstraintViolationListener getQosConstraintViolationListener() {
+		return this.listener;
 	}
 
 	private void doAdjust(HashMap<QosEdge, Integer> edgesToAdjust)
@@ -120,9 +108,9 @@ public class BufferSizeManager {
 		for (QosEdge edge : edgesToAdjust.keySet()) {
 			int newTargetObl = edgesToAdjust.get(edge);
 
-			BufferSizeHistory sizeHistory = edge.getQosData()
-					.getBufferSizeHistory();
-			sizeHistory.addToHistory(this.timeOfNextAdjustment, newTargetObl);
+			ValueHistory<Integer> oblHistory = edge.getQosData()
+					.getTargetOblHistory();
+			oblHistory.addToHistory(this.timeOfNextAdjustment, newTargetObl);
 
 			this.setTargetOutputBufferLatency(edge, newTargetObl);
 		}
@@ -137,10 +125,10 @@ public class BufferSizeManager {
 
 	private void collectEdgesToAdjust(JobGraphLatencyConstraint constraint,
 			List<QosGraphMember> sequenceMembers,
-			QosSequenceSummary qosSummary,
+			QosSequenceLatencySummary qosSummary,
 			HashMap<QosEdge, Integer> edgesToAdjust) {
 
-		int targetOutputBufferLatency = (int) computeBufferSizeAdjustmentFactor(
+		int targetOutputBufferLatency = (int) computeUniformTargetObl(
 				constraint, qosSummary);
 
 		for (QosGraphMember member : sequenceMembers) {
@@ -167,22 +155,21 @@ public class BufferSizeManager {
 				// overload case (nonOutputBufferLatency >= constraint): we
 				// don't have a chance of meeting the constraint by
 				// adjusting output buffer sizes. in this case just make
-				// buffers as large as possible for maximum throughput
+				// buffers quite large.
 				newTargetObl = 100;
 			}
 
 			// do nothing if change is very small
-			double oldTargetObl = qosData.getTargetOutputBufferLatency();
-			if (oldTargetObl != -1
-					&& Math.abs(oldTargetObl - newTargetObl) / oldTargetObl < 0.05) {
-				LOG.debug(String.format(
-						"Rejecting edge: target obl change from %d to %d",
-						oldTargetObl, newTargetObl));
-				continue;
+			ValueHistory<Integer> targetOblHistory = qosData.getTargetOblHistory();
+			if(targetOblHistory.hasEntries()) {
+				int oldTargetObl = targetOblHistory.getLastEntry().getValue();
+				if (Math.abs(oldTargetObl - newTargetObl) / oldTargetObl < 0.05) {
+					continue;
+				}
 			}
 
-			// do nothing if buffers on this edge are already being adjusted to
-			// a smaller size
+			// do nothing target output buffer latency on this edge is already being adjusted to
+			// a smaller value
 			if (!edgesToAdjust.containsKey(edge)
 					|| edgesToAdjust.get(edge) > newTargetObl) {
 				edgesToAdjust.put(qosData.getEdge(), newTargetObl);
@@ -190,8 +177,8 @@ public class BufferSizeManager {
 		}
 	}
 
-	private double computeBufferSizeAdjustmentFactor(
-			JobGraphLatencyConstraint constraint, QosSequenceSummary qosSummary) {
+	private double computeUniformTargetObl(
+			JobGraphLatencyConstraint constraint, QosSequenceLatencySummary qosSummary) {
 
 		if (constraint.getLatencyConstraintInMillis() > qosSummary
 				.getNonOutputBufferLatency()) {

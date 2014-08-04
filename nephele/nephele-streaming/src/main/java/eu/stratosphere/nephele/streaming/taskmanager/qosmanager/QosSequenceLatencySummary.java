@@ -5,22 +5,22 @@ import java.util.List;
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.streaming.JobGraphSequence;
 import eu.stratosphere.nephele.streaming.SequenceElement;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.ValueHistory;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.EdgeQosData;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosEdge;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphMember;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosVertex;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.VertexQosData;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.VertexQosData.GateCombinationStatistics;
 
-public class QosSequenceSummary {
+public class QosSequenceLatencySummary {
 	
-	private int[][] inputOutputGateCombinations;
+	private final int[][] inputOutputGateCombinations;
+	
+	private final double memberLatencies[][];
 	
 	private int noOfEdges;
 	
 	private int noOfVertices;
-	
-	private double memberStats[][];
 	
 	private double sequenceLatency;
 	
@@ -28,26 +28,26 @@ public class QosSequenceSummary {
 	
 	private boolean isMemberQosDataFresh;
 
-	public QosSequenceSummary(JobGraphSequence jobGraphSequence) {
+	public QosSequenceLatencySummary(JobGraphSequence jobGraphSequence) {
 		this.inputOutputGateCombinations = new int[jobGraphSequence.size()][];
 		this.noOfEdges = 0;
 		this.noOfVertices = 0;
 		
-		this.memberStats = new double[jobGraphSequence.size()][];
+		this.memberLatencies = new double[jobGraphSequence.size()][];
 		for (SequenceElement<JobVertexID> sequenceElement : jobGraphSequence) {
 			int index = sequenceElement.getIndexInSequence();
 
 			this.inputOutputGateCombinations[index] = new int[2];
 			if (sequenceElement.isVertex()) {
 				this.noOfVertices++;
-				this.memberStats[index] = new double[3];
+				this.memberLatencies[index] = new double[1];
 				this.inputOutputGateCombinations[index][0] = sequenceElement
 						.getInputGateIndex();
 				this.inputOutputGateCombinations[index][1] = sequenceElement
 						.getOutputGateIndex();
 			} else {
 				this.noOfEdges++;
-				this.memberStats[index] = new double[2];
+				this.memberLatencies[index] = new double[2];
 				this.inputOutputGateCombinations[index][0] = sequenceElement
 						.getOutputGateIndex();
 				this.inputOutputGateCombinations[index][1] = sequenceElement
@@ -69,36 +69,34 @@ public class QosSequenceSummary {
 				int inputGateIndex = this.inputOutputGateCombinations[index][0];
 				int outputGateIndex = this.inputOutputGateCombinations[index][1];
 
-				GateCombinationStatistics stats = vertexQos.getGateCombinationStatistics(inputGateIndex, outputGateIndex);
-				this.memberStats[index][0] = stats.getLatencyInMillis();
-				this.memberStats[index][1] = stats.getRecordsConsumedPerSec();
-				this.memberStats[index][2] = stats.getRecordsEmittedPerSec();
-				sequenceLatency += this.memberStats[index][0];
+				this.memberLatencies[index][0] = vertexQos.getLatencyInMillis(inputGateIndex, outputGateIndex);
+				sequenceLatency += this.memberLatencies[index][0];
 			} else {
 				EdgeQosData edgeQos = ((QosEdge) member).getQosData();
 				double channelLatency = edgeQos.getChannelLatencyInMillis();
 				double outputBufferLatency = Math.min(channelLatency, edgeQos.getOutputBufferLifetimeInMillis() / 2);
 				
-				this.memberStats[index][0] = outputBufferLatency;
-				this.memberStats[index][1] = channelLatency - outputBufferLatency;
+				this.memberLatencies[index][0] = outputBufferLatency;
+				this.memberLatencies[index][1] = channelLatency - outputBufferLatency;
 				sequenceLatency += channelLatency;
 				outputBufferLatencySum += outputBufferLatency;
-				this.isMemberQosDataFresh = this.isMemberQosDataFresh && hasFreshValues(edgeQos);
+				this.isMemberQosDataFresh = this.isMemberQosDataFresh && hasFreshValues((QosEdge) member);
 			}
 
 			index++;
 		}
 	}
 	
-	private boolean hasFreshValues(EdgeQosData qosData) {
-		long freshnessThreshold = qosData.getBufferSizeHistory().getLastEntry().getTimestamp();
+	private boolean hasFreshValues(QosEdge edge) {
+		EdgeQosData edgeQos = edge.getQosData();
 
-		return qosData.isChannelLatencyFresherThan(freshnessThreshold)
-				&& qosData.isOutputBufferLifetimeFresherThan(freshnessThreshold);
+		ValueHistory<Integer> targetOblHistory = edgeQos.getTargetOblHistory();
+		return !targetOblHistory.hasEntries()
+				|| edgeQos.hasNewerData(targetOblHistory.getLastEntry().getTimestamp());
 	}
 
-	public double[][] getMemberStatistics() {
-		return memberStats;
+	public double[][] getMemberLatencies() {
+		return memberLatencies;
 	}
 
 	public double getSequenceLatency() {

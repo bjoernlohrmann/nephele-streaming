@@ -22,12 +22,15 @@ import java.util.List;
 
 import org.apache.log4j.Logger;
 
+import eu.stratosphere.nephele.configuration.GlobalConfiguration;
 import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
 import eu.stratosphere.nephele.io.GateID;
 import eu.stratosphere.nephele.io.channels.ChannelID;
 import eu.stratosphere.nephele.jobgraph.JobID;
+import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
+import eu.stratosphere.nephele.streaming.SequenceElement;
 import eu.stratosphere.nephele.streaming.message.ChainUpdates;
 import eu.stratosphere.nephele.streaming.message.action.EdgeQosReporterConfig;
 import eu.stratosphere.nephele.streaming.message.action.VertexQosReporterConfig;
@@ -35,6 +38,7 @@ import eu.stratosphere.nephele.streaming.message.qosreport.EdgeLatency;
 import eu.stratosphere.nephele.streaming.message.qosreport.EdgeStatistics;
 import eu.stratosphere.nephele.streaming.message.qosreport.QosReport;
 import eu.stratosphere.nephele.streaming.message.qosreport.VertexStatistics;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.OutputBufferLatencyManager;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.QosConstraintSummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.EdgeQosData;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosEdge;
@@ -235,15 +239,22 @@ public class QosModel {
 		for (VertexStatistics vertexStats : vertexLatencies) {
 			QosReporterID.Vertex reporterID = vertexStats.getReporterID();
 
-			QosGate inputGate = this.gatesByGateId.get(reporterID
-					.getInputGateID());
-			QosGate outputGate = this.gatesByGateId.get(reporterID
-					.getOutputGateID());
+			QosVertex qosVertex = this.vertexByID.get(reporterID.getVertexID());
+			
+			int inputGateIndex = -1;
+			if(reporterID.getInputGateID() != null) {
+				inputGateIndex = this.gatesByGateId.get(reporterID.getInputGateID()).getGateIndex();
+			}
+			
+			int outputGateIndex = -1;
+			if(reporterID.getOutputGateID() != null) {
+				outputGateIndex = this.gatesByGateId.get(reporterID.getOutputGateID()).getGateIndex();
+			}
 
-			if (inputGate != null) {
-				VertexQosData qosData = inputGate.getVertex().getQosData();
-				qosData.addVertexStatisticsMeasurement(inputGate.getGateIndex(),
-						outputGate.getGateIndex(), now,
+			if(qosVertex != null) {
+				VertexQosData qosData = qosVertex.getQosData();
+				qosData.addVertexStatisticsMeasurement(inputGateIndex,
+						outputGateIndex, now,
 						vertexStats);
 			}
 		}
@@ -392,6 +403,10 @@ public class QosModel {
 		if (inputGateIndex != -1 && outputGateIndex != -1) {
 			memberVertex.getQosData().prepareForReportsOnGateCombination(
 					inputGateIndex, outputGateIndex);
+		} else if (inputGateIndex != -1) {
+			memberVertex.getQosData().prepareForReportsOnInputGate(inputGateIndex);
+		} else {
+			memberVertex.getQosData().prepareForReportsOnOutputGate(outputGateIndex);
 		}
 	}
 
@@ -422,21 +437,93 @@ public class QosModel {
 		}
 	}
 
-	public List<QosConstraintSummary> findQosConstraintViolations(
+	public List<QosConstraintSummary> findQosConstraintViolationsAndSummarize(
 			QosConstraintViolationListener listener) {
+		
+		long now = System.currentTimeMillis();
+
+		long inactivityThresholdTime = now
+				- 2
+				* GlobalConfiguration.getLong(
+						OutputBufferLatencyManager.QOSMANAGER_ADJUSTMENTINTERVAL_KEY,
+						OutputBufferLatencyManager.DEFAULT_ADJUSTMENTINTERVAL);
 
 		List<QosConstraintSummary> constraintSummaries = new LinkedList<QosConstraintSummary>();
 
-		for (JobGraphLatencyConstraint constraint : this.qosGraph.getConstraints()) {
+		for (JobGraphLatencyConstraint constraint : this.qosGraph
+				.getConstraints()) {
 
 			QosConstraintViolationFinder constraintViolationFinder = new QosConstraintViolationFinder(
-					constraint.getID(), this.qosGraph, listener);
-			constraintSummaries.add(constraintViolationFinder.findSequencesWithViolatedQosConstraint());
+					constraint.getID(), this.qosGraph, listener,
+					inactivityThresholdTime);
+			QosConstraintSummary constraintSummary = constraintViolationFinder
+					.scanSequencesForQosConstraintViolations();
+
+			setGroupEdgeRecordRates(constraintSummary, inactivityThresholdTime);
+
+			constraintSummaries.add(constraintSummary);
 		}
 
 		return constraintSummaries;
 	}
 	
+	private void setGroupEdgeRecordRates(
+			QosConstraintSummary constraintSummary, long inactivityThresholdTime) {
+
+		JobGraphLatencyConstraint constraint = qosGraph
+				.getConstraintByID(constraintSummary.getLatencyConstraintID());
+
+		for (SequenceElement<JobVertexID> seqElem : constraint.getSequence()) {
+			if (seqElem.isVertex()) {
+				continue;
+			}
+
+			double emissionRate = computeSourceGroupVertexEmissionRate(seqElem,
+					inactivityThresholdTime);
+
+			double consumptionRate = computeTargetGroupVertexConsumptionRate(
+					seqElem, inactivityThresholdTime);
+
+			constraintSummary
+					.setGroupEdgeRecordRates(seqElem.getIndexInSequence(),
+							emissionRate, consumptionRate);
+		}
+	}
+
+	private double computeTargetGroupVertexConsumptionRate(
+			SequenceElement<JobVertexID> edge, long inactivityThresholdTime) {
+
+		double consumptionRate = 0;
+		int inputGateIndex = edge.getInputGateIndex();
+		QosGroupVertex targetGroupVertex = qosGraph.getGroupVertexByID(edge
+				.getTargetVertexID());
+		for (QosVertex memberVertex : targetGroupVertex.getMembers()) {
+			VertexQosData qosData = memberVertex.getQosData();
+			if (qosData.hasNewerData(inputGateIndex, -1, inactivityThresholdTime)) {
+				consumptionRate += qosData.getRecordsConsumedPerSec(inputGateIndex);
+			}
+		}
+
+		return consumptionRate;
+	}
+
+	private double computeSourceGroupVertexEmissionRate(
+			SequenceElement<JobVertexID> edge, long inactivityThresholdTime) {
+
+		double emissionRate = 0;
+		int outputGateIndex = edge.getOutputGateIndex();
+		QosGroupVertex sourceGroupVertex = qosGraph.getGroupVertexByID(edge
+				.getSourceVertexID());
+		for (QosVertex memberVertex : sourceGroupVertex.getMembers()) {
+			VertexQosData qosData = memberVertex.getQosData();
+			if (qosData.hasNewerData(-1, outputGateIndex, inactivityThresholdTime)) {
+				emissionRate += qosData.getRecordsEmittedPerSec(outputGateIndex);
+			}
+		}
+
+		return emissionRate;
+	}
+
 	public JobGraphLatencyConstraint getJobGraphLatencyConstraint(LatencyConstraintID constraintID) {
 		return this.qosGraph.getConstraintByID(constraintID);
 	}

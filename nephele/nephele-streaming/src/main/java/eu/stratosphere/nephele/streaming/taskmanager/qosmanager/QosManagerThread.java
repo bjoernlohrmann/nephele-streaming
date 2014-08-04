@@ -21,7 +21,7 @@ import eu.stratosphere.nephele.streaming.message.QosManagerConstraintSummaries;
 import eu.stratosphere.nephele.streaming.message.action.DeployInstanceQosRolesAction;
 import eu.stratosphere.nephele.streaming.message.qosreport.QosReport;
 import eu.stratosphere.nephele.streaming.taskmanager.StreamMessagingThread;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.BufferSizeManager;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.OutputBufferLatencyManager;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.QosConstraintSummary;
 
 /**
@@ -43,7 +43,7 @@ public class QosManagerThread extends Thread {
 
 	private final LinkedBlockingQueue<AbstractQosMessage> streamingDataQueue;
 
-	private BufferSizeManager bufferSizeManager;
+	private OutputBufferLatencyManager oblManager;
 
 	private QosModel qosModel;
 	
@@ -55,7 +55,7 @@ public class QosManagerThread extends Thread {
 		this.jobID = jobID;
 		this.qosModel = new QosModel(jobID);
 		this.streamingDataQueue = new LinkedBlockingQueue<AbstractQosMessage>();
-		this.bufferSizeManager = new BufferSizeManager(jobID, this.qosModel);
+		this.oblManager = new OutputBufferLatencyManager(jobID);
 		this.qosLoggers = new HashMap<LatencyConstraintID, QosLogger>();
 		this.setName(String.format("QosManagerThread (JobID: %s)",
 				jobID.toString()));
@@ -116,15 +116,20 @@ public class QosManagerThread extends Thread {
 
 				long now = System.currentTimeMillis();
 				if (this.qosModel.isReady()
-						&& this.bufferSizeManager.isAdjustmentNecessary(now)) {
+						&& this.oblManager.isAdjustmentNecessary(now)) {
 
-					List<QosConstraintSummary> constraintSummaries = this.bufferSizeManager
-							.adjustBufferSizes();
+					QosConstraintViolationListener listener = this.oblManager
+							.getQosConstraintViolationListener();
+
+					List<QosConstraintSummary> constraintSummaries = this.qosModel
+							.findQosConstraintViolationsAndSummarize(listener);
+					
+					this.oblManager.applyAndSendBufferAdjustments();
 					
 					logConstraintSummaries(constraintSummaries);
 					sendConstraintSummariesToJm(constraintSummaries);
 
-					long buffersizeAdjustmentOverhead = System
+					long adjustmentOverhead = System
 							.currentTimeMillis() - now;
 					LOG.debug(String
 							.format("total messages: %d (edge: %d lats and %d stats | vertex: %d | edgeReporters: %d | vertexReporters: %d) || enqueued: %d || buffersizeAdjustmentOverhead: %d",
@@ -132,7 +137,7 @@ public class QosManagerThread extends Thread {
 									noOfEdgeStatistics, noOfVertexLatencies,
 									noOfEdgeAnnounces, noOfVertexAnnounces,
 									this.streamingDataQueue.size(),
-									buffersizeAdjustmentOverhead));
+									adjustmentOverhead));
 
 					nooOfReports = 0;
 					noOfEdgeLatencies = 0;
@@ -180,8 +185,8 @@ public class QosManagerThread extends Thread {
 						qosModel.getJobGraphLatencyConstraint(constraintID),
 						GlobalConfiguration
 								.getLong(
-										BufferSizeManager.QOSMANAGER_ADJUSTMENTINTERVAL_KEY,
-										BufferSizeManager.DEFAULT_ADJUSTMENTINTERVAL));
+										OutputBufferLatencyManager.QOSMANAGER_ADJUSTMENTINTERVAL_KEY,
+										OutputBufferLatencyManager.DEFAULT_ADJUSTMENTINTERVAL));
 				this.qosLoggers.put(constraintID, logger);
 			}
 			logger.logSummary(constraintSummary);
@@ -193,7 +198,7 @@ public class QosManagerThread extends Thread {
 	private void cleanUp() {
 		this.streamingDataQueue.clear();
 		this.qosModel = null;
-		this.bufferSizeManager = null;
+		this.oblManager = null;
 	}
 
 	public void shutdown() {

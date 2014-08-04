@@ -25,7 +25,6 @@ import eu.stratosphere.nephele.streaming.message.action.EdgeQosReporterConfig;
 import eu.stratosphere.nephele.streaming.message.action.LimitBufferSizeAction;
 import eu.stratosphere.nephele.streaming.message.action.SetOutputLatencyTargetAction;
 import eu.stratosphere.nephele.streaming.message.action.VertexQosReporterConfig;
-import eu.stratosphere.nephele.streaming.message.qosreport.DummyVertexReporterActivity;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.listener.QosReportingListenerHelper;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.StreamTaskEnvironment;
@@ -106,12 +105,12 @@ public class StreamTaskQosCoordinator implements QosReporterConfigListener {
 	}
 
 	private void prepareQosReporting() {
-		this.installVertexLatencyReporters();
+		this.installVertexStatisticsReporters();
 		this.installInputGateListeners();
 		this.installOutputGateListeners();
 	}
 
-	private void installVertexLatencyReporters() {
+	private void installVertexStatisticsReporters() {
 		Set<VertexQosReporterConfig> vertexReporterConfigs = this.reporterConfigCenter
 				.getVertexQosReporters(this.task.getVertexID());
 
@@ -120,21 +119,12 @@ public class StreamTaskQosCoordinator implements QosReporterConfigListener {
 					this.task.getVertexID(), this);
 		} else {
 			for (VertexQosReporterConfig reporterConfig : vertexReporterConfigs) {
-				if (reporterConfig.isDummy()) {
-					this.announceDummyReporter(reporterConfig.getReporterID());
-				} else {
-					this.installVertexLatencyReporter(reporterConfig);
-				}
+				this.installVertexStatisticsReporter(reporterConfig);
 			}
 		}
 	}
 
-	private void announceDummyReporter(QosReporterID.Vertex reporterID) {
-		this.reporterThread.addToNextReport(new DummyVertexReporterActivity(
-				reporterID));
-	}
-
-	private void installVertexLatencyReporter(
+	private void installVertexStatisticsReporter(
 			VertexQosReporterConfig reporterConfig) {
 
 		QosReporterID.Vertex reporterID = reporterConfig.getReporterID();
@@ -143,19 +133,31 @@ public class StreamTaskQosCoordinator implements QosReporterConfigListener {
 			return;
 		}
 
-		StreamInputGate<? extends Record> inputGate = this.taskEnvironment
-				.getInputGate(reporterConfig.getInputGateID());
+		int inputGateIndex = -1;
+		if (reporterConfig.getInputGateID() != null) {
+			StreamInputGate<? extends Record> inputGate = this.taskEnvironment
+					.getInputGate(reporterConfig.getInputGateID());
+			
+			QosReportingListenerHelper.listenToVertexStatisticsOnInputGate(
+					inputGate, this.vertexStatisticsManager);
+			
+			inputGateIndex = inputGate.getIndex();
+		}
 
-		StreamOutputGate<? extends Record> outputGate = this.taskEnvironment
-				.getOutputGate(reporterConfig.getOutputGateID());
+		int outputGateIndex = -1;
+		if (reporterConfig.getOutputGateID() != null) {
+			StreamOutputGate<? extends Record> outputGate = this.taskEnvironment
+					.getOutputGate(reporterConfig.getOutputGateID());
+			
+			QosReportingListenerHelper.listenToVertexStatisticsOnOutputGate(
+					outputGate, this.vertexStatisticsManager);
+			
+			outputGateIndex = outputGate.getIndex();
+		}
 
-		this.vertexStatisticsManager.addReporter(inputGate.getIndex(),
-				outputGate.getIndex(), reporterID);
+		this.vertexStatisticsManager.addReporter(inputGateIndex,
+				outputGateIndex, reporterID);
 
-		QosReportingListenerHelper.listenToVertexLatencyOnInputGate(inputGate,
-				this.vertexStatisticsManager);
-		QosReportingListenerHelper.listenToVertexLatencyOnOutputGate(
-				outputGate, this.vertexStatisticsManager);
 	}
 
 	private void installInputGateListeners() {
@@ -311,11 +313,7 @@ public class StreamTaskQosCoordinator implements QosReporterConfigListener {
 			return;
 		}
 
-		if (reporterConfig.isDummy()) {
-			this.announceDummyReporter(reporterConfig.getReporterID());
-		} else {
-			this.installVertexLatencyReporter(reporterConfig);
-		}
+		this.installVertexStatisticsReporter(reporterConfig);
 	}
 
 	/*

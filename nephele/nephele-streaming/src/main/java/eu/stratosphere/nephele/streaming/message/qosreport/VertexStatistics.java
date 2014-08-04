@@ -77,22 +77,44 @@ public final class VertexStatistics extends AbstractQosReportRecord {
 	 * @return the task latency in milliseconds
 	 */
 	public double getVertexLatency() {
+		if (vertexLatency == -1) {
+			return -1;
+		}
+
 		return this.vertexLatency / this.counter;
 	}
 
 	public double getRecordsConsumedPerSec() {
-		return recordsConsumedPerSec;
+		if (recordsConsumedPerSec == -1) {
+			return -1;
+		}
+
+		return recordsConsumedPerSec / this.counter;
 	}
 
 	public double getRecordsEmittedPerSec() {
-		return recordsEmittedPerSec;
+		if (recordsEmittedPerSec == -1) {
+			return -1;
+		}
+
+		return recordsEmittedPerSec / this.counter;
 	}
 
 	public void add(VertexStatistics vertexStats) {
 		this.counter++;
-		this.vertexLatency += vertexStats.getVertexLatency();
-		this.recordsConsumedPerSec += vertexStats.getRecordsConsumedPerSec();
-		this.recordsEmittedPerSec += vertexStats.getRecordsEmittedPerSec();
+
+		if (vertexLatency != -1) {
+			this.vertexLatency += vertexStats.getVertexLatency();
+		}
+
+		if (recordsConsumedPerSec != -1) {
+			this.recordsConsumedPerSec += vertexStats
+					.getRecordsConsumedPerSec();
+		}
+
+		if (recordsEmittedPerSec != -1) {
+			this.recordsEmittedPerSec += vertexStats.getRecordsEmittedPerSec();
+		}
 	}
 
 	@Override
@@ -139,5 +161,6 @@ public final class VertexStatistics extends AbstractQosReportRecord {
 		this.vertexLatency = in.readDouble();
 		this.recordsConsumedPerSec = in.readDouble();
 		this.recordsEmittedPerSec = in.readDouble();
+		this.counter = 1;
 	}
 }

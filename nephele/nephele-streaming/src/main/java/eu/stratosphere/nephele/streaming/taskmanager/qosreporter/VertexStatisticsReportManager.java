@@ -38,7 +38,11 @@ public class VertexStatisticsReportManager {
 
 	private class VertexQosReporter {
 
-		private QosReporterID.Vertex reporterID;
+		private final QosReporterID.Vertex reporterID;
+		
+		private final boolean hasInputGate;
+		
+		private final boolean hasOutputGate;
 
 		private int inputGateReceiveCounter;
 
@@ -51,32 +55,53 @@ public class VertexStatisticsReportManager {
 		private int currentReportingProbeCounter;
 
 		private long timeOfNextReport;
+		
+		private long timeOfLastReport;
 
 		public VertexQosReporter(QosReporterID.Vertex reporterID) {
 			this.reporterID = reporterID;
-			this.reportingProbeInterval = VertexStatisticsReportManager.this.reportForwarder
-					.getConfigCenter().getTaggingInterval();
+			this.hasInputGate = reporterID.getInputGateID() != null;
+			this.hasOutputGate = reporterID.getOutputGateID() != null;
+			
+			this.currentReportingProbeCounter = 0;
+			this.reportingProbeInterval = 1;
+			setTimeOfReports(System.currentTimeMillis());
+		}
+
+		private void setTimeOfReports(long now) {
+			this.timeOfLastReport = now;
+			this.timeOfNextReport = timeOfLastReport
+					+ reportForwarder.getConfigCenter()
+							.getAggregationInterval();
 		}
 
 		public void sendReportIfDue() {
 			this.currentReportingProbeCounter++;
 			if (this.currentReportingProbeCounter >= this.reportingProbeInterval) {
 				this.currentReportingProbeCounter = 0;
+				
 				if (this.hasData()) {
+					
 					long now = System.currentTimeMillis();
-
 					if (now >= this.timeOfNextReport) {
-
-						double avgLatencyPerReceivedRecord = (now - this.inputGateTimeOfFirstReceive)
-								/ (1.0 * this.inputGateReceiveCounter);
 						
-						double secsPassed = (reportForwarder.getConfigCenter()
-								.getAggregationInterval()
-								+ now
-								- this.timeOfNextReport) / 1000.0;
+						double secsPassed = (now - timeOfLastReport) / 1000.0;
 						
-						double consumptionRate = inputGateReceiveCounter / secsPassed;
-						double emissionRate = outputGateEmitCounter / secsPassed;
+						double consumptionRate = -1;
+						if (hasInputGate) {
+							consumptionRate = inputGateReceiveCounter / secsPassed;
+						}
+						
+						double emissionRate  = -1;
+						if (hasOutputGate) {
+							emissionRate = outputGateEmitCounter / secsPassed;
+						}
+						
+						double avgLatencyPerReceivedRecord = -1;
+						if(hasInputGate && hasOutputGate) {
+							avgLatencyPerReceivedRecord = (now - this.inputGateTimeOfFirstReceive)
+									/ ((double) this.inputGateReceiveCounter);
+						}
 
 						VertexStatisticsReportManager.this.reportForwarder
 								.addToNextReport(new VertexStatistics(
@@ -92,16 +117,20 @@ public class VertexStatisticsReportManager {
 		}
 
 		private void prepareNextReport(long now) {
+			// try to probe 10 times per measurement interval
+			this.reportingProbeInterval = (int) Math
+					.ceil((inputGateReceiveCounter + outputGateEmitCounter) / 10.0);
+			
 			this.inputGateReceiveCounter = 0;
 			this.outputGateEmitCounter = 0;
 			this.inputGateTimeOfFirstReceive = -1;
-			this.timeOfNextReport = now
-					+ reportForwarder.getConfigCenter().getAggregationInterval();
+			
+			setTimeOfReports(now);
 		}
 
 		public boolean hasData() {
-			return this.inputGateReceiveCounter > 0
-					&& this.outputGateEmitCounter > 0;
+			return (!hasInputGate || inputGateReceiveCounter > 0)
+					&& (!hasOutputGate || this.outputGateEmitCounter > 0);
 		}
 
 		public void recordReceived() {
@@ -109,6 +138,7 @@ public class VertexStatisticsReportManager {
 				this.inputGateTimeOfFirstReceive = System.currentTimeMillis();
 			}
 			this.inputGateReceiveCounter++;
+			this.sendReportIfDue();
 		}
 
 		public void recordEmitted() {
@@ -169,10 +199,15 @@ public class VertexStatisticsReportManager {
 
 		this.reporters.put(reporterID, reporter);
 
-		this.appendReporterToArrayAt(this.reportersByInputGate,
-				runtimeInputGateIndex, reporter);
-		this.appendReporterToArrayAt(this.reportersByOutputGate,
-				runtimeOutputGateIndex, reporter);
+		if (runtimeInputGateIndex != -1) {
+			this.appendReporterToArrayAt(this.reportersByInputGate,
+					runtimeInputGateIndex, reporter);
+		}
+		
+		if (runtimeOutputGateIndex != -1) {
+			this.appendReporterToArrayAt(this.reportersByOutputGate,
+					runtimeOutputGateIndex, reporter);
+		}
 	}
 
 	private void appendReporterToArrayAt(

@@ -20,8 +20,14 @@ public class QosStatistic {
 		this.sortedById = new LinkedList<QosValue>();
 		this.sortedByValue = new ArrayList<QosValue>();
 		this.statisticWindowSize = statisticWindowSize;
+		clear();
+	}
+	
+	public void clear() {
 		this.noOfStoredValues = 0;
 		this.sumOfValues = 0;
+		this.sortedById.clear();
+		this.sortedByValue.clear();
 	}
 
 	public void addValue(QosValue value) {

@@ -33,7 +33,7 @@ import eu.stratosphere.nephele.types.Record;
  */
 public class QosReportingListenerHelper {
 
-	public static void listenToVertexLatencyOnInputGate(
+	public static void listenToVertexStatisticsOnInputGate(
 			StreamInputGate<? extends Record> inputGate,
 			final VertexStatisticsReportManager vertexStatsManager) {
 
@@ -56,7 +56,7 @@ public class QosReportingListenerHelper {
 		}
 	}
 
-	public static void listenToVertexLatencyOnOutputGate(
+	public static void listenToVertexStatisticsOnOutputGate(
 			StreamOutputGate<? extends Record> outputGate,
 			final VertexStatisticsReportManager vertexStatsManager) {
 
