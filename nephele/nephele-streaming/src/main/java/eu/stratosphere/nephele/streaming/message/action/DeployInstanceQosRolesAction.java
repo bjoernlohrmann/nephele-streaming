@@ -24,7 +24,7 @@ import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.streaming.message.AbstractSerializableQosMessage;
 
 /**
- * Informs a task manager about its Qos reporter and Qos manager roles.
+ * Informs a task manager about its Qos reporter roles.
  * 
  * @author Bjoern Lohrmann
  * 
@@ -32,8 +32,6 @@ import eu.stratosphere.nephele.streaming.message.AbstractSerializableQosMessage;
 public class DeployInstanceQosRolesAction extends AbstractSerializableQosMessage implements QosAction {
 
 	private final InstanceConnectionInfo instanceConnectionInfo;
-
-	private QosManagerConfig qosManager;
 
 	private final LinkedList<EdgeQosReporterConfig> edgeQosReporters = new LinkedList<EdgeQosReporterConfig>();
 
@@ -55,10 +53,6 @@ public class DeployInstanceQosRolesAction extends AbstractSerializableQosMessage
 		return this.instanceConnectionInfo;
 	}
 
-	public void setQosManager(QosManagerConfig qosManager) {
-		this.qosManager = qosManager;
-	}
-
 	public void addEdgeQosReporter(EdgeQosReporterConfig edgeQosReporter) {
 		this.edgeQosReporters.add(edgeQosReporter);
 	}
@@ -69,10 +63,6 @@ public class DeployInstanceQosRolesAction extends AbstractSerializableQosMessage
 	
 	public void addCandidateChain(CandidateChainConfig candidateChain) {
 		this.candidateChains.add(candidateChain);
-	}
-
-	public QosManagerConfig getQosManager() {
-		return this.qosManager;
 	}
 
 	public LinkedList<EdgeQosReporterConfig> getEdgeQosReporters() {
@@ -94,10 +84,6 @@ public class DeployInstanceQosRolesAction extends AbstractSerializableQosMessage
 	public void write(final DataOutput out) throws IOException {
 		super.write(out);
 		this.instanceConnectionInfo.write(out);
-		out.writeBoolean(this.qosManager != null);
-		if (this.qosManager != null) {
-			this.qosManager.write(out);
-		}
 		out.writeInt(this.edgeQosReporters.size());
 		for (EdgeQosReporterConfig edgeQosReporter : this.edgeQosReporters) {
 			edgeQosReporter.write(out);
@@ -119,10 +105,6 @@ public class DeployInstanceQosRolesAction extends AbstractSerializableQosMessage
 	public void read(final DataInput in) throws IOException {
 		super.read(in);
 		this.instanceConnectionInfo.read(in);
-		if (in.readBoolean()) {
-			this.qosManager = new QosManagerConfig();
-			this.qosManager.read(in);
-		}
 
 		int noOfEdgeQosReporters = in.readInt();
 		for (int i = 0; i < noOfEdgeQosReporters; i++) {

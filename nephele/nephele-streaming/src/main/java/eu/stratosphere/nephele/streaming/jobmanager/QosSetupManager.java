@@ -1,5 +1,6 @@
 package eu.stratosphere.nephele.streaming.jobmanager;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -259,12 +260,13 @@ public class QosSetupManager implements VertexAssignmentListener {
 		}
 	}
 
-	private void computeAndDistributeQosSetup() {
+	private void computeAndDistributeQosSetup() throws IOException {
 		this.qosGraphs = createQosGraphs();
 		this.qosSetup = new QosSetup(this.qosGraphs);
 		this.qosSetup.computeQosRoles();
 		this.qosSetup.computeCandidateChains(this.executionGraph);
 		this.qosSetup.attachRolesToExecutionGraph(this.executionGraph);
+		this.qosSetup.distributeManagerRoles(executionGraph, this.taskManagers);
 	}
 
 	private void ensureElasticTaskAutoScalerIsRunning() {

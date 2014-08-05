@@ -26,6 +26,7 @@ import eu.stratosphere.nephele.profiling.ProfilingException;
 import eu.stratosphere.nephele.streaming.message.AbstractQosMessage;
 import eu.stratosphere.nephele.streaming.message.ChainUpdates;
 import eu.stratosphere.nephele.streaming.message.action.CandidateChainConfig;
+import eu.stratosphere.nephele.streaming.message.action.DeployInstanceQosManagerRoleAction;
 import eu.stratosphere.nephele.streaming.message.action.DeployInstanceQosRolesAction;
 import eu.stratosphere.nephele.streaming.message.action.LimitBufferSizeAction;
 import eu.stratosphere.nephele.streaming.message.action.SetOutputLatencyTargetAction;
@@ -167,6 +168,8 @@ public class StreamJobEnvironment {
 			this.handleLimitBufferSizeAction((LimitBufferSizeAction) streamMsg);
 		} else if (streamMsg instanceof SetOutputLatencyTargetAction) {
 			this.handleSetOutputLatencyTargetAction((SetOutputLatencyTargetAction) streamMsg);
+		} else if (streamMsg instanceof DeployInstanceQosManagerRoleAction) {
+			this.handleDeployInstanceQosManagerRoleAction((DeployInstanceQosManagerRoleAction) streamMsg);
 		} else if (streamMsg instanceof DeployInstanceQosRolesAction) {
 			this.handleDeployInstanceQosRolesAction((DeployInstanceQosRolesAction) streamMsg);
 		} else {
@@ -194,10 +197,6 @@ public class StreamJobEnvironment {
 	private void handleDeployInstanceQosRolesAction(
 			DeployInstanceQosRolesAction deployRolesAction) {
 
-		if (deployRolesAction.getQosManager() != null) {
-			this.processQosManagerConfig(deployRolesAction);
-		}
-
 		this.qosReportForwarder.configureReporting(deployRolesAction);
 
 		for (CandidateChainConfig chainConfig : deployRolesAction
@@ -206,22 +205,23 @@ public class StreamJobEnvironment {
 		}
 
 		LOG.info(String
-				.format("Deployed %d vertex Qos reporters, %d edge Qos reporters and %d Qos manager roles",
+				.format("Deployed %d vertex and %d edge Qos reporters.",
 						deployRolesAction.getVertexQosReporters().size(),
-						deployRolesAction.getEdgeQosReporters().size(),
-						deployRolesAction.getQosManager() != null ? 1 : 0));
+						deployRolesAction.getEdgeQosReporters().size()));
+	}
+
+	private void handleDeployInstanceQosManagerRoleAction(
+			DeployInstanceQosManagerRoleAction deployRoleAction) {
+
+		this.ensureQosManagerIsRunning();
+		this.qosManager.handOffStreamingData(deployRoleAction);
+
+		LOG.info("Deployed Qos manager role.");
 	}
 
 	private void handleQosReport(QosReport data) {
 		this.ensureQosManagerIsRunning();
 		this.qosManager.handOffStreamingData(data);
-	}
-
-	private void processQosManagerConfig(
-			DeployInstanceQosRolesAction deployRolesAction) {
-
-		this.ensureQosManagerIsRunning();
-		this.qosManager.handOffStreamingData(deployRolesAction);
 	}
 
 	private void ensureQosManagerIsRunning() {
@@ -269,8 +269,7 @@ public class StreamJobEnvironment {
 			this.taskQosCoordinators.remove(vertexID);
 		}
 
-		if (this.taskQosCoordinators.isEmpty()) {
-			shutdownEnvironment();
-		}
+		// don't shutdown environment in elastic scale edition
+		// TODO: shutdown environment after job is done instead of all local tasks are unregistered
 	}
 }
