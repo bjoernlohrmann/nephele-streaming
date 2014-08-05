@@ -31,6 +31,7 @@ import eu.stratosphere.nephele.plugins.PluginManager;
 import eu.stratosphere.nephele.plugins.TaskManagerPlugin;
 import eu.stratosphere.nephele.profiling.ProfilingException;
 import eu.stratosphere.nephele.streaming.message.AbstractQosMessage;
+import eu.stratosphere.nephele.streaming.message.action.DestroyInstanceQosRolesAction;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.StreamJobEnvironment;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.StreamTaskEnvironment;
 import eu.stratosphere.nephele.taskmanager.Task;
@@ -223,7 +224,14 @@ public class StreamTaskManagerPlugin implements TaskManagerPlugin {
 	@Override
 	public void sendData(final IOReadableWritable data) throws IOException {
 		try {
-			if (data instanceof AbstractQosMessage) {
+			if (data instanceof DestroyInstanceQosRolesAction) {
+				JobID jobID = ((DestroyInstanceQosRolesAction) data).getJobID();
+				StreamJobEnvironment jobEnv = this.streamJobEnvironments.remove(jobID);
+
+				if (jobEnv != null)
+					jobEnv.shutdownEnvironment();
+
+			} else if (data instanceof AbstractQosMessage) {
 				AbstractQosMessage streamMsg = (AbstractQosMessage) data;
 				this.getOrCreateJobEnvironment(streamMsg.getJobID())
 						.handleStreamMessage(streamMsg);

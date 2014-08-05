@@ -93,6 +93,7 @@ public class StreamJobManagerPlugin implements JobManagerPlugin,
 		if (this.qosSetupManagers.containsKey(jobId)) {
 			this.qosSetupManagers.get(jobId).registerOnExecutionGraph(
 					executionGraph);
+			executionGraph.registerJobStatusListener(this);
 		}
 
 		return executionGraph;
