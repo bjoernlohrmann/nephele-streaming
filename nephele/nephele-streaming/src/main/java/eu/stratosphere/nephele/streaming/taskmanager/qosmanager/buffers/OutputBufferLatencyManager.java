@@ -128,7 +128,7 @@ public class OutputBufferLatencyManager {
 			QosSequenceLatencySummary qosSummary,
 			HashMap<QosEdge, Integer> edgesToAdjust) {
 
-		int targetOutputBufferLatency = (int) computeUniformTargetObl(
+		int uniformTargetObl = computeUniformTargetObl(
 				constraint, qosSummary);
 
 		for (QosGraphMember member : sequenceMembers) {
@@ -144,26 +144,11 @@ public class OutputBufferLatencyManager {
 				continue;
 			}
 
-			int newTargetObl;
-			if (targetOutputBufferLatency > 0) {
-				// regular case (nonOutputBufferLatency < constraint): we have a
-				// chance of meeting the constraint
-				// by telling the TM to adjusting output buffer sizes
-				newTargetObl = targetOutputBufferLatency;
-
-			} else {
-				// overload case (nonOutputBufferLatency >= constraint): we
-				// don't have a chance of meeting the constraint by
-				// adjusting output buffer sizes. in this case just make
-				// buffers quite large.
-				newTargetObl = 100;
-			}
-
 			// do nothing if change is very small
 			ValueHistory<Integer> targetOblHistory = qosData.getTargetOblHistory();
 			if(targetOblHistory.hasEntries()) {
 				int oldTargetObl = targetOblHistory.getLastEntry().getValue();
-				if (Math.abs(oldTargetObl - newTargetObl) / oldTargetObl < 0.05) {
+				if (Math.abs(oldTargetObl - uniformTargetObl) / oldTargetObl < 0.05) {
 					continue;
 				}
 			}
@@ -171,21 +156,29 @@ public class OutputBufferLatencyManager {
 			// do nothing target output buffer latency on this edge is already being adjusted to
 			// a smaller value
 			if (!edgesToAdjust.containsKey(edge)
-					|| edgesToAdjust.get(edge) > newTargetObl) {
-				edgesToAdjust.put(qosData.getEdge(), newTargetObl);
+					|| edgesToAdjust.get(edge) > uniformTargetObl) {
+				edgesToAdjust.put(qosData.getEdge(), uniformTargetObl);
 			}
 		}
 	}
 
-	private double computeUniformTargetObl(
+	private int computeUniformTargetObl(
 			JobGraphLatencyConstraint constraint, QosSequenceLatencySummary qosSummary) {
 
-		if (constraint.getLatencyConstraintInMillis() > qosSummary
-				.getNonOutputBufferLatency()) {
-			return (constraint.getLatencyConstraintInMillis() - qosSummary
+		if (constraint.getLatencyConstraintInMillis() > qosSummary.getNonOutputBufferLatency()) {
+			// regular case (nonOutputBufferLatency < constraint): we have a
+			// chance of meeting the constraint
+			// by telling the TM to adjust output buffer sizes
+			
+			return (int) (constraint.getLatencyConstraintInMillis() - qosSummary
 					.getNonOutputBufferLatency()) / qosSummary.getNoOfEdges();
 		} else {
-			return -1;
+			// overload case (nonOutputBufferLatency >= constraint): we
+			// don't have a chance of meeting the constraint by
+			// adjusting output buffer sizes. in this case
+			// choose a sensible default
+			
+			return (int) constraint.getLatencyConstraintInMillis() / qosSummary.getNoOfEdges();
 		}
 	}
 

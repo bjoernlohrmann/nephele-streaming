@@ -4,8 +4,6 @@ import java.util.ArrayList;
 
 import eu.stratosphere.nephele.configuration.GlobalConfiguration;
 import eu.stratosphere.nephele.io.channels.bytebuffered.AbstractByteBufferedOutputChannel;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosStatistic;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosValue;
 import eu.stratosphere.nephele.taskmanager.bufferprovider.GlobalBufferPool;
 
 /**
@@ -33,23 +31,19 @@ public class OutputBufferLatencyEnforcer {
 	private final int adjustmentIntervalMillis;
 
 	private class ChannelStatistics {
-		
-		QosStatistic oblStatistic = new QosStatistic(5);
 
 		int outputBuffersSentSinceLastAdjust = 0;
 
 		int recordsEmittedSinceLastAdjust = 0;
 		
-		public long totalBytesTransmitted = 0;
-		
-		public long totalBytesTransmittedAtLastAdjust = 0;
+		public long amountTransmittedAtLastAdjust = 0;
 
 		private int targetOutputBufferLatency;
 
 		private long timeOfLastAdjust = -1;
 
 		private int outputBufferSize = maxOutputBufferSize;
-
+		
 		private int adjustFrequency = 1; // in number of output buffers
 
 		private final AbstractByteBufferedOutputChannel<?> channel;
@@ -66,35 +60,40 @@ public class OutputBufferLatencyEnforcer {
 			int newOutputBufferSize = computeNewOutputBufferSize(now);
 			
 			this.channel.limitBufferSize(newOutputBufferSize);
+			int oldOutputBufferSize = this.outputBufferSize; 
 			this.outputBufferSize = newOutputBufferSize;
 
-			resetCounters(now);
+			resetCounters(now, oldOutputBufferSize);
 		}
 
-		private void resetCounters(long now) {
+		private void resetCounters(long now, int oldOutputBufferSize) {
 			// recalibrate adjust frequency
-			double buffersPerMilli = outputBuffersSentSinceLastAdjust
+			double oldBuffersPerMilli = outputBuffersSentSinceLastAdjust
 					/ ((double) now - timeOfLastAdjust);
 
-			this.adjustFrequency = (int) Math.max(1, adjustmentIntervalMillis * buffersPerMilli);
+			double newBuffersPerMilliEstimated = (oldBuffersPerMilli * oldOutputBufferSize)
+					/ this.outputBufferSize;
+
+			this.adjustFrequency = (int) Math.max(1, adjustmentIntervalMillis
+					* newBuffersPerMilliEstimated);
 
 			this.outputBuffersSentSinceLastAdjust = 0;
 			this.recordsEmittedSinceLastAdjust = 0;
-			this.totalBytesTransmittedAtLastAdjust = totalBytesTransmitted;
+			this.amountTransmittedAtLastAdjust = channel
+					.getAmountOfDataTransmitted();
 			this.timeOfLastAdjust = now;
 		}
 
 		private int computeNewOutputBufferSize(long now) {
 			double millisPassed = now - timeOfLastAdjust;
 			double currObl = millisPassed / outputBuffersSentSinceLastAdjust / 2;
-			oblStatistic.addValue(new QosValue(currObl, now));
-			
-			int newOutputBufferSize = (int) (outputBufferSize * (targetOutputBufferLatency / oblStatistic
-					.getArithmeticMean()));
-			
-			
-			long bytesTransmittedSinceLastAdjust = totalBytesTransmitted - totalBytesTransmittedAtLastAdjust; 
-			double avgRecordSize = ((double) bytesTransmittedSinceLastAdjust) / recordsEmittedSinceLastAdjust;
+			int newOutputBufferSize = (int) (outputBufferSize * (targetOutputBufferLatency / currObl));
+
+			long bytesTransmittedSinceLastAdjust = channel
+					.getAmountOfDataTransmitted()
+					- amountTransmittedAtLastAdjust;
+			double avgRecordSize = ((double) bytesTransmittedSinceLastAdjust)
+					/ recordsEmittedSinceLastAdjust;
 
 			return (int) Math.max(avgRecordSize,
 					Math.min(newOutputBufferSize, maxOutputBufferSize));
@@ -107,14 +106,13 @@ public class OutputBufferLatencyEnforcer {
 			}
 
 			if (outputBuffersSentSinceLastAdjust >= adjustFrequency
-					&& recordsEmittedSinceLastAdjust>0) {
+					&& recordsEmittedSinceLastAdjust > 0) {
 				this.adjustOutputBufferSize();
 			}
 		}
 
 		void setTargetOutputBufferLatency(int targetOutputBufferLatency) {
 			this.targetOutputBufferLatency = targetOutputBufferLatency;
-			resetCounters(System.currentTimeMillis());
 		}
 	}
 
@@ -134,10 +132,9 @@ public class OutputBufferLatencyEnforcer {
 		this.channelStats.add(new ChannelStatistics(channel));
 	}
 
-	public void outputBufferSent(int channelIndex, long currAmountTransmitted) {
+	public void outputBufferSent(int channelIndex) {
 		ChannelStatistics stats = this.channelStats.get(channelIndex); 
 		stats.outputBuffersSentSinceLastAdjust++;
-		stats.totalBytesTransmitted =  currAmountTransmitted;
 		stats.adjustOutputBufferSizeIfDue();
 	}
 

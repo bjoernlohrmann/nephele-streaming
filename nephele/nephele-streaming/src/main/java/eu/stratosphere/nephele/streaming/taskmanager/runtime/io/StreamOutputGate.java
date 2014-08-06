@@ -197,8 +197,7 @@ public final class StreamOutputGate<T extends Record> extends
 	 */
 	@Override
 	public void outputBufferSent(final int channelIndex) {
-		oblEnforcer.outputBufferSent(channelIndex, this.getOutputChannel(channelIndex)
-				.getAmountOfDataTransmitted());
+		oblEnforcer.outputBufferSent(channelIndex);
 		
 		if (this.qosCallback != null) {
 			this.qosCallback.outputBufferSent(channelIndex, this
