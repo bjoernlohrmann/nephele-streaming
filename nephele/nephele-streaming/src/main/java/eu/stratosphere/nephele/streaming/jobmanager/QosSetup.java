@@ -45,6 +45,7 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraph;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphTraversal;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphTraversalListener;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGroupVertex;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosManagerID;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosVertex;
 
 /**
@@ -73,6 +74,19 @@ public class QosSetup {
 		this.computeQosManagerRoles();
 		this.computeQosReporterRoles();
 	}
+	
+	public Set<QosManagerID> getQosManagerIDs() {
+		HashSet<QosManagerID> ids = new HashSet<QosManagerID>();
+		for (TaskManagerQosSetup tmSetup : taskManagerQosSetups.values()) {
+			QosManagerID id = tmSetup.getQosManagerID();
+			if (id != null) {
+				ids.add(id);
+			}
+		}
+
+		return ids;
+	}
+
 
 	private void computeQosReporterRoles() {
 		for (QosManagerRole qosManager : this.collectAllManagerRoles()) {

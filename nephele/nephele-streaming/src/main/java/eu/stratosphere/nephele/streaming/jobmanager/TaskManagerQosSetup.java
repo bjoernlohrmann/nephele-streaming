@@ -24,13 +24,13 @@ import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
 import eu.stratosphere.nephele.streaming.jobmanager.QosReporterRole.ReportingAction;
 import eu.stratosphere.nephele.streaming.message.action.CandidateChainConfig;
-import eu.stratosphere.nephele.streaming.message.action.DeployInstanceQosManagerRoleAction;
 import eu.stratosphere.nephele.streaming.message.action.DeployInstanceQosRolesAction;
 import eu.stratosphere.nephele.streaming.message.action.EdgeQosReporterConfig;
 import eu.stratosphere.nephele.streaming.message.action.QosManagerConfig;
 import eu.stratosphere.nephele.streaming.message.action.VertexQosReporterConfig;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosEdge;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraph;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosManagerID;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosVertex;
 
@@ -46,6 +46,8 @@ public class TaskManagerQosSetup {
 	private InstanceConnectionInfo taskManagerConnectionInfo;
 
 	private HashMap<LatencyConstraintID, QosManagerRole> managerRoles;
+	
+	private QosManagerID qosManagerID;
 
 	private HashMap<QosReporterID, QosReporterRole> reporterRoles;
 
@@ -69,6 +71,13 @@ public class TaskManagerQosSetup {
 		}
 
 		this.managerRoles.put(managerRole.getConstraintID(), managerRole);
+		if (this.qosManagerID == null) {
+			this.qosManagerID = new QosManagerID();
+		}
+	}
+
+	public QosManagerID getQosManagerID() {
+		return qosManagerID;
 	}
 
 	public void addReporterRole(QosReporterRole reporterRole) {
@@ -96,6 +105,10 @@ public class TaskManagerQosSetup {
 		DeployInstanceQosRolesAction deploymentAction = new DeployInstanceQosRolesAction(
 				jobID, this.taskManagerConnectionInfo);
 
+		if (!this.managerRoles.isEmpty()) {
+			this.addQosManagerConfig(deploymentAction);
+		}
+
 		for (QosReporterRole reporterRole : this.reporterRoles.values()) {
 			if (reporterRole.getAction() == ReportingAction.REPORT_CHANNEL_STATS) {
 				deploymentAction.addEdgeQosReporter(this
@@ -115,13 +128,8 @@ public class TaskManagerQosSetup {
 		return deploymentAction;
 	}
 
-	public boolean hasQosManagerRoles() {
-		return !this.managerRoles.isEmpty();
-	}
-
-	public DeployInstanceQosManagerRoleAction toManagerDeploymentAction(JobID jobID) {
-		DeployInstanceQosManagerRoleAction deploymentAction =
-				new DeployInstanceQosManagerRoleAction(jobID, this.taskManagerConnectionInfo);
+	private void addQosManagerConfig(
+			DeployInstanceQosRolesAction deploymentAction) {
 
 		QosGraph shallowQosGraph = null;
 		for (QosManagerRole managerRole : this.managerRoles.values()) {
@@ -133,9 +141,7 @@ public class TaskManagerQosSetup {
 						.cloneWithoutMembers());
 			}
 		}
-		deploymentAction.setQosManager(new QosManagerConfig(shallowQosGraph));
-
-		return deploymentAction;
+		deploymentAction.setQosManager(new QosManagerConfig(shallowQosGraph, this.qosManagerID));
 	}
 
 	private VertexQosReporterConfig toVertexQosReporterConfig(

@@ -20,6 +20,7 @@ import java.io.IOException;
 
 import eu.stratosphere.nephele.io.IOReadableWritable;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraph;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosManagerID;
 
 /**
  * Describes a Qos manager role.
@@ -28,14 +29,17 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraph;
  * 
  */
 public class QosManagerConfig implements IOReadableWritable {
+	
+	private QosManagerID qosManagerID;
 
-	private final QosGraph shallowQosGraph;
+	private QosGraph shallowQosGraph;
 
 	public QosManagerConfig() {
-		this.shallowQosGraph = new QosGraph();
 	}
 
-	public QosManagerConfig(QosGraph shallowQosGraph) {
+	public QosManagerConfig(QosGraph shallowQosGraph, QosManagerID qosManagerID) {
+		this.qosManagerID = qosManagerID;
+		
 		if (shallowQosGraph == null) {
 			throw new RuntimeException("Need to provide a Qos graph!");
 		}
@@ -51,6 +55,10 @@ public class QosManagerConfig implements IOReadableWritable {
 		return this.shallowQosGraph;
 	}
 
+	public QosManagerID getQosManagerID() {
+		return qosManagerID;
+	}
+
 	/*
 	 * (non-Javadoc)
 	 * 
@@ -59,6 +67,7 @@ public class QosManagerConfig implements IOReadableWritable {
 	 */
 	@Override
 	public void write(DataOutput out) throws IOException {
+		this.qosManagerID.write(out);
 		this.shallowQosGraph.write(out);
 	}
 
@@ -70,6 +79,10 @@ public class QosManagerConfig implements IOReadableWritable {
 	 */
 	@Override
 	public void read(DataInput in) throws IOException {
+		this.qosManagerID = new QosManagerID();
+		this.qosManagerID.read(in);
+		
+		this.shallowQosGraph = new QosGraph();
 		this.shallowQosGraph.read(in);
 	}
 }

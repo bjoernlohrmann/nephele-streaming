@@ -18,12 +18,13 @@ import eu.stratosphere.nephele.streaming.LatencyConstraintID;
 import eu.stratosphere.nephele.streaming.message.AbstractQosMessage;
 import eu.stratosphere.nephele.streaming.message.ChainUpdates;
 import eu.stratosphere.nephele.streaming.message.QosManagerConstraintSummaries;
-import eu.stratosphere.nephele.streaming.message.action.DeployInstanceQosManagerRoleAction;
 import eu.stratosphere.nephele.streaming.message.action.DeployInstanceQosRolesAction;
+import eu.stratosphere.nephele.streaming.message.action.QosManagerConfig;
 import eu.stratosphere.nephele.streaming.message.qosreport.QosReport;
 import eu.stratosphere.nephele.streaming.taskmanager.StreamMessagingThread;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.OutputBufferLatencyManager;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.QosConstraintSummary;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosManagerID;
 
 /**
  * Implements a thread that serves as a Qos manager. It is started by invoking
@@ -51,6 +52,8 @@ public class QosManagerThread extends Thread {
 	private HashMap<LatencyConstraintID, QosLogger> qosLoggers;
 
 	private InstanceConnectionInfo jmConnectionInfo;
+
+	private QosManagerID qosManagerID;
 
 	public QosManagerThread(JobID jobID) {
 		this.jobID = jobID;
@@ -107,12 +110,9 @@ public class QosManagerThread extends Thread {
 							.getEdgeQosReporterAnnouncements().size();
 					nooOfReports++;
 				} else if (streamingData instanceof DeployInstanceQosRolesAction) {
-					throw new RuntimeException("Got unexpected DeployInstanceQosRolesAction@QosManager!");
-
-				} else if (streamingData instanceof DeployInstanceQosManagerRoleAction) {
-					this.qosModel
-							.mergeShallowQosGraph(((DeployInstanceQosManagerRoleAction) streamingData)
-									.getQosManager().getShallowQosGraph());
+					QosManagerConfig config = ((DeployInstanceQosRolesAction) streamingData).getQosManager();
+					this.qosManagerID = config.getQosManagerID();
+					this.qosModel.mergeShallowQosGraph(config.getShallowQosGraph());
 				} else if (streamingData instanceof ChainUpdates) {
 					this.qosModel
 							.processChainUpdates((ChainUpdates) streamingData);
@@ -131,7 +131,7 @@ public class QosManagerThread extends Thread {
 					this.oblManager.applyAndSendBufferAdjustments();
 					
 					logConstraintSummaries(constraintSummaries);
-					sendConstraintSummariesToJm(constraintSummaries);
+					sendConstraintSummariesToJm(constraintSummaries, now);
 
 					long adjustmentOverhead = System
 							.currentTimeMillis() - now;
@@ -161,12 +161,15 @@ public class QosManagerThread extends Thread {
 	}
 
 	private void sendConstraintSummariesToJm(
-			List<QosConstraintSummary> constraintSummaries)
+			List<QosConstraintSummary> constraintSummaries, long timestamp)
 			throws InterruptedException {
-
-		StreamMessagingThread.getInstance().sendAsynchronously(
-				this.jmConnectionInfo,
-				new QosManagerConstraintSummaries(jobID, constraintSummaries));
+		
+		if(qosManagerID != null) {
+			StreamMessagingThread.getInstance().sendAsynchronously(
+					this.jmConnectionInfo,
+					new QosManagerConstraintSummaries(jobID, qosManagerID, timestamp, constraintSummaries));
+			
+		}
 	}
 
 	private void logConstraintSummaries(
@@ -185,12 +188,9 @@ public class QosManagerThread extends Thread {
 
 		try {
 			if (logger == null) {
-				logger = new QosLogger(
-						qosModel.getJobGraphLatencyConstraint(constraintID),
-						GlobalConfiguration
-								.getLong(
-										OutputBufferLatencyManager.QOSMANAGER_ADJUSTMENTINTERVAL_KEY,
-										OutputBufferLatencyManager.DEFAULT_ADJUSTMENTINTERVAL));
+				logger = new QosLogger(qosModel.getJobGraphLatencyConstraint(constraintID),
+						GlobalConfiguration.getLong(OutputBufferLatencyManager.QOSMANAGER_ADJUSTMENTINTERVAL_KEY,
+								OutputBufferLatencyManager.DEFAULT_ADJUSTMENTINTERVAL));
 				this.qosLoggers.put(constraintID, logger);
 			}
 			logger.logSummary(constraintSummary);

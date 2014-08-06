@@ -84,8 +84,10 @@ public class QosLogger {
 
 		for (int i = 0; i < memberStats.length; i++) {
 			for (int j = 0; j < memberStats[i].length; j++) {
-				builder.append(';');
-				builder.append(this.formatDouble(memberStats[i][j]));
+				if (j < 4) {
+					builder.append(';');
+					builder.append(this.formatDouble(memberStats[i][j]));
+				}
 			}
 		}
 	}

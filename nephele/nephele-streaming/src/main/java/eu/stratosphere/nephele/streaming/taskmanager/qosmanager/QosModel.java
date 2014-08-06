@@ -478,50 +478,61 @@ public class QosModel {
 				continue;
 			}
 
-			double emissionRate = computeSourceGroupVertexEmissionRate(seqElem,
-					inactivityThresholdTime);
+			setSourceGroupVertexEmissionRate(seqElem,
+					inactivityThresholdTime, constraintSummary);
 
-			double consumptionRate = computeTargetGroupVertexConsumptionRate(
-					seqElem, inactivityThresholdTime);
+			setTargetGroupVertexConsumptionRate(
+					seqElem, inactivityThresholdTime,constraintSummary);
 
-			constraintSummary
-					.setGroupEdgeRecordRates(seqElem.getIndexInSequence(),
-							emissionRate, consumptionRate);
 		}
 	}
 
-	private double computeTargetGroupVertexConsumptionRate(
-			SequenceElement<JobVertexID> edge, long inactivityThresholdTime) {
+	private void setTargetGroupVertexConsumptionRate(
+			SequenceElement<JobVertexID> edge, long inactivityThresholdTime, 
+			QosConstraintSummary constraintSummary) {
 
 		double consumptionRate = 0;
+		int activeVertices = 0;
+
 		int inputGateIndex = edge.getInputGateIndex();
 		QosGroupVertex targetGroupVertex = qosGraph.getGroupVertexByID(edge
 				.getTargetVertexID());
 		for (QosVertex memberVertex : targetGroupVertex.getMembers()) {
 			VertexQosData qosData = memberVertex.getQosData();
-			if (qosData.hasNewerData(inputGateIndex, -1, inactivityThresholdTime)) {
-				consumptionRate += qosData.getRecordsConsumedPerSec(inputGateIndex);
+			if (qosData.hasNewerData(inputGateIndex, -1,
+					inactivityThresholdTime)) {
+				activeVertices++;
+				consumptionRate += qosData
+						.getRecordsConsumedPerSec(inputGateIndex);
 			}
 		}
 
-		return consumptionRate;
+		constraintSummary.setGroupEdgeConsumptionRate(
+				edge.getIndexInSequence(), consumptionRate, activeVertices);
 	}
 
-	private double computeSourceGroupVertexEmissionRate(
-			SequenceElement<JobVertexID> edge, long inactivityThresholdTime) {
+	private void setSourceGroupVertexEmissionRate(
+			SequenceElement<JobVertexID> edge, long inactivityThresholdTime, 
+			QosConstraintSummary constraintSummary) {
 
 		double emissionRate = 0;
+		int activeVertices = 0;
+
 		int outputGateIndex = edge.getOutputGateIndex();
 		QosGroupVertex sourceGroupVertex = qosGraph.getGroupVertexByID(edge
 				.getSourceVertexID());
 		for (QosVertex memberVertex : sourceGroupVertex.getMembers()) {
 			VertexQosData qosData = memberVertex.getQosData();
-			if (qosData.hasNewerData(-1, outputGateIndex, inactivityThresholdTime)) {
-				emissionRate += qosData.getRecordsEmittedPerSec(outputGateIndex);
+			if (qosData.hasNewerData(-1, outputGateIndex,
+					inactivityThresholdTime)) {
+				activeVertices++;
+				emissionRate += qosData
+						.getRecordsEmittedPerSec(outputGateIndex);
 			}
 		}
 
-		return emissionRate;
+		constraintSummary.setGroupEdgeEmissionRate(edge.getIndexInSequence(),
+				emissionRate, activeVertices);
 	}
 
 	public JobGraphLatencyConstraint getJobGraphLatencyConstraint(LatencyConstraintID constraintID) {

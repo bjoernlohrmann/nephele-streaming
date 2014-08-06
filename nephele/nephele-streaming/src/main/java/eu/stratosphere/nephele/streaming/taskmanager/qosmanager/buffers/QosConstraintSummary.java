@@ -69,7 +69,7 @@ public class QosConstraintSummary implements IOReadableWritable {
 			if (nextIsVertex) {
 				this.aggregatedMemberStats[i] = new double[] { 0 };
 			} else {
-				this.aggregatedMemberStats[i] = new double[] { 0, 0, 0, 0 };
+				this.aggregatedMemberStats[i] = new double[] { 0, 0, 0, 0, 0, 0 };
 			}
 			nextIsVertex = !nextIsVertex;
 		}
@@ -115,11 +115,18 @@ public class QosConstraintSummary implements IOReadableWritable {
 		}
 	}
 
-	public void setGroupEdgeRecordRates(int indexInSequence,
-			double totalEmissionRate, double totalConsumptionRate) {
+	public void setGroupEdgeConsumptionRate(int indexInSequence,
+			double totalConsumptionRate, int noOfConsumingVertices) {
 
-		this.aggregatedMemberStats[indexInSequence][2] = totalEmissionRate;
 		this.aggregatedMemberStats[indexInSequence][3] = totalConsumptionRate;
+		this.aggregatedMemberStats[indexInSequence][5] = noOfConsumingVertices;
+	}
+	
+	public void setGroupEdgeEmissionRate(int indexInSequence,
+			double totalEmissionRate, int noOfEmittingVertices) {
+		
+		this.aggregatedMemberStats[indexInSequence][2] = totalEmissionRate;
+		this.aggregatedMemberStats[indexInSequence][4] = noOfEmittingVertices;
 	}
 
 	public void mergeOtherSummary(QosConstraintSummary constraintSummary) {
@@ -138,9 +145,12 @@ public class QosConstraintSummary implements IOReadableWritable {
 					// to compute average latencies
 					this.aggregatedMemberStats[i][j] += noOfSummarizedSequences
 							* memberStats[i][j];
+				} else if (j == 2 || j == 3) {
+					// record emission/consumption rates are weighted with their
+					// number of vertices
+					this.aggregatedMemberStats[i][j] += memberStats[i][j+2] * memberStats[i][j];
 				} else {
-					// record emission/consumption rates are cumulative, hence
-					// no weighting
+					// vertex counts are just added up
 					this.aggregatedMemberStats[i][j] += memberStats[i][j];
 				}
 			}
@@ -171,7 +181,16 @@ public class QosConstraintSummary implements IOReadableWritable {
 				for (int i = 0; i < getSequenceLength(); i++) {
 					for (int j = 0; j < this.aggregatedMemberStats[i].length; j++) {
 						if (j < 2) {
+							// latencies have previously been weighted
+							// with their number of sequences, now we compute the average
+							// over all sequences
 							this.aggregatedMemberStats[i][j] /= this.noOfSequences;
+						} else if (j == 2 || j == 3) {
+							// record emission/consumption rates have previously been weighted
+							// with their number of vertices, no we compute the avg per
+							// vertex
+							this.aggregatedMemberStats[i][j] = aggregatedMemberStats[i][j]
+									/ aggregatedMemberStats[i][j + 2];
 						}
 					}
 				}
@@ -194,8 +213,8 @@ public class QosConstraintSummary implements IOReadableWritable {
 		return latencyConstraintMillis;
 	}
 	
-	public boolean doesSequenceStartWithVertex() {
-		return this.aggregatedMemberStats[0].length == 3;
+	private boolean doesSequenceStartWithVertex() {
+		return this.aggregatedMemberStats[0].length == 1;
 	}
 
 	public int getSequenceLength() {
@@ -210,13 +229,24 @@ public class QosConstraintSummary implements IOReadableWritable {
 	 * average vertex latency of the group vertex's active {@link QosVertex}
 	 * members.
 	 * 
-	 * Subarrays aggregating a group edge contain four elements: (0) = The
-	 * average output buffer latency the group edge's {@link QosEdge} members.
+	 * Subarrays aggregating a group edge contain four elements:
+	 * (0) = The average output buffer latency the group edge's {@link QosEdge} members.
+	 * 
 	 * (1) = The average remaining transport latency (i.e. without output buffer
-	 * latency) of the group edge's {@link QosEdge} members. (2) = The total
-	 * number of record's per second being written into the group edge's
-	 * {@link QosEdge} member edges. (3) = The total number of record's per
-	 * second being read from the group edge's {@link QosEdge} member edges.
+	 * latency) of the group edge's {@link QosEdge} members. 
+	 * 
+	 * (2) = The average number of records per second that the source (member) vertices
+	 * write into the group edge's {@link QosEdge} member edges. 
+	 * 
+	 * (3) = The avg number of records per second that the target (member) vertices read
+	 * from the group edge's {@link QosEdge} member edges.
+	 * 
+	 * (4) The number of source (member) vertices writing into the group edge's {@link QosEdge}
+	 * member edges. This is actually an int but represented as a double.
+	 * 
+	 * (5) The number of target (member) vertices reading from the group edge's {@link QosEdge}
+	 * member edges. This is actually an int but represented as a double.
+	 * 
 	 */
 	public double[][] getAggregatedMemberStatistics() {
 		ensureIsFinalized();

@@ -1,6 +1,8 @@
-package eu.stratosphere.nephele.streaming.jobmanager;
+package eu.stratosphere.nephele.streaming.jobmanager.autoscaling;
 
+import java.io.IOException;
 import java.util.HashMap;
+import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.apache.commons.logging.Log;
@@ -15,9 +17,11 @@ import eu.stratosphere.nephele.streaming.message.AbstractQosMessage;
 import eu.stratosphere.nephele.streaming.message.AbstractSerializableQosMessage;
 import eu.stratosphere.nephele.streaming.message.QosManagerConstraintSummaries;
 import eu.stratosphere.nephele.streaming.message.TaskLoadStateChange;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosLogger;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.OutputBufferLatencyManager;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.QosConstraintSummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraph;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosManagerID;
 
 public class ElasticTaskQosAutoScalingThread extends Thread {
 
@@ -28,31 +32,39 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 
 	private final HashMap<LatencyConstraintID, JobGraphLatencyConstraint> qosConstraints = new HashMap<LatencyConstraintID, JobGraphLatencyConstraint>();
 
-	/**
-	 * Each QosManager reports a {@link QosConstraintSummary} in regular time
-	 * intervals. The {@link QosConstraintSummary} objects are the result of
-	 * aggregating all the {@link QosConstraintSummary} objects belonging to the
-	 * same constraint.
-	 */
-	private final HashMap<LatencyConstraintID, QosConstraintSummary> aggregatedConstraintSummaries = new HashMap<LatencyConstraintID, QosConstraintSummary>();
-
 	private final HashMap<ExecutionVertexID, TaskLoadStateChange> currentTaskLoads = new HashMap<ExecutionVertexID, TaskLoadStateChange>();
 
 	private long timeOfLastScaling;
 
 	private long timeOfNextScaling;
+	
+	private final HashMap<LatencyConstraintID, QosConstraintSummaryAggregator> aggregators = new HashMap<LatencyConstraintID, QosConstraintSummaryAggregator>();
 
+	private QosLogger logger;
+	
 	public ElasticTaskQosAutoScalingThread(
-			HashMap<LatencyConstraintID, QosGraph> qosGraphs) {
+			HashMap<LatencyConstraintID, QosGraph> qosGraphs, Set<QosManagerID> qosManagers) {
 
 		this.setName("QosAutoScalingThread");
 		this.timeOfLastScaling = 0;
 		this.timeOfNextScaling = 0;
 		
 		for (LatencyConstraintID constraintID : qosGraphs.keySet()) {
-			qosConstraints.put(constraintID, qosGraphs.get(constraintID)
-					.getConstraintByID(constraintID));
+			JobGraphLatencyConstraint constraint = qosGraphs.get(constraintID)
+					.getConstraintByID(constraintID);
+
+			qosConstraints.put(constraintID, constraint);
+			aggregators.put(constraintID, new QosConstraintSummaryAggregator(
+					constraint, qosManagers));
 		}
+		
+		try {
+			logger = new QosLogger(qosConstraints.values().iterator().next(),
+						GlobalConfiguration.getLong(OutputBufferLatencyManager.QOSMANAGER_ADJUSTMENTINTERVAL_KEY,
+								OutputBufferLatencyManager.DEFAULT_ADJUSTMENTINTERVAL));
+		} catch (IOException e) {
+			LOG.error("Exception in QosLogger", e);
+		} 
 		
 		this.start();
 	}
@@ -96,19 +108,12 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 		
 		HashMap<JobVertexID, Integer> scalingActions = new HashMap<JobVertexID, Integer>();
 		
-		for(QosConstraintSummary constraintSummary : aggregatedConstraintSummaries.values()) {
+		for(QosConstraintSummaryAggregator summaryAggregator : aggregators.values()) {
+			collectScalingActionsForConstraint(
+					summaryAggregator.getConstraint(),
+					summaryAggregator.computeAggregation(),
+					scalingActions);
 			
-			JobGraphLatencyConstraint constraint = this.qosConstraints.get(constraintSummary.getLatencyConstraintID());
-			collectScalingActionsForConstraint(constraint, constraintSummary, scalingActions);
-			
-			// FIXME implement autoscaling algorithm
-			// determine load state on constrained subgraph (LOW, MEDIUM or HIGH)
-			// if load state is LOW:
-			//   execute scale down policy
-			// else if load state is HIGH:
-			//   execute scale up policy
-
-			constraintSummary.reset();
 		}		
 	}
 
@@ -116,15 +121,27 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 			JobGraphLatencyConstraint constraint,
 			QosConstraintSummary constraintSummary,
 			HashMap<JobVertexID, Integer> scalingActions) {
-
-		// FIXME
 		
+		if (logger != null) {
+			try {
+				logger.logSummary(constraintSummary);
+			} catch (IOException e) {
+				LOG.error("Error during QoS logging", e);
+			}
+		}
+
+		// FIXME implement autoscaling algorithm
+		// determine load state on constrained subgraph (LOW, MEDIUM or HIGH)
+		// if load state is LOW:
+		//   execute scale down policy
+		// else if load state is HIGH:
+		//   execute scale up policy		
 	}
 
 	private void cleanUp() {
 		// clear large memory structures
 		this.qosConstraints.clear();
-		this.aggregatedConstraintSummaries.clear();
+		this.aggregators.clear();
 		this.currentTaskLoads.clear();
 	}
 
@@ -134,10 +151,9 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 		}
 
 		for (LatencyConstraintID constraintID : qosConstraints.keySet()) {
-			QosConstraintSummary constraintSummary = aggregatedConstraintSummaries
-					.get(constraintID);
+			QosConstraintSummaryAggregator summaryAggregator = aggregators.get(constraintID);
 
-			if (constraintSummary == null || !constraintSummary.hasData()) {
+			if (!summaryAggregator.canAggregate()) {
 				return false;
 			}
 		}
@@ -161,25 +177,12 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 
 		for (QosConstraintSummary constraintSummary : nextMessage
 				.getConstraintSummaries()) {
-			
+
 			LatencyConstraintID constraintID = constraintSummary
 					.getLatencyConstraintID();
 
-			QosConstraintSummary aggregatedConstraintSummary = aggregatedConstraintSummaries
-					.get(constraintID);
-
-			if (aggregatedConstraintSummary == null) {
-				aggregatedConstraintSummary = new QosConstraintSummary(
-						constraintID,
-						constraintSummary.getLatencyConstraintMillis(),
-						constraintSummary.getSequenceLength(),
-						constraintSummary.doesSequenceStartWithVertex());
-
-				aggregatedConstraintSummaries.put(constraintID,
-						aggregatedConstraintSummary);
-			}
-
-			aggregatedConstraintSummary.mergeOtherSummary(constraintSummary);
+			aggregators.get(constraintID).add(nextMessage.getQosManagerID(),
+					constraintSummary);
 		}
 	}
 

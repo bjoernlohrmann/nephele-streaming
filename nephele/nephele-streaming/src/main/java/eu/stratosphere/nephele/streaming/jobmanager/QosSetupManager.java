@@ -1,6 +1,5 @@
 package eu.stratosphere.nephele.streaming.jobmanager;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -28,9 +27,8 @@ import eu.stratosphere.nephele.jobgraph.JobTaskVertex;
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
-import eu.stratosphere.nephele.streaming.StreamingPluginLoader;
+import eu.stratosphere.nephele.streaming.jobmanager.autoscaling.ElasticTaskQosAutoScalingThread;
 import eu.stratosphere.nephele.streaming.message.AbstractSerializableQosMessage;
-import eu.stratosphere.nephele.streaming.message.action.DestroyInstanceQosRolesAction;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraph;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphFactory;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.WrapperUtils;
@@ -132,14 +130,6 @@ public class QosSetupManager implements VertexAssignmentListener {
 	}
 
 	public void shutdown() {
-		for (AbstractInstance instance : this.taskManagers.values()) {
-			try {
-				instance.sendData(StreamingPluginLoader.STREAMING_PLUGIN_ID,
-						new DestroyInstanceQosRolesAction(this.jobID));
-			} catch (IOException e) {
-				LOG.warn("Failed to signal task manager qos setup shutdown: " + e.getMessage());
-			}
-		}
 		this.taskManagers.clear();
 
 		this.executionGraph = null;
@@ -270,18 +260,17 @@ public class QosSetupManager implements VertexAssignmentListener {
 		}
 	}
 
-	private void computeAndDistributeQosSetup() throws IOException {
+	private void computeAndDistributeQosSetup() {
 		this.qosGraphs = createQosGraphs();
 		this.qosSetup = new QosSetup(this.qosGraphs);
 		this.qosSetup.computeQosRoles();
 		this.qosSetup.computeCandidateChains(this.executionGraph);
 		this.qosSetup.attachRolesToExecutionGraph(this.executionGraph);
-		this.qosSetup.distributeManagerRoles(executionGraph, this.taskManagers);
 	}
 
 	private void ensureElasticTaskAutoScalerIsRunning() {
 		if (this.autoscalingThread == null) {
-			this.autoscalingThread = new ElasticTaskQosAutoScalingThread(qosGraphs);
+			this.autoscalingThread = new ElasticTaskQosAutoScalingThread(qosGraphs, qosSetup.getQosManagerIDs());
 		}
 	}
 
