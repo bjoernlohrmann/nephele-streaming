@@ -51,7 +51,6 @@ import eu.stratosphere.nephele.instance.InstanceListener;
 import eu.stratosphere.nephele.instance.InstanceManager;
 import eu.stratosphere.nephele.instance.InstanceRequestMap;
 import eu.stratosphere.nephele.instance.InstanceType;
-import eu.stratosphere.nephele.io.channels.ChannelType;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.jobmanager.DeploymentManager;
@@ -712,8 +711,7 @@ public abstract class AbstractScheduler implements InstanceListener {
 			final int noOfSubtasksToStart) throws Exception {
 
 		final ExecutionGraph graph = getExecutionGraphByID(jobID);
-		final ExecutionGroupVertex startGroupVertex = getExecutionGroupVertex(jobVertexID, graph);
-
+		final ExecutionGroupVertex startGroupVertex = graph.getExecutionGroupVertex(jobVertexID);
 
 		Runnable command = new Runnable() {
 
@@ -806,21 +804,6 @@ public abstract class AbstractScheduler implements InstanceListener {
 		waitForStableState(startGroupVertex);
 	}
 
-	private ExecutionGroupVertex getExecutionGroupVertex(
-			JobVertexID jobVertexID, final ExecutionGraph graph) {
-
-		ExecutionGroupVertex groupVertex = null;
-
-		ExecutionStage stage = graph.getCurrentExecutionStage();
-		for (int i = 0; i < stage.getNumberOfStageMembers(); i++) {
-			if (stage.getStageMember(i).getJobVertexID().equals(jobVertexID)) {
-				groupVertex = stage.getStageMember(i);
-				break;
-			}
-		}
-		return groupVertex;
-	}
-
 	/**
 	 * @return true if graph contains a vertex with state SUSPENDING
 	 */
@@ -841,8 +824,7 @@ public abstract class AbstractScheduler implements InstanceListener {
 			final int noOfSubtasksToSuspend) throws Exception {
 
 		final ExecutionGraph graph = getExecutionGraphByID(jobID);
-		final ExecutionGroupVertex groupVertex = getExecutionGroupVertex(
-				jobVertexID, graph);
+		final ExecutionGroupVertex groupVertex = graph.getExecutionGroupVertex(jobVertexID);
 
         int targetNumber = groupVertex.getCurrentElasticNumberOfRunningSubtasks() - noOfSubtasksToSuspend;
 

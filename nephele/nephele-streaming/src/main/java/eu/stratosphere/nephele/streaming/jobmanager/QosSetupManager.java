@@ -270,7 +270,7 @@ public class QosSetupManager implements VertexAssignmentListener {
 
 	private void ensureElasticTaskAutoScalerIsRunning() {
 		if (this.autoscalingThread == null) {
-			this.autoscalingThread = new ElasticTaskQosAutoScalingThread(qosGraphs, qosSetup.getQosManagerIDs());
+			this.autoscalingThread = new ElasticTaskQosAutoScalingThread(executionGraph, qosGraphs, qosSetup.getQosManagerIDs());
 		}
 	}
 

@@ -222,31 +222,49 @@ public class QosConstraintSummary implements IOReadableWritable {
 	}
 
 	/**
+	 * <p>
 	 * Each subarray aggregates data for a {@link QosGroupVertex} or a
 	 * {@link QosGroupEdge}.
+	 * </p>
 	 * 
-	 * Subarrays aggregating a group vertex contain one element: (0) = The
+	 * <p>
+	 * Subarrays aggregating a group vertex contain one element: The
 	 * average vertex latency of the group vertex's active {@link QosVertex}
 	 * members.
+	 * </p>
 	 * 
-	 * Subarrays aggregating a group edge contain four elements:
+	 * <p>
+	 * Subarrays aggregating a group edge contain six elements:
+	 * </p>
+	 * 
+	 * <p>
 	 * (0) = The average output buffer latency the group edge's {@link QosEdge} members.
+	 * </p>
 	 * 
+	 * <p>
 	 * (1) = The average remaining transport latency (i.e. without output buffer
 	 * latency) of the group edge's {@link QosEdge} members. 
+	 * </p>
 	 * 
+	 * <p>
 	 * (2) = The average number of records per second that the source (member) vertices
 	 * write into the group edge's {@link QosEdge} member edges. 
+	 * </p>
 	 * 
+	 * <p>
 	 * (3) = The avg number of records per second that the target (member) vertices read
 	 * from the group edge's {@link QosEdge} member edges.
+	 * </p>
 	 * 
+	 * <p>
 	 * (4) The number of source (member) vertices writing into the group edge's {@link QosEdge}
 	 * member edges. This is actually an int but represented as a double.
+	 * </p>
 	 * 
+	 * <p>
 	 * (5) The number of target (member) vertices reading from the group edge's {@link QosEdge}
 	 * member edges. This is actually an int but represented as a double.
-	 * 
+	 * </p>
 	 */
 	public double[][] getAggregatedMemberStatistics() {
 		ensureIsFinalized();

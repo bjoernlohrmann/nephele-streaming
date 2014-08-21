@@ -51,6 +51,7 @@ import eu.stratosphere.nephele.jobgraph.JobEdge;
 import eu.stratosphere.nephele.jobgraph.JobFileOutputVertex;
 import eu.stratosphere.nephele.jobgraph.JobGraph;
 import eu.stratosphere.nephele.jobgraph.JobID;
+import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.taskmanager.runtime.ExecutorThreadFactory;
 import eu.stratosphere.nephele.template.AbstractInputTask;
 import eu.stratosphere.nephele.template.AbstractInvokable;
@@ -1437,6 +1438,20 @@ public class ExecutionGraph implements ExecutionListener {
 
 		return 1;
 	}
+	
+	public ExecutionGroupVertex getExecutionGroupVertex(JobVertexID jobVertexID) {
+		ExecutionGroupVertex groupVertex = null;
+
+		ExecutionStage stage = getCurrentExecutionStage();
+		for (int i = 0; i < stage.getNumberOfStageMembers(); i++) {
+			if (stage.getStageMember(i).getJobVertexID().equals(jobVertexID)) {
+				groupVertex = stage.getStageMember(i);
+				break;
+			}
+		}
+		return groupVertex;
+	}
+
 
 	/**
 	 * Performs an asynchronous update operation to this execution graph.

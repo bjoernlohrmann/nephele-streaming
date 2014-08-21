@@ -15,8 +15,9 @@ import eu.stratosphere.nephele.configuration.GlobalConfiguration;
 import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
 import eu.stratosphere.nephele.instance.InstanceConnectionInfo;
 import eu.stratosphere.nephele.profiling.ProfilingException;
-import eu.stratosphere.nephele.streaming.message.TaskLoadStateChange;
-import eu.stratosphere.nephele.streaming.message.TaskLoadStateChange.LoadState;
+import eu.stratosphere.nephele.streaming.message.CpuLoadClassifier;
+import eu.stratosphere.nephele.streaming.message.CpuLoadClassifier.CpuLoad;
+import eu.stratosphere.nephele.streaming.message.TaskCpuLoadChange;
 import eu.stratosphere.nephele.streaming.taskmanager.StreamMessagingThread;
 import eu.stratosphere.nephele.taskmanager.runtime.RuntimeTask;
 
@@ -39,7 +40,7 @@ public class TaskProfilingThread extends Thread {
 
 	private static TaskProfilingThread singletonInstance = null;
 
-	private HashMap<ExecutionVertexID, LoadState> taskLoadStates = new HashMap<ExecutionVertexID, LoadState>();
+	private HashMap<ExecutionVertexID, CpuLoad> taskLoadStates = new HashMap<ExecutionVertexID, CpuLoad>();
 
 	private InstanceConnectionInfo jmConnectionInfo;
 
@@ -86,37 +87,28 @@ public class TaskProfilingThread extends Thread {
 	private void notifyJobManagerOfLoadStateChanges()
 			throws InterruptedException {
 		for (TaskInfo taskInfo : tasks.values()) {
-			LoadState lastLoadState = taskLoadStates
-					.get(taskInfo.getVertexID());
-			LoadState currLoadState = getLoadState(taskInfo);
+			CpuLoad lastLoadState = taskLoadStates.get(taskInfo.getVertexID());
+			CpuLoad currLoadState = getLoadState(taskInfo);
 
 			if (lastLoadState != currLoadState) {
 				taskLoadStates.put(taskInfo.getVertexID(), currLoadState);
-				StreamMessagingThread.getInstance()
-						.sendAsynchronously(
-								jmConnectionInfo,
-								new TaskLoadStateChange(taskInfo.getTask()
-										.getJobID(), currLoadState, taskInfo
-										.getVertexID(), taskInfo
+				StreamMessagingThread.getInstance().sendAsynchronously(
+						jmConnectionInfo,
+						new TaskCpuLoadChange(taskInfo.getTask().getJobID(),
+								taskInfo.getVertexID(), taskInfo
 										.getCPUUtilization()));
 			}
 		}
 
 	}
 
-	private LoadState getLoadState(TaskInfo taskInfo) {
+	private CpuLoad getLoadState(TaskInfo taskInfo) {
 		if(!taskInfo.hasCPUUtilizationMeasurements()) {
 			return  null;
 		}
 		
 		double cpuUtilization = taskInfo.getCPUUtilization();
-		if (cpuUtilization <= 60) {
-			return LoadState.LOW;
-		} else if (cpuUtilization > 60 && cpuUtilization <= 85) {
-			return LoadState.MEDIUM;
-		} else {
-			return LoadState.HIGH;
-		}
+		return CpuLoadClassifier.fromCpuUtilization(cpuUtilization);
 	}
 
 	private void cleanUp() {

@@ -14,6 +14,7 @@ import eu.stratosphere.nephele.configuration.ConfigConstants;
 import eu.stratosphere.nephele.configuration.GlobalConfiguration;
 import eu.stratosphere.nephele.instance.InstanceConnectionInfo;
 import eu.stratosphere.nephele.jobgraph.JobID;
+import eu.stratosphere.nephele.jobmanager.JobManager;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
 import eu.stratosphere.nephele.streaming.message.AbstractQosMessage;
 import eu.stratosphere.nephele.streaming.message.ChainUpdates;
@@ -130,7 +131,9 @@ public class QosManagerThread extends Thread {
 					
 					this.oblManager.applyAndSendBufferAdjustments();
 					
-					logConstraintSummaries(constraintSummaries);
+					if (JobManager.getInstance() == null) {
+						logConstraintSummaries(constraintSummaries);
+					}
 					sendConstraintSummariesToJm(constraintSummaries, now);
 
 					long adjustmentOverhead = System

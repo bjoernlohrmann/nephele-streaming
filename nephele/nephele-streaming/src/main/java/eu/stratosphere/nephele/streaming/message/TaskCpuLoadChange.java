@@ -6,6 +6,7 @@ import java.io.IOException;
 
 import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
 import eu.stratosphere.nephele.jobgraph.JobID;
+import eu.stratosphere.nephele.streaming.message.CpuLoadClassifier.CpuLoad;
 
 /**
  * Used to signal by a task manager to the job manager, that the CPU load state
@@ -14,32 +15,24 @@ import eu.stratosphere.nephele.jobgraph.JobID;
  * @author Bjoern Lohrmann
  * 
  */
-public class TaskLoadStateChange extends AbstractSerializableQosMessage {
-
-	public enum LoadState {
-		LOW, MEDIUM, HIGH
-	}
-
-	private LoadState loadState;
+public class TaskCpuLoadChange extends AbstractSerializableQosMessage {
 
 	private ExecutionVertexID vertexId;
 
 	private double cpuUtilization;
 
-	public TaskLoadStateChange() {
+	public TaskCpuLoadChange() {
 	}
 	
-	public TaskLoadStateChange(JobID jobID, LoadState loadState,
-			ExecutionVertexID vertexId, double cpuUtilization) {
+	public TaskCpuLoadChange(JobID jobID, ExecutionVertexID vertexId, double cpuUtilization) {
 
 		super(jobID);
-		this.loadState = loadState;
 		this.vertexId = vertexId;
 		this.cpuUtilization = cpuUtilization;
 	}
 
-	public LoadState getLoadState() {
-		return loadState;
+	public CpuLoad getLoadState() {
+		return CpuLoadClassifier.fromCpuUtilization(cpuUtilization);
 	}
 
 	public ExecutionVertexID getVertexId() {
@@ -55,7 +48,6 @@ public class TaskLoadStateChange extends AbstractSerializableQosMessage {
 		super.write(out);
 
 		this.vertexId.write(out);
-		out.writeUTF(loadState.name());
 		out.writeDouble(cpuUtilization);
 	}
 
@@ -65,7 +57,6 @@ public class TaskLoadStateChange extends AbstractSerializableQosMessage {
 
 		vertexId = new ExecutionVertexID();
 		vertexId.read(in);
-		loadState = LoadState.valueOf(in.readUTF());
 		cpuUtilization = in.readDouble();
 	}
 }

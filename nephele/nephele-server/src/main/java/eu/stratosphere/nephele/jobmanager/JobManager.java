@@ -156,6 +156,8 @@ public class JobManager implements DeploymentManager, ExtendedManagementProtocol
 	// --------------------------------------------------------------------------------------------
 
 	private static final Log LOG = LogFactory.getLog(JobManager.class);
+	
+	private static JobManager singletonInstance;
 
 	private Server jobManagerServer = null;
 
@@ -405,6 +407,11 @@ public class JobManager implements DeploymentManager, ExtendedManagementProtocol
 		}
 	}
 	
+	
+	public static JobManager getInstance() {
+		return singletonInstance;
+	}
+	
 	/**
 	 * Entry point for the program
 	 * 
@@ -466,6 +473,8 @@ public class JobManager implements DeploymentManager, ExtendedManagementProtocol
 		// Create a new job manager object
 		JobManager jobManager = new JobManager(executionMode);
 		
+		singletonInstance = jobManager;
+		
 		// Set base dir for info server
 		Configuration infoserverConfig = GlobalConfiguration.getConfiguration();
 		if (configDir != null) {
@@ -474,6 +483,8 @@ public class JobManager implements DeploymentManager, ExtendedManagementProtocol
 				
 		// Start info server for jobmanager
 		jobManager.startInfoServer(infoserverConfig);
+		
+		
 
 		// Run the main task loop
 		jobManager.runTaskLoop();
