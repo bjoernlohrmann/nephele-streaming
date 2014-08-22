@@ -64,7 +64,7 @@ public class QosSetupManager implements VertexAssignmentListener {
 
 	private HashSet<ExecutionVertexID> verticesWithPendingAllocation;
 	
-	private ElasticTaskQosAutoScalingThread autoscalingThread;
+	private volatile ElasticTaskQosAutoScalingThread autoscalingThread;
 	
 	private QosSetup qosSetup;
 
@@ -269,8 +269,19 @@ public class QosSetupManager implements VertexAssignmentListener {
 	}
 
 	private void ensureElasticTaskAutoScalerIsRunning() {
+		// this may seem like clunky code, however
+		// this is a highly used code path. Reading a volatile
+		// variable that is rarely written is very cheap, whereas obtaining an
+		// object monitor (as done when calling a synchronized method) is not.
 		if (this.autoscalingThread == null) {
-			this.autoscalingThread = new ElasticTaskQosAutoScalingThread(executionGraph, qosGraphs, qosSetup.getQosManagerIDs());
+			ensureElasticTaskAutoScalerIsRunningSynchronized();
+		}
+	}
+
+	private synchronized void ensureElasticTaskAutoScalerIsRunningSynchronized() {
+		if (this.autoscalingThread == null) {
+			this.autoscalingThread = new ElasticTaskQosAutoScalingThread(
+					executionGraph, qosGraphs, qosSetup.getQosManagerIDs());
 		}
 	}
 
