@@ -14,32 +14,26 @@
  **********************************************************************************************************************/
 package eu.stratosphere.nephele.streaming.jobmanager;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
 
 import eu.stratosphere.nephele.executiongraph.ExecutionGraph;
-import eu.stratosphere.nephele.executiongraph.ExecutionVertex;
 import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
-import eu.stratosphere.nephele.instance.AbstractInstance;
 import eu.stratosphere.nephele.instance.InstanceConnectionInfo;
 import eu.stratosphere.nephele.io.DistributionPattern;
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.streaming.JobGraphSequence;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
 import eu.stratosphere.nephele.streaming.SequenceElement;
-import eu.stratosphere.nephele.streaming.StreamingPluginLoader;
-import eu.stratosphere.nephele.streaming.message.action.DeployInstanceQosManagerRoleAction;
-import eu.stratosphere.nephele.streaming.message.action.DeployInstanceQosRolesAction;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosEdge;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraph;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphTraversal;
@@ -64,6 +58,8 @@ public class QosSetup {
 	private HashMap<LatencyConstraintID, QosGraph> qosGraphs;
 
 	private HashMap<InstanceConnectionInfo, TaskManagerQosSetup> taskManagerQosSetups;
+	
+	private HashSet<QosManagerID> qosManagerIds = new HashSet<QosManagerID>();
 
 	public QosSetup(HashMap<LatencyConstraintID, QosGraph> qosGraphs) {
 		this.qosGraphs = qosGraphs;
@@ -75,16 +71,12 @@ public class QosSetup {
 		this.computeQosReporterRoles();
 	}
 	
+	public Map<InstanceConnectionInfo, TaskManagerQosSetup> getQosRoles() {
+		return taskManagerQosSetups; 
+	}
+	
 	public Set<QosManagerID> getQosManagerIDs() {
-		HashSet<QosManagerID> ids = new HashSet<QosManagerID>();
-		for (TaskManagerQosSetup tmSetup : taskManagerQosSetups.values()) {
-			QosManagerID id = tmSetup.getQosManagerID();
-			if (id != null) {
-				ids.add(id);
-			}
-		}
-
-		return ids;
+		return qosManagerIds;
 	}
 
 
@@ -198,8 +190,9 @@ public class QosSetup {
 				QosManagerRole managerRole = new QosManagerRole(qosGraph,
 						qosGraph.getConstraints().iterator().next().getID(),
 						anchorVertex, membersOnInstance);
-				this.getOrCreateInstanceRoles(instance).addManagerRole(
-						managerRole);
+				TaskManagerQosSetup tmQosSetup = this.getOrCreateInstanceRoles(instance);
+				tmQosSetup.addManagerRole(managerRole);
+				this.qosManagerIds.add(tmQosSetup.getQosManagerID());
 			}
 
 			LOG.info(String
@@ -399,58 +392,6 @@ public class QosSetup {
 		return anchorCandidates;
 	}
 
-	public void attachRolesToExecutionGraph(ExecutionGraph executionGraph) {
-		for (TaskManagerQosSetup instanceQosRoles : this.taskManagerQosSetups
-				.values()) {
-			DeployInstanceQosRolesAction rolesDeployment = instanceQosRoles
-					.toDeploymentAction(executionGraph.getJobID());
-
-			if (!rolesDeployment.getVertexQosReporters().isEmpty()) {
-				executionGraph.getVertexByID(
-						rolesDeployment.getVertexQosReporters().get(0)
-								.getVertexID()).setPluginData(
-						StreamingPluginLoader.STREAMING_PLUGIN_ID,
-						rolesDeployment);
-			} else {
-				ExecutionVertex sourceVertex = executionGraph
-						.getVertexByChannelID(rolesDeployment
-								.getEdgeQosReporters().get(0)
-								.getSourceChannelID());
-
-				if (instanceQosRoles.getConnectionInfo().equals(
-						sourceVertex.getAllocatedResource().getInstance()
-								.getInstanceConnectionInfo())) {
-
-					sourceVertex.setPluginData(
-							StreamingPluginLoader.STREAMING_PLUGIN_ID,
-							rolesDeployment);
-				} else {
-					ExecutionVertex targetVertex = executionGraph
-							.getVertexByChannelID(rolesDeployment
-									.getEdgeQosReporters().get(0)
-									.getTargetChannelID());
-
-					targetVertex.setPluginData(
-							StreamingPluginLoader.STREAMING_PLUGIN_ID,
-							rolesDeployment);
-				}
-			}
-		}
-	}
-
-	public void distributeManagerRoles(ExecutionGraph executionGraph,
-			ConcurrentHashMap<InstanceConnectionInfo, AbstractInstance> taskManagers) throws IOException {
-
-		for (TaskManagerQosSetup instanceQosRoles : this.taskManagerQosSetups.values()) {
-			if (instanceQosRoles.hasQosManagerRoles()) {
-				DeployInstanceQosManagerRoleAction roleAction =
-						instanceQosRoles.toManagerDeploymentAction(executionGraph.getJobID());
-
-				AbstractInstance instance = taskManagers.get(instanceQosRoles.getConnectionInfo());
-				instance.sendData(StreamingPluginLoader.STREAMING_PLUGIN_ID, roleAction);
-			}
-		}
-	}
 
 	public void computeCandidateChains(ExecutionGraph executionGraph) {
 		// gets called whenever a candidate chain is found

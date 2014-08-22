@@ -21,6 +21,7 @@ import java.io.IOException;
 
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 
+import eu.stratosphere.nephele.io.channels.ChannelID;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
 
 /**

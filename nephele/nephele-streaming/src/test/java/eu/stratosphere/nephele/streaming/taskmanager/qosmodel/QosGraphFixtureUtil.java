@@ -1,14 +1,15 @@
 package eu.stratosphere.nephele.streaming.taskmanager.qosmodel;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+
+import org.powermock.api.mockito.PowerMockito;
+
 import eu.stratosphere.nephele.executiongraph.ExecutionGroupVertex;
 import eu.stratosphere.nephele.executiongraph.ExecutionVertex;
 import eu.stratosphere.nephele.instance.AbstractInstance;
 import eu.stratosphere.nephele.instance.AllocatedResource;
 import eu.stratosphere.nephele.instance.InstanceConnectionInfo;
-import org.powermock.api.mockito.PowerMockito;
-
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 
 public class QosGraphFixtureUtil {
     static InstanceConnectionInfo[] generateAndAssignInstances(

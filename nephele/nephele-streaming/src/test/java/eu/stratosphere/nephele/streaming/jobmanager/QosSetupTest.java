@@ -2,9 +2,7 @@ package eu.stratosphere.nephele.streaming.jobmanager;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -17,12 +15,10 @@ import org.powermock.modules.junit4.PowerMockRunner;
 
 import eu.stratosphere.nephele.executiongraph.ExecutionGroupVertex;
 import eu.stratosphere.nephele.executiongraph.ExecutionSignature;
-import eu.stratosphere.nephele.executiongraph.ExecutionStage;
 import eu.stratosphere.nephele.executiongraph.ExecutionVertex;
 import eu.stratosphere.nephele.instance.AbstractInstance;
 import eu.stratosphere.nephele.instance.AllocatedResource;
 import eu.stratosphere.nephele.instance.InstanceConnectionInfo;
-import eu.stratosphere.nephele.streaming.StreamingPluginLoader;
 import eu.stratosphere.nephele.streaming.message.action.DeployInstanceQosRolesAction;
 
 /**
@@ -80,25 +76,10 @@ public class QosSetupTest {
 	public void testManagerAssignment() throws Exception {
 		QosSetup qosSetup = new QosSetup(this.fix.constraints);
 		qosSetup.computeQosRoles();
-		qosSetup.attachRolesToExecutionGraph(this.fix.executionGraph);
-		ExecutionStage stage = this.fix.executionGraph.getStage(0);
-		Map<ExecutionVertex, DeployInstanceQosRolesAction> vertexToRole = new HashMap<ExecutionVertex, DeployInstanceQosRolesAction>();
+		Map<InstanceConnectionInfo, TaskManagerQosSetup> qosRoles = qosSetup.getQosRoles();
 
-		for (int i = 0; i < stage.getNumberOfStageMembers(); i++) {
-			ExecutionGroupVertex executionGroupVertex = stage.getStageMember(i);
-			for (int j = 0; j < executionGroupVertex
-					.getCurrentNumberOfGroupMembers(); j++) {
-				ExecutionVertex groupMember = executionGroupVertex
-						.getGroupMember(j);
-
-				DeployInstanceQosRolesAction pluginData = (DeployInstanceQosRolesAction) groupMember
-						.getPluginData(StreamingPluginLoader.STREAMING_PLUGIN_ID);
-				if (pluginData != null)
-					vertexToRole.put(groupMember, pluginData);
-			}
-		}
 		// we expect 2 manager nodes
-		assertEquals(2, vertexToRole.size());
+		assertEquals(2, qosRoles.size());
 
 		ExecutionVertex groupMember1 = this.fix.execTaskVertex
 				.getGroupMember(0);
@@ -107,11 +88,8 @@ public class QosSetupTest {
 		Set<InstanceConnectionInfo> expectedInfos = Sets.newSet(
 				this.getInstanceConnectionInfo(groupMember1),
 				this.getInstanceConnectionInfo(groupMember2));
-		for (Map.Entry<ExecutionVertex, DeployInstanceQosRolesAction> e : vertexToRole
-				.entrySet())
-			assertTrue(expectedInfos.remove(e.getValue()
-					.getInstanceConnectionInfo()));
-		assertEquals(0, expectedInfos.size());
+		
+		expectedInfos.equals(qosRoles.keySet());
 	}
 
 	/**
@@ -124,25 +102,10 @@ public class QosSetupTest {
 	public void testManagerAssignmentGraph2() throws Exception {
 		QosSetup qosSetup = new QosSetup(this.fix.constraints2);
 		qosSetup.computeQosRoles();
-		qosSetup.attachRolesToExecutionGraph(this.fix.executionGraph2);
-		ExecutionStage stage = this.fix.executionGraph2.getStage(0);
-		Map<ExecutionVertex, DeployInstanceQosRolesAction> vertexToRole = new HashMap<ExecutionVertex, DeployInstanceQosRolesAction>();
-
-		for (int i = 0; i < stage.getNumberOfStageMembers(); i++) {
-			ExecutionGroupVertex executionGroupVertex = stage.getStageMember(i);
-			for (int j = 0; j < executionGroupVertex
-					.getCurrentNumberOfGroupMembers(); j++) {
-				ExecutionVertex groupMember = executionGroupVertex
-						.getGroupMember(j);
-				DeployInstanceQosRolesAction pluginData = (DeployInstanceQosRolesAction) groupMember
-						.getPluginData(StreamingPluginLoader.STREAMING_PLUGIN_ID);
-				if (pluginData != null)
-					vertexToRole.put(groupMember, pluginData);
-			}
-		}
+		Map<InstanceConnectionInfo, TaskManagerQosSetup> qosRoles = qosSetup.getQosRoles();
 
 		// we still expect 2 manager nodes
-		assertEquals(2, vertexToRole.size());
+		assertEquals(2, qosRoles.size());
 
 		ExecutionVertex member1 = this.fix.execTaskVertex2.getGroupMember(0);
 		ExecutionVertex member2 = this.fix.execTaskVertex2.getGroupMember(1);
@@ -150,11 +113,7 @@ public class QosSetupTest {
 		Set<InstanceConnectionInfo> expectedInfos = Sets.newSet(
 				this.getInstanceConnectionInfo(member1),
 				this.getInstanceConnectionInfo(member2));
-		for (Map.Entry<ExecutionVertex, DeployInstanceQosRolesAction> e : vertexToRole
-				.entrySet())
-			assertTrue(expectedInfos.remove(e.getValue()
-					.getInstanceConnectionInfo()));
-		assertEquals(0, expectedInfos.size());
+		expectedInfos.equals(qosRoles.keySet());
 	}
 
 	/**

@@ -360,7 +360,7 @@ public class QosConstraintViolationFinderTest {
 	 *            {@link EdgeQosData} instance.
 	 */
 	private void initializeConstraintWithLatencies(
-			JobGraphLatencyConstraint constraint,
+			final JobGraphLatencyConstraint constraint,
 			Set<QosVertex> qosStartVertices, final long timestamp,
 			final double vertexLatency, final double edgeLatency,
 			final boolean edgeIsInChain, final boolean useEdgeStatisticsFixture) {
@@ -391,6 +391,13 @@ public class QosConstraintViolationFinderTest {
 								SequenceElement<JobVertexID> sequenceElem) {
 							if (edge.getQosData() != null)
 								return;
+							
+							if (sequenceElem == constraint.getSequence().getFirst()) {
+								addEmitRateMeasurement(edge);
+							} else if (sequenceElem== constraint.getSequence().getLast()) {
+								addConsumeRateMeasurement(edge);
+							}
+							
 							EdgeQosData edgeQosData = new EdgeQosData(edge);
 							edgeQosData.addLatencyMeasurement(timestamp,
 									edgeLatency);
@@ -401,6 +408,27 @@ public class QosConstraintViolationFinderTest {
 												timestamp,
 												QosConstraintViolationFinderTest.this.fauxEdgeStatistics);
 							edge.setQosData(edgeQosData);
+						}
+
+						private void addConsumeRateMeasurement(QosEdge edge) {
+							QosVertex targetVertex = edge.getInputGate().getVertex();
+							VertexQosData vertexQosData = new VertexQosData(targetVertex);
+							vertexQosData.prepareForReportsOnInputGate(edge.getInputGate().getGateIndex());
+							vertexQosData.addVertexStatisticsMeasurement(
+									edge.getInputGate().getGateIndex(), -1, timestamp,
+									new VertexStatistics(null, -1, 50, -1));
+							targetVertex.setQosData(vertexQosData);
+							
+						}
+
+						private void addEmitRateMeasurement(QosEdge edge) {
+							QosVertex sourceVertex = edge.getOutputGate().getVertex();
+							VertexQosData vertexQosData = new VertexQosData(sourceVertex);
+							vertexQosData.prepareForReportsOnOutputGate(edge.getOutputGate().getGateIndex());
+							vertexQosData.addVertexStatisticsMeasurement(
+									-1, edge.getOutputGate().getGateIndex(), timestamp,
+									new VertexStatistics(null, -1, -1, 50));
+							sourceVertex.setQosData(vertexQosData);
 						}
 					});
 			qgt.traverseForward();
