@@ -38,7 +38,6 @@ import eu.stratosphere.nephele.streaming.message.qosreport.EdgeLatency;
 import eu.stratosphere.nephele.streaming.message.qosreport.EdgeStatistics;
 import eu.stratosphere.nephele.streaming.message.qosreport.QosReport;
 import eu.stratosphere.nephele.streaming.message.qosreport.VertexStatistics;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.OutputBufferLatencyManager;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.QosConstraintSummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.EdgeQosData;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosEdge;
@@ -445,8 +444,8 @@ public class QosModel {
 		long inactivityThresholdTime = now
 				- 2
 				* GlobalConfiguration.getLong(
-						OutputBufferLatencyManager.QOSMANAGER_ADJUSTMENTINTERVAL_KEY,
-						OutputBufferLatencyManager.DEFAULT_ADJUSTMENTINTERVAL);
+						QosManagerThread.QOSMANAGER_ADJUSTMENTINTERVAL_KEY,
+						QosManagerThread.DEFAULT_ADJUSTMENTINTERVAL);
 
 		List<QosConstraintSummary> constraintSummaries = new LinkedList<QosConstraintSummary>();
 

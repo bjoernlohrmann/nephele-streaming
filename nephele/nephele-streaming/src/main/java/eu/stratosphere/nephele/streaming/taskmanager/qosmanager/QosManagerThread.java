@@ -6,6 +6,7 @@ import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -15,10 +16,12 @@ import eu.stratosphere.nephele.configuration.GlobalConfiguration;
 import eu.stratosphere.nephele.instance.InstanceConnectionInfo;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.jobmanager.JobManager;
+import eu.stratosphere.nephele.plugins.PluginManager;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
 import eu.stratosphere.nephele.streaming.message.AbstractQosMessage;
 import eu.stratosphere.nephele.streaming.message.ChainUpdates;
 import eu.stratosphere.nephele.streaming.message.QosManagerConstraintSummaries;
+import eu.stratosphere.nephele.streaming.message.action.DeployInstanceQosManagerRoleAction;
 import eu.stratosphere.nephele.streaming.message.action.DeployInstanceQosRolesAction;
 import eu.stratosphere.nephele.streaming.message.action.QosManagerConfig;
 import eu.stratosphere.nephele.streaming.message.qosreport.QosReport;
@@ -41,6 +44,17 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosManagerID;
 public class QosManagerThread extends Thread {
 
 	private static final Log LOG = LogFactory.getLog(QosManagerThread.class);
+	
+	/**
+	 * Provides access to the configuration entry which defines the time interval
+	 * for adjusting target output buffer latencies.
+	 */
+	public static final String QOSMANAGER_ADJUSTMENTINTERVAL_KEY = PluginManager
+			.prefixWithPluginNamespace("streaming.qosmanager.adjustmentinterval");
+
+	public static final long DEFAULT_ADJUSTMENTINTERVAL = 5000;
+
+	public final static long WAIT_BEFORE_FIRST_ADJUSTMENT = 10 * 1000;
 
 	private JobID jobID;
 
@@ -56,8 +70,61 @@ public class QosManagerThread extends Thread {
 
 	private QosManagerID qosManagerID;
 
+	private final long adjustmentInterval;
+
+	private long timeOfNextAdjustment;
+	
+	private class MessageStats {
+		
+		int noOfMessages = 0;
+		int noOfEdgeLatencies = 0;
+		int noOfVertexLatencies = 0;
+		int noOfEdgeStatistics = 0;
+		int noOfVertexAnnounces = 0;
+		int noOfEdgeAnnounces = 0;
+		
+		public void logAndReset() {
+			logAndReset(0);
+		}
+		
+		public void logAndReset(long adjustmentOverhead) {
+			LOG.debug(String.format("total messages: %d (edge: %d lats and %d stats | vertex: %d | edgeReporters: %d | vertexReporters: %d) || enqueued: %d || buffersizeAdjustmentOverhead: %d",
+							noOfMessages, noOfEdgeLatencies,
+							noOfEdgeStatistics, noOfVertexLatencies,
+							noOfEdgeAnnounces, noOfVertexAnnounces,
+							streamingDataQueue.size(),
+							adjustmentOverhead));
+
+			noOfMessages = 0;
+			noOfEdgeLatencies = 0;
+			noOfVertexLatencies = 0;
+			noOfEdgeStatistics = 0;
+			noOfEdgeAnnounces = 0;
+			noOfVertexAnnounces = 0;
+		}
+
+		public void updateWithReport(QosReport qosReport) {
+			noOfEdgeLatencies += qosReport.getEdgeLatencies().size();
+			noOfVertexLatencies += qosReport.getVertexStatistics()
+					.size();
+			noOfEdgeStatistics += qosReport.getEdgeStatistics().size();
+			noOfVertexAnnounces += qosReport
+					.getVertexQosReporterAnnouncements().size();
+			noOfEdgeAnnounces += qosReport
+					.getEdgeQosReporterAnnouncements().size();
+		}
+	}
+
 	public QosManagerThread(JobID jobID) {
 		this.jobID = jobID;
+		
+		this.adjustmentInterval = GlobalConfiguration.getLong(
+				QOSMANAGER_ADJUSTMENTINTERVAL_KEY, DEFAULT_ADJUSTMENTINTERVAL);
+
+		this.timeOfNextAdjustment = QosUtils.alignToInterval(
+				System.currentTimeMillis() + WAIT_BEFORE_FIRST_ADJUSTMENT,
+				this.adjustmentInterval);
+		
 		this.qosModel = new QosModel(jobID);
 		this.streamingDataQueue = new LinkedBlockingQueue<AbstractQosMessage>();
 		this.oblManager = new OutputBufferLatencyManager(jobID);
@@ -84,75 +151,21 @@ public class QosManagerThread extends Thread {
 	public void run() {
 		LOG.info("Started Qos manager thread.");
 
-		int nooOfReports = 0;
-		int noOfEdgeLatencies = 0;
-		int noOfVertexLatencies = 0;
-		int noOfEdgeStatistics = 0;
-		int noOfVertexAnnounces = 0;
-		int noOfEdgeAnnounces = 0;
+		MessageStats stats = new MessageStats();
 
 		try {
 			while (!interrupted()) {
 				AbstractQosMessage streamingData = this.streamingDataQueue
-						.take();
+						.poll(adjustmentInterval, TimeUnit.MILLISECONDS);
 
-				nooOfReports++;
-
-				if (streamingData instanceof QosReport) {
-					QosReport qosReport = (QosReport) streamingData;
-					this.qosModel.processQosReport(qosReport);
-					noOfEdgeLatencies += qosReport.getEdgeLatencies().size();
-					noOfVertexLatencies += qosReport.getVertexStatistics()
-							.size();
-					noOfEdgeStatistics += qosReport.getEdgeStatistics().size();
-					noOfVertexAnnounces += qosReport
-							.getVertexQosReporterAnnouncements().size();
-					noOfEdgeAnnounces += qosReport
-							.getEdgeQosReporterAnnouncements().size();
-					nooOfReports++;
-				} else if (streamingData instanceof DeployInstanceQosRolesAction) {
-					QosManagerConfig config = ((DeployInstanceQosRolesAction) streamingData).getQosManager();
-					this.qosManagerID = config.getQosManagerID();
-					this.qosModel.mergeShallowQosGraph(config.getShallowQosGraph());
-				} else if (streamingData instanceof ChainUpdates) {
-					this.qosModel
-							.processChainUpdates((ChainUpdates) streamingData);
+				if (streamingData == null) {
+					stats.logAndReset();
+					continue;
 				}
-
-				long now = System.currentTimeMillis();
-				if (this.qosModel.isReady()
-						&& this.oblManager.isAdjustmentNecessary(now)) {
-
-					QosConstraintViolationListener listener = this.oblManager
-							.getQosConstraintViolationListener();
-
-					List<QosConstraintSummary> constraintSummaries = this.qosModel
-							.findQosConstraintViolationsAndSummarize(listener);
-					
-					this.oblManager.applyAndSendBufferAdjustments();
-					
-					if (JobManager.getInstance() == null) {
-						logConstraintSummaries(constraintSummaries);
-					}
-					sendConstraintSummariesToJm(constraintSummaries, now);
-
-					long adjustmentOverhead = System
-							.currentTimeMillis() - now;
-					LOG.debug(String
-							.format("total messages: %d (edge: %d lats and %d stats | vertex: %d | edgeReporters: %d | vertexReporters: %d) || enqueued: %d || buffersizeAdjustmentOverhead: %d",
-									nooOfReports, noOfEdgeLatencies,
-									noOfEdgeStatistics, noOfVertexLatencies,
-									noOfEdgeAnnounces, noOfVertexAnnounces,
-									this.streamingDataQueue.size(),
-									adjustmentOverhead));
-
-					nooOfReports = 0;
-					noOfEdgeLatencies = 0;
-					noOfVertexLatencies = 0;
-					noOfEdgeStatistics = 0;
-					noOfEdgeAnnounces = 0;
-					noOfVertexAnnounces = 0;
-				}
+				
+				stats.noOfMessages++;
+				processStreamingData(stats, streamingData);
+				adjustIfNecessary(stats);
 			}
 
 		} catch (InterruptedException e) {
@@ -161,6 +174,59 @@ public class QosManagerThread extends Thread {
 		}
 
 		LOG.info("Stopped Qos Manager thread");
+	}
+
+	private void adjustIfNecessary(MessageStats stats)
+			throws InterruptedException {
+
+		long beginAdjustTime = System.currentTimeMillis();
+		if (this.qosModel.isReady() && isAdjustmentNecessary(beginAdjustTime)) {
+
+			QosConstraintViolationListener listener = this.oblManager
+					.getQosConstraintViolationListener();
+
+			List<QosConstraintSummary> constraintSummaries = this.qosModel
+					.findQosConstraintViolationsAndSummarize(listener);
+
+			this.oblManager.applyAndSendBufferAdjustments(beginAdjustTime);
+
+			sendConstraintSummariesToJm(constraintSummaries, beginAdjustTime);
+			if (JobManager.getInstance() == null) {
+				logConstraintSummaries(constraintSummaries);
+			}
+
+			long now = System.currentTimeMillis();
+			stats.logAndReset(now - beginAdjustTime);
+			this.refreshTimeOfNextAdjustment(now);
+		}
+	}
+	
+	private boolean isAdjustmentNecessary(long now) {
+		return now >= this.timeOfNextAdjustment;
+	}
+
+	private void processStreamingData(MessageStats stats,
+			AbstractQosMessage streamingData) {
+		
+		if (streamingData instanceof QosReport) {
+			QosReport qosReport = (QosReport) streamingData;
+			this.qosModel.processQosReport(qosReport);
+			stats.updateWithReport(qosReport);
+		} else if (streamingData instanceof DeployInstanceQosRolesAction) {
+			throw new RuntimeException("Got unexpected DeployInstanceQosRolesAction@QosManager!");
+		} else if (streamingData instanceof DeployInstanceQosManagerRoleAction) {
+			QosManagerConfig config = ((DeployInstanceQosManagerRoleAction) streamingData).getQosManager();
+			this.qosManagerID = config.getQosManagerID();
+			this.qosModel.mergeShallowQosGraph(config.getShallowQosGraph());
+		} else if (streamingData instanceof ChainUpdates) {
+			this.qosModel.processChainUpdates((ChainUpdates) streamingData);
+		}
+	}
+	
+	private void refreshTimeOfNextAdjustment(long now) {
+		while (this.timeOfNextAdjustment <= now) {
+			this.timeOfNextAdjustment += this.adjustmentInterval;
+		}
 	}
 
 	private void sendConstraintSummariesToJm(
@@ -191,9 +257,7 @@ public class QosManagerThread extends Thread {
 
 		try {
 			if (logger == null) {
-				logger = new QosLogger(qosModel.getJobGraphLatencyConstraint(constraintID),
-						GlobalConfiguration.getLong(OutputBufferLatencyManager.QOSMANAGER_ADJUSTMENTINTERVAL_KEY,
-								OutputBufferLatencyManager.DEFAULT_ADJUSTMENTINTERVAL));
+				logger = new QosLogger(qosModel.getJobGraphLatencyConstraint(constraintID), adjustmentInterval);
 				this.qosLoggers.put(constraintID, logger);
 			}
 			logger.logSummary(constraintSummary);

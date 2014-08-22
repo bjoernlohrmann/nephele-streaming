@@ -6,16 +6,13 @@ import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import eu.stratosphere.nephele.configuration.GlobalConfiguration;
 import eu.stratosphere.nephele.instance.InstanceConnectionInfo;
 import eu.stratosphere.nephele.jobgraph.JobID;
-import eu.stratosphere.nephele.plugins.PluginManager;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.message.action.SetOutputLatencyTargetAction;
 import eu.stratosphere.nephele.streaming.taskmanager.StreamMessagingThread;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosConstraintViolationListener;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosSequenceLatencySummary;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosUtils;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.EdgeQosData;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosEdge;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphMember;
@@ -33,28 +30,13 @@ public class OutputBufferLatencyManager {
 
 	private static final Log LOG = LogFactory.getLog(OutputBufferLatencyManager.class);
 
-	/**
-	 * Provides access to the configuration entry which defines the time interval
-	 * for adjusting target output buffer latencies.
-	 */
-	public static final String QOSMANAGER_ADJUSTMENTINTERVAL_KEY = PluginManager
-			.prefixWithPluginNamespace("streaming.qosmanager.adjustmentinterval");
-
-	public static final long DEFAULT_ADJUSTMENTINTERVAL = 5000;
-
-	public final static long WAIT_BEFORE_FIRST_ADJUSTMENT = 10 * 1000;
-
-	public long adjustmentInterval;
-
-	private StreamMessagingThread messagingThread;
-
-	private long timeOfNextAdjustment;
-
-	private JobID jobID;
+	private final JobID jobID;
 	
-	final HashMap<QosEdge, Integer> edgesToAdjust = new HashMap<QosEdge, Integer>();
+	private final StreamMessagingThread messagingThread;
 	
-	int staleSequencesCounter = 0;
+	private final HashMap<QosEdge, Integer> edgesToAdjust = new HashMap<QosEdge, Integer>();
+	
+	private int staleSequencesCounter = 0;
 	
 	final QosConstraintViolationListener listener = new QosConstraintViolationListener() {
 		@Override
@@ -74,35 +56,23 @@ public class OutputBufferLatencyManager {
 	public OutputBufferLatencyManager(JobID jobID) {
 		this.jobID = jobID;
 		this.messagingThread = StreamMessagingThread.getInstance();
-
-		this.adjustmentInterval = GlobalConfiguration.getLong(
-				QOSMANAGER_ADJUSTMENTINTERVAL_KEY, DEFAULT_ADJUSTMENTINTERVAL);
-
-		this.timeOfNextAdjustment = QosUtils.alignToInterval(
-				System.currentTimeMillis() + WAIT_BEFORE_FIRST_ADJUSTMENT,
-				this.adjustmentInterval);
 	}
 
-	public long getAdjustmentInterval() {
-		return this.adjustmentInterval;
-	}
-
-	public void applyAndSendBufferAdjustments() throws InterruptedException {
-		doAdjust(edgesToAdjust);
+	public void applyAndSendBufferAdjustments(long oblHistoryTimestamp) throws InterruptedException {
+		doAdjust(edgesToAdjust, oblHistoryTimestamp);
 		
 		LOG.debug(String.format(
 				"Adjusted edges: %d | Sequences with stale Qos data: %d",
 				edgesToAdjust.size(), staleSequencesCounter));
 		edgesToAdjust.clear();
 		staleSequencesCounter = 0;
-		this.refreshTimeOfNextAdjustment();
 	}
 	
 	public QosConstraintViolationListener getQosConstraintViolationListener() {
 		return this.listener;
 	}
 
-	private void doAdjust(HashMap<QosEdge, Integer> edgesToAdjust)
+	private void doAdjust(HashMap<QosEdge, Integer> edgesToAdjust, long oblHistoryTimestamp)
 			throws InterruptedException {
 
 		for (QosEdge edge : edgesToAdjust.keySet()) {
@@ -110,16 +80,9 @@ public class OutputBufferLatencyManager {
 
 			ValueHistory<Integer> oblHistory = edge.getQosData()
 					.getTargetOblHistory();
-			oblHistory.addToHistory(this.timeOfNextAdjustment, newTargetObl);
+			oblHistory.addToHistory(oblHistoryTimestamp, newTargetObl);
 
 			this.setTargetOutputBufferLatency(edge, newTargetObl);
-		}
-	}
-
-	private void refreshTimeOfNextAdjustment() {
-		long now = System.currentTimeMillis();
-		while (this.timeOfNextAdjustment <= now) {
-			this.timeOfNextAdjustment += this.adjustmentInterval;
 		}
 	}
 
@@ -180,11 +143,6 @@ public class OutputBufferLatencyManager {
 			
 			return (int) constraint.getLatencyConstraintInMillis() / qosSummary.getNoOfEdges();
 		}
-	}
-
-
-	public boolean isAdjustmentNecessary(long now) {
-		return now >= this.timeOfNextAdjustment;
 	}
 
 	private void setTargetOutputBufferLatency(QosEdge edge, int targetObl)

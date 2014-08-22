@@ -26,7 +26,7 @@ import eu.stratosphere.nephele.streaming.message.AbstractSerializableQosMessage;
 import eu.stratosphere.nephele.streaming.message.QosManagerConstraintSummaries;
 import eu.stratosphere.nephele.streaming.message.TaskCpuLoadChange;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosLogger;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.OutputBufferLatencyManager;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosManagerThread;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.QosConstraintSummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraph;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGroupEdge;
@@ -79,9 +79,8 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 				qosLoggers.put(constraintID,
 							new QosLogger(
 								constraint,
-								GlobalConfiguration.getLong(
-									OutputBufferLatencyManager.QOSMANAGER_ADJUSTMENTINTERVAL_KEY,
-									OutputBufferLatencyManager.DEFAULT_ADJUSTMENTINTERVAL)));
+								GlobalConfiguration.getLong(QosManagerThread.QOSMANAGER_ADJUSTMENTINTERVAL_KEY,
+										QosManagerThread.DEFAULT_ADJUSTMENTINTERVAL)));
 			} catch (IOException e) {
 				LOG.error("Exception in QosLogger", e);
 			}
@@ -165,9 +164,8 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 					timeOfLastScaling = System.currentTimeMillis();
 					timeOfNextScaling = timeOfLastScaling
 							+ GlobalConfiguration
-									.getLong(
-											OutputBufferLatencyManager.QOSMANAGER_ADJUSTMENTINTERVAL_KEY,
-											OutputBufferLatencyManager.DEFAULT_ADJUSTMENTINTERVAL);
+									.getLong(QosManagerThread.QOSMANAGER_ADJUSTMENTINTERVAL_KEY,
+											QosManagerThread.DEFAULT_ADJUSTMENTINTERVAL);
 				}
 			}
 		} catch (InterruptedException e) {
