@@ -127,13 +127,15 @@ public class OutputBufferLatencyManager {
 
 	private int computeUniformTargetObl(
 			JobGraphLatencyConstraint constraint, QosSequenceLatencySummary qosSummary) {
+		
+		int toReturn;
 
 		if (constraint.getLatencyConstraintInMillis() > qosSummary.getNonOutputBufferLatency()) {
 			// regular case (nonOutputBufferLatency < constraint): we have a
 			// chance of meeting the constraint
 			// by telling the TM to adjust output buffer sizes
 			
-			return (int) (constraint.getLatencyConstraintInMillis() - qosSummary
+			toReturn = (int) (constraint.getLatencyConstraintInMillis() - qosSummary
 					.getNonOutputBufferLatency()) / qosSummary.getNoOfEdges();
 		} else {
 			// overload case (nonOutputBufferLatency >= constraint): we
@@ -141,8 +143,10 @@ public class OutputBufferLatencyManager {
 			// adjusting output buffer sizes. in this case
 			// choose a sensible default
 			
-			return (int) constraint.getLatencyConstraintInMillis() / qosSummary.getNoOfEdges();
+			toReturn = (int) constraint.getLatencyConstraintInMillis() / qosSummary.getNoOfEdges();
 		}
+		
+		return Math.max(1, toReturn);
 	}
 
 	private void setTargetOutputBufferLatency(QosEdge edge, int targetObl)

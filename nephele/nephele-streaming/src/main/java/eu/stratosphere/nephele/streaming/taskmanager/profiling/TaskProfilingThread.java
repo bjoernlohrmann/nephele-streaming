@@ -16,7 +16,6 @@ import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
 import eu.stratosphere.nephele.instance.InstanceConnectionInfo;
 import eu.stratosphere.nephele.profiling.ProfilingException;
 import eu.stratosphere.nephele.streaming.message.CpuLoadClassifier;
-import eu.stratosphere.nephele.streaming.message.CpuLoadClassifier.CpuLoad;
 import eu.stratosphere.nephele.streaming.message.TaskCpuLoadChange;
 import eu.stratosphere.nephele.streaming.taskmanager.StreamMessagingThread;
 import eu.stratosphere.nephele.taskmanager.runtime.RuntimeTask;
@@ -40,7 +39,7 @@ public class TaskProfilingThread extends Thread {
 
 	private static TaskProfilingThread singletonInstance = null;
 
-	private HashMap<ExecutionVertexID, CpuLoad> taskLoadStates = new HashMap<ExecutionVertexID, CpuLoad>();
+	private final HashMap<ExecutionVertexID, Double> taskCpuUtilizations = new HashMap<ExecutionVertexID, Double>();
 
 	private InstanceConnectionInfo jmConnectionInfo;
 
@@ -86,12 +85,21 @@ public class TaskProfilingThread extends Thread {
 
 	private void notifyJobManagerOfLoadStateChanges()
 			throws InterruptedException {
+		
 		for (TaskInfo taskInfo : tasks.values()) {
-			CpuLoad lastLoadState = taskLoadStates.get(taskInfo.getVertexID());
-			CpuLoad currLoadState = getLoadState(taskInfo);
+			Double lastNotified = taskCpuUtilizations.get(taskInfo
+					.getVertexID());
+			Double curr = getCpuUtilization(taskInfo);
 
-			if (lastLoadState != currLoadState) {
-				taskLoadStates.put(taskInfo.getVertexID(), currLoadState);
+			boolean mustNotify = (lastNotified == null && curr != null)
+					|| (lastNotified != null 
+					     && curr != null 
+					     && ((Math.abs(lastNotified - curr) > 5) 
+					    		 || CpuLoadClassifier.fromCpuUtilization(lastNotified) != 
+					    		    CpuLoadClassifier.fromCpuUtilization(curr)));
+
+			if (mustNotify) {
+				taskCpuUtilizations.put(taskInfo.getVertexID(), curr);
 				StreamMessagingThread.getInstance().sendAsynchronously(
 						jmConnectionInfo,
 						new TaskCpuLoadChange(taskInfo.getTask().getJobID(),
@@ -102,13 +110,12 @@ public class TaskProfilingThread extends Thread {
 
 	}
 
-	private CpuLoad getLoadState(TaskInfo taskInfo) {
+	private Double getCpuUtilization(TaskInfo taskInfo) {
 		if(!taskInfo.hasCPUUtilizationMeasurements()) {
 			return  null;
 		}
 		
-		double cpuUtilization = taskInfo.getCPUUtilization();
-		return CpuLoadClassifier.fromCpuUtilization(cpuUtilization);
+		return taskInfo.getCPUUtilization();
 	}
 
 	private void cleanUp() {

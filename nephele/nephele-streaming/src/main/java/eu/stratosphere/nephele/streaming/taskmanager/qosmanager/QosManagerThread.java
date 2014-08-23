@@ -169,6 +169,9 @@ public class QosManagerThread extends Thread {
 			}
 
 		} catch (InterruptedException e) {
+			// do nothing
+		} catch (Exception e) {
+			LOG.error("Error in QosManager thread", e);
 		} finally {
 			this.cleanUp();
 		}

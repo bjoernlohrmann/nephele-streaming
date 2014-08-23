@@ -89,11 +89,15 @@ public final class StreamOutputGate<T extends Record> extends
 	@Override
 	public void writeRecord(final T record) throws IOException,
 			InterruptedException {
-
-		this.reportRecordEmitted(record);
+		
+		int outputChannel = this.streamChannelSelector.invokeWrappedChannelSelector(record,
+						this.getNumberOfActiveOutputChannels())[0];
+		
+		this.reportRecordEmitted(record, outputChannel);
 
 		if (this.streamChain == null) {
 			this.getWrappedOutputGate().writeRecord(record);
+			oblEnforcer.reportRecordEmitted(outputChannel);
 		} else {
 			this.streamChain.writeRecord(record);
 		}
@@ -179,13 +183,7 @@ public final class StreamOutputGate<T extends Record> extends
 		channel.limitBufferSize(lbsa.getBufferSize());
 	}
 
-	public void reportRecordEmitted(final T record) {
-		int outputChannel = this.streamChannelSelector
-				.invokeWrappedChannelSelector(record,
-						this.getNumberOfActiveOutputChannels())[0];
-		
-		oblEnforcer.reportRecordEmitted(outputChannel);
-
+	public void reportRecordEmitted(final T record, int outputChannel) {
 		if (this.qosCallback != null) {
 			AbstractTaggableRecord taggableRecord = (AbstractTaggableRecord) record;
 			this.qosCallback.recordEmitted(outputChannel, taggableRecord);
@@ -196,9 +194,7 @@ public final class StreamOutputGate<T extends Record> extends
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void outputBufferSent(final int channelIndex) {
-		oblEnforcer.outputBufferSent(channelIndex);
-		
+	public void outputBufferSent(final int channelIndex) {		
 		if (this.qosCallback != null) {
 			this.qosCallback.outputBufferSent(channelIndex, this
 					.getOutputChannel(channelIndex)

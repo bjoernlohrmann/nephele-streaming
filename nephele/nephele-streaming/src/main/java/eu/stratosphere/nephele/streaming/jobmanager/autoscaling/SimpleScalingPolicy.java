@@ -3,6 +3,9 @@ package eu.stratosphere.nephele.streaming.jobmanager.autoscaling;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import eu.stratosphere.nephele.executiongraph.ExecutionGraph;
 import eu.stratosphere.nephele.executiongraph.ExecutionGroupVertex;
 import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
@@ -23,6 +26,9 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.QosConst
  * 
  */
 public class SimpleScalingPolicy extends AbstractScalingPolicy {
+	
+	private static final Log LOG = LogFactory
+			.getLog(SimpleScalingPolicy.class);
 
 	public SimpleScalingPolicy(
 			ExecutionGraph execGraph,
@@ -37,9 +43,9 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 			Map<JobVertexID, Integer> scalingActions)
 			throws UnexpectedVertexExecutionStateException {
 
-		Map<JobVertexID, Double> summarizedCpuUtilizations = summarizeCpuUtilizations(
+		Map<JobVertexID, GroupVertexCpuLoadSummary> summarizedCpuUtilizations = summarizeCpuUtilizations(
 				constraint, taskCpuLoads);
-
+		
 		for (SequenceElement<JobVertexID> seqElem : constraint.getSequence()) {
 			if (seqElem.isEdge()) {
 
@@ -61,14 +67,23 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 						.getIndexInSequence()][3]
 						* getNoOfRunningTasks(consumerGroupVertex);
 
-				double consumerCpuUtilPercent = summarizedCpuUtilizations
+				
+				GroupVertexCpuLoadSummary cpuLoadSummary = summarizedCpuUtilizations
 						.get(seqElem.getTargetVertexID());
+				
+				LOG.debug(String.format("sendRate: %.1f | consumeRate: %.1f | avgCpuUtil: %.1f | hi:%d med:%d lo:%d\n",
+						recordSendRate, recordConsumptionRate, cpuLoadSummary.getAvgCpuUtilization(),
+						cpuLoadSummary.getHighs(), cpuLoadSummary.getMediums(), cpuLoadSummary.getLows()));
 
-				CpuLoad cpuLoad = CpuLoadClassifier
-						.fromCpuUtilization(consumerCpuUtilPercent);
-
-				if (cpuLoad == CpuLoad.HIGH
-						&& (100 * recordSendRate / recordConsumptionRate) >= CpuLoadClassifier.HIGH_THRESHOLD_PERCENT) {
+				if (recordSendRate == 0 || recordConsumptionRate == 0) {
+					continue;
+				}
+				
+				double sendConsumeRatio = recordSendRate / recordConsumptionRate;
+				
+				if (cpuLoadSummary.getAvgCpuLoad() == CpuLoad.HIGH
+						&& cpuLoadSummary.getLows() < 2
+						&& sendConsumeRatio >= CpuLoadClassifier.HIGH_THRESHOLD_PERCENT / 100.0) {
 
 					// in general, scale up if the consumer task's avg cpu
 					// utilization is high, with one exception:
@@ -81,14 +96,16 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 
 					addScaleUpAction(seqElem, constraintSummary, scalingActions);
 
-				} else if (cpuLoad == CpuLoad.LOW
-						&& (100 * recordSendRate / recordConsumptionRate) >= CpuLoadClassifier.HIGH_THRESHOLD_PERCENT) {
+				} else if (cpuLoadSummary.getAvgCpuLoad() == CpuLoad.LOW
+						&& cpuLoadSummary.getHighs() < 2
+						&& sendConsumeRatio >= CpuLoadClassifier.HIGH_THRESHOLD_PERCENT / 100.0) {
 
 					addScaleDownAction(seqElem, constraintSummary,
-							consumerCpuUtilPercent / 100.0, scalingActions);
+							cpuLoadSummary.getAvgCpuUtilization() / 100.0, scalingActions);
 				}
 			}
 		}
+		LOG.debug(scalingActions.toString());
 	}
 
 	private void addScaleUpAction(SequenceElement<JobVertexID> edge,
@@ -113,6 +130,8 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 				.ceil((avgSendRate * noOfSenderTasks)
 						/ (avgConsumeRate * targetCpuUtil));
 
+		LOG.debug(String.format("SCALE-UP: newConsumers (before ulimits): %d\n", newNoOfConsumerTasks));
+		
 		// apply user defined limits
 		ExecutionGroupVertex consumer = getExecutionGraph()
 				.getExecutionGroupVertex(edge.getTargetVertexID());
@@ -152,6 +171,8 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 		int newNoOfConsumerTasks = (int) Math.ceil(loadFactor * avgConsumeRate
 				/ targetCpuUtil);
 
+		LOG.debug(String.format("SCALE-DOWN: newConsumers (before ulimits): %d\n", newNoOfConsumerTasks));
+		
 		// apply user defined limits
 		newNoOfConsumerTasks = applyElasticityLimits(consumer,
 				newNoOfConsumerTasks);

@@ -4,10 +4,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import eu.stratosphere.nephele.execution.ExecutionState;
 import eu.stratosphere.nephele.executiongraph.ExecutionGraph;
 import eu.stratosphere.nephele.executiongraph.ExecutionGroupVertex;
-import eu.stratosphere.nephele.executiongraph.ExecutionVertex;
 import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
@@ -70,12 +68,12 @@ public abstract class AbstractScalingPolicy {
 						groupVertex.getMaxElasticNumberOfRunningSubtasks()));
 	}
 
-	protected Map<JobVertexID, Double> summarizeCpuUtilizations(
+	protected Map<JobVertexID, GroupVertexCpuLoadSummary> summarizeCpuUtilizations(
 			JobGraphLatencyConstraint constraint,
 			Map<ExecutionVertexID, TaskCpuLoadChange> taskCpuLoads)
 			throws UnexpectedVertexExecutionStateException {
 
-		Map<JobVertexID, Double> toReturn = new HashMap<JobVertexID, Double>();
+		Map<JobVertexID, GroupVertexCpuLoadSummary> toReturn = new HashMap<JobVertexID, GroupVertexCpuLoadSummary>();
 
 		for (SequenceElement<JobVertexID> seqElem : constraint.getSequence()) {
 			if (seqElem.isEdge()) {
@@ -84,18 +82,16 @@ public abstract class AbstractScalingPolicy {
 				if (!toReturn.containsKey(sourceVertexID)) {
 					toReturn.put(
 							sourceVertexID,
-							summarizeCpuUtilization(execGraph
-									.getExecutionGroupVertex(sourceVertexID),
-									taskCpuLoads));
+							new GroupVertexCpuLoadSummary(taskCpuLoads, execGraph
+									.getExecutionGroupVertex(sourceVertexID)));
 				}
 
 				JobVertexID targetVertexID = seqElem.getTargetVertexID();
 				if (!toReturn.containsKey(targetVertexID)) {
 					toReturn.put(
 							targetVertexID,
-							summarizeCpuUtilization(execGraph
-									.getExecutionGroupVertex(targetVertexID),
-									taskCpuLoads));
+							new GroupVertexCpuLoadSummary(taskCpuLoads, execGraph
+									.getExecutionGroupVertex(targetVertexID)));
 				}
 
 			}
@@ -104,42 +100,6 @@ public abstract class AbstractScalingPolicy {
 		return toReturn;
 	}
 
-	protected double summarizeCpuUtilization(ExecutionGroupVertex groupVertex,
-			Map<ExecutionVertexID, TaskCpuLoadChange> taskCpuLoads)
-			throws UnexpectedVertexExecutionStateException {
-		int noOfRunningTasks = getNoOfRunningTasks(groupVertex);
-
-		double aggregatedCpuUtilization = 0;
-		int aggregatedTasks = 0;
-
-		for (int i = 0; i < noOfRunningTasks; i++) {
-			ExecutionVertex execVertex = groupVertex.getGroupMember(i);
-			ExecutionState vertexState = execVertex.getExecutionState();
-
-			switch (vertexState) {
-			case RUNNING:
-				if (taskCpuLoads.containsKey(execVertex.getID())) {
-					aggregatedCpuUtilization += taskCpuLoads.get(
-							execVertex.getID()).getCpuUtilization();
-					aggregatedTasks++;
-				}
-				break;
-			case SUSPENDING:
-			case SUSPENDED:
-				break;
-			default:
-				throw new UnexpectedVertexExecutionStateException();
-			}
-		}
-
-		if (aggregatedTasks == 0) {
-			throw new RuntimeException(
-					"No running tasks with available CPU utilization data");
-		} else {
-			return aggregatedCpuUtilization / aggregatedTasks;
-		}
-
-	}
 
 	protected int getNoOfRunningTasks(ExecutionGroupVertex sendingGroupVertex) {
 		int noOfSendingTasks;

@@ -18,7 +18,7 @@ public class OutputBufferLatencyEnforcer {
 	
 	private static final String INITIAL_TARGET_OBL_KEY = "plugins.streaming.taskmanager.io.initialTargetOutputBufferLatencyMillis";
 
-	private static final int INITIAL_TARGET_OBL_DEFAULT = 100;
+	private static final int INITIAL_TARGET_OBL_DEFAULT = 50;
 
 	private static final String ADJUSTMENT_INTERVAL_KEY = "plugins.streaming.taskmanager.io.outputBufferSizeAdjustmentIntervalMillis";
 
@@ -32,8 +32,6 @@ public class OutputBufferLatencyEnforcer {
 
 	private class ChannelStatistics {
 
-		int outputBuffersSentSinceLastAdjust = 0;
-
 		int recordsEmittedSinceLastAdjust = 0;
 		
 		public long amountTransmittedAtLastAdjust = 0;
@@ -44,7 +42,7 @@ public class OutputBufferLatencyEnforcer {
 
 		private int outputBufferSize = maxOutputBufferSize;
 		
-		private int adjustFrequency = 1; // in number of output buffers
+		private int adjustFrequency = 3; // in number of records
 
 		private final AbstractByteBufferedOutputChannel<?> channel;
 
@@ -57,7 +55,13 @@ public class OutputBufferLatencyEnforcer {
 		
 		void adjustOutputBufferSize() {
 			long now = System.currentTimeMillis();
-			int newOutputBufferSize = computeNewOutputBufferSize(now);
+			
+			long millisPassedSinceLastAdjust = now - timeOfLastAdjust;
+			if (millisPassedSinceLastAdjust < targetOutputBufferLatency) {
+				return;
+			}
+			
+			int newOutputBufferSize = computeNewOutputBufferSize(millisPassedSinceLastAdjust);
 			
 			this.channel.limitBufferSize(newOutputBufferSize);
 			int oldOutputBufferSize = this.outputBufferSize; 
@@ -68,32 +72,37 @@ public class OutputBufferLatencyEnforcer {
 
 		private void resetCounters(long now, int oldOutputBufferSize) {
 			// recalibrate adjust frequency
-			double oldBuffersPerMilli = outputBuffersSentSinceLastAdjust
+			double oldRecordsPerMilli = recordsEmittedSinceLastAdjust
 					/ ((double) now - timeOfLastAdjust);
 
-			double newBuffersPerMilliEstimated = (oldBuffersPerMilli * oldOutputBufferSize)
-					/ this.outputBufferSize;
+			this.adjustFrequency = (int) Math.max(1, adjustmentIntervalMillis * oldRecordsPerMilli);
 
-			this.adjustFrequency = (int) Math.max(1, adjustmentIntervalMillis
-					* newBuffersPerMilliEstimated);
-
-			this.outputBuffersSentSinceLastAdjust = 0;
 			this.recordsEmittedSinceLastAdjust = 0;
 			this.amountTransmittedAtLastAdjust = channel
 					.getAmountOfDataTransmitted();
 			this.timeOfLastAdjust = now;
 		}
 
-		private int computeNewOutputBufferSize(long now) {
-			double millisPassed = now - timeOfLastAdjust;
-			double currObl = millisPassed / outputBuffersSentSinceLastAdjust / 2;
+		private int computeNewOutputBufferSize(long millisPassedSinceLastAdjust) {
+			
+			double bytesSinceLastAdjust = channel.getAmountOfDataTransmitted()
+					- amountTransmittedAtLastAdjust;
+			
+			double outputBuffersFilledSinceLastAdjust = bytesSinceLastAdjust / outputBufferSize;
+			
+			double currObl = millisPassedSinceLastAdjust / outputBuffersFilledSinceLastAdjust / 2;
 			int newOutputBufferSize = (int) (outputBufferSize * (targetOutputBufferLatency / currObl));
 
-			long bytesTransmittedSinceLastAdjust = channel
-					.getAmountOfDataTransmitted()
-					- amountTransmittedAtLastAdjust;
-			double avgRecordSize = ((double) bytesTransmittedSinceLastAdjust)
-					/ recordsEmittedSinceLastAdjust;
+			double avgRecordSize = Math.max(1, bytesSinceLastAdjust / recordsEmittedSinceLastAdjust);
+			
+//			System.err.printf("msPassed: %d | bytes: %d | #ob: %.2f | obl: %.1f | avgRecS: %d | oldObs: %d | newObs: %d\n",
+//					millisPassedSinceLastAdjust,
+//					(int) bytesSinceLastAdjust,
+//					outputBuffersFilledSinceLastAdjust,
+//					currObl,
+//					(int) avgRecordSize,
+//					outputBufferSize,
+//					newOutputBufferSize);
 
 			return (int) Math.max(avgRecordSize,
 					Math.min(newOutputBufferSize, maxOutputBufferSize));
@@ -105,8 +114,7 @@ public class OutputBufferLatencyEnforcer {
 				return;
 			}
 
-			if (outputBuffersSentSinceLastAdjust >= adjustFrequency
-					&& recordsEmittedSinceLastAdjust > 0) {
+			if (recordsEmittedSinceLastAdjust >= adjustFrequency) {
 				this.adjustOutputBufferSize();
 			}
 		}
@@ -132,14 +140,10 @@ public class OutputBufferLatencyEnforcer {
 		this.channelStats.add(new ChannelStatistics(channel));
 	}
 
-	public void outputBufferSent(int channelIndex) {
-		ChannelStatistics stats = this.channelStats.get(channelIndex); 
-		stats.outputBuffersSentSinceLastAdjust++;
-		stats.adjustOutputBufferSizeIfDue();
-	}
-
 	public void reportRecordEmitted(int channelIndex) {
-		this.channelStats.get(channelIndex).recordsEmittedSinceLastAdjust++;
+		ChannelStatistics stats = this.channelStats.get(channelIndex);
+		stats.recordsEmittedSinceLastAdjust++;
+		stats.adjustOutputBufferSizeIfDue();
 	}
 
 	public void setTargetOutputBufferLatency(int channelIndex,

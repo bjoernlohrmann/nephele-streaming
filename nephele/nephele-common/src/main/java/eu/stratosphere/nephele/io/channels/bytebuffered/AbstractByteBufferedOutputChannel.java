@@ -159,9 +159,6 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 	 *         thrown if the thread is interrupted while releasing the buffers
 	 */
 	private void releaseWriteBuffer() throws IOException, InterruptedException {
-		// Keep track of number of bytes transmitted through this channel
-		this.amountOfDataTransmitted += this.dataBuffer.position();
-
 		this.outputChannelBroker.releaseWriteBuffer(this.dataBuffer);
 		this.dataBuffer = null;
 
@@ -200,7 +197,7 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 				requestWriteBufferFromBroker();
 			}
 			
-			this.serializationBuffer.read(this.dataBuffer);
+			this.amountOfDataTransmitted += this.serializationBuffer.read(this.dataBuffer);
 			if (this.dataBuffer.remaining() == 0) {
 				releaseWriteBuffer();
 			}
