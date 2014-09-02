@@ -15,6 +15,7 @@
 package eu.stratosphere.nephele.streaming.taskmanager.chaining;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -42,6 +43,8 @@ public class ChainManagerThread extends Thread {
 
 	private final CopyOnWriteArraySet<CandidateChainConfig> pendingCandidateChainConfigs = new CopyOnWriteArraySet<CandidateChainConfig>();
 
+	private final CopyOnWriteArraySet<ExecutionVertexID> pendingUnregisteredTasks = new CopyOnWriteArraySet<ExecutionVertexID>();
+
 	private final ArrayList<TaskChainer> taskChainers = new ArrayList<TaskChainer>();
 
 	private final QosReporterConfigCenter configCenter;
@@ -62,6 +65,7 @@ public class ChainManagerThread extends Thread {
 		int counter = 0;
 		try {
 			while (!interrupted()) {
+				this.processPendingUnregisteredTasks();
 				this.processPendingCandidateChainConfigs();
 
 				if (counter == 5) {
@@ -116,6 +120,39 @@ public class ChainManagerThread extends Thread {
 		return true;
 	}
 
+	/**
+	 * Find and invalidate chainers containing unregistered (scaled down) tasks.
+	 * 
+	 * Removes all paths containg unregistered tassks and announce them as unchained.
+	 */
+	private void processPendingUnregisteredTasks() throws InterruptedException {
+		HashSet<TaskChainer> chainsToRemove = new HashSet<TaskChainer>();
+
+		for (ExecutionVertexID vertexID : this.pendingUnregisteredTasks) {
+			for (TaskChainer taskChainer : this.taskChainers) {
+				// the whole path becomes invalid if it contains one
+				// unregistered task
+				if (taskChainer.containsTask(vertexID)) {
+					chainsToRemove.add(taskChainer);
+				}
+			}
+
+			this.pendingUnregisteredTasks.remove(vertexID);
+		}
+
+		for (TaskChainer taskChainer : chainsToRemove) {
+			this.taskChainers.remove(taskChainer);
+			this.pendingCandidateChainConfigs.add(taskChainer.toCandidateChainConfig());
+			taskChainer.resetAndAnnounceAllChaines();
+		}
+
+		if (chainsToRemove.size() > 0)
+			LOG.debug("Invalidating " + chainsToRemove.size() + " chains: "
+					+ "pendingConfigs=" + this.pendingCandidateChainConfigs.size()
+					+ ", pendingUnregister=" + this.pendingUnregisteredTasks.size()
+					+ ", active chains=" + this.taskChainers.size());
+	}
+
 	private void cleanUp() {
 		// FIXME clean up data structures here
 	}
@@ -132,5 +169,9 @@ public class ChainManagerThread extends Thread {
 			this.start();
 		}
 
+	}
+
+	public void unregisterTask(ExecutionVertexID vertexID) {
+		this.pendingUnregisteredTasks.add(vertexID);
 	}
 }

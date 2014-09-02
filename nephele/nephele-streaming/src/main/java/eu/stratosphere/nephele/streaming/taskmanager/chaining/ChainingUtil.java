@@ -14,6 +14,13 @@
  **********************************************************************************************************************/
 package eu.stratosphere.nephele.streaming.taskmanager.chaining;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
+
 import eu.stratosphere.nephele.instance.InstanceConnectionInfo;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.streaming.message.ChainUpdates;
@@ -26,27 +33,18 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.QosReporterConf
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.StreamTaskEnvironment;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.chaining.RuntimeChain;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.chaining.RuntimeChainLink;
-import eu.stratosphere.nephele.streaming.taskmanager.runtime.io.StreamOutputGate;
-import eu.stratosphere.nephele.types.Record;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
 
 /**
  * @author Bjoern Lohrmann
+ * 
  */
 public class ChainingUtil {
 
 	public static void chainTaskThreads(TaskChain chainModel,
-																			QosReporterConfigCenter configCenter) throws InterruptedException {
+			QosReporterConfigCenter configCenter) throws InterruptedException {
 
 		RuntimeChain runtimeChain = assembleRuntimeChain(chainModel);
-
-		StreamOutputGate<? extends Record> firstOutputGate = runtimeChain.getFirstOutputGate();
-		firstOutputGate.enqueueQosAction(
+		runtimeChain.getFirstOutputGate().enqueueQosAction(
 				new EstablishNewChainAction(runtimeChain));
 		runtimeChain.waitUntilTasksAreChained();
 
@@ -55,8 +53,8 @@ public class ChainingUtil {
 	}
 
 	private static void announceNewChainingStatus(JobID jobID,
-																								Set<QosReporterID.Edge> edges, boolean newlyChained,
-																								QosReporterConfigCenter configCenter) throws InterruptedException {
+			Set<QosReporterID.Edge> edges, boolean newlyChained,
+			QosReporterConfigCenter configCenter) throws InterruptedException {
 
 		HashMap<InstanceConnectionInfo, ChainUpdates> updatesByQosManager = new HashMap<InstanceConnectionInfo, ChainUpdates>();
 
@@ -146,5 +144,21 @@ public class ChainingUtil {
 
 		announceNewChainingStatus(leftChain.getJobID(),
 				Collections.singleton(unchainedEdge), false, configCenter);
+	}
+
+	/**
+	 * Announce all edges in given chains as unchained.
+	 */
+	public static void announceAllTasksUnchained(Collection<TaskChain> chains,
+			QosReporterConfigCenter configCenter) throws InterruptedException {
+
+		HashSet<QosReporterID.Edge> unchainedEdges = new HashSet<QosReporterID.Edge>();
+		JobID jobID = null;
+		for (TaskChain chain : chains) {
+			unchainedEdges.addAll(collectChainedEdges(chain));
+			jobID = chain.getJobID();
+		}
+
+		announceNewChainingStatus(jobID, unchainedEdges, false, configCenter);
 	}
 }

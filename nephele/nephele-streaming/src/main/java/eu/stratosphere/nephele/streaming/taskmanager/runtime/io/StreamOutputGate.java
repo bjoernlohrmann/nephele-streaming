@@ -148,19 +148,26 @@ public final class StreamOutputGate<T extends Record> extends
 			throws InterruptedException, IOException {
 
 		RuntimeChain streamChain = chainTasksAction.getRuntimeChain();
-		this.streamChain = streamChain;
-		this.flush();
 
-		for (RuntimeChainLink chainLink : streamChain.getChainLinks().subList(
-				1, streamChain.getChainLinks().size())) {
+		if (getGateState() == GateState.RUNNING) {
+			this.streamChain = streamChain;
+			this.flush();
 
-			chainLink.getInputGate().haltTaskThreadIfNecessary();
-			chainLink.getOutputGate().flush();
-			chainLink.getOutputGate().streamChain = null;
+			for (RuntimeChainLink chainLink : streamChain.getChainLinks()
+					.subList(1, streamChain.getChainLinks().size())) {
+
+				chainLink.getInputGate().haltTaskThreadIfNecessary();
+				chainLink.getOutputGate().flush();
+				chainLink.getOutputGate().streamChain = null;
+			}
+
+			streamChain.signalTasksAreSuccessfullyChained();
+			LOG.info("Established chain " + streamChain);
+
+		} else {
+			streamChain.signalTasksAreSuccessfullyChained();
+			LOG.info("Ignoring chain request on chain " + streamChain + " (gate is not in running state!).");
 		}
-
-		streamChain.signalTasksAreSuccessfullyChained();
-		LOG.info("Established chain " + streamChain);
 	}
 
 	private void limitBufferSize(LimitBufferSizeAction lbsa) {
@@ -226,5 +233,31 @@ public final class StreamOutputGate<T extends Record> extends
 	@Override
 	public ChannelSelector<T> getChannelSelector() {
 		return this.streamChannelSelector;
+	}
+
+	private void dropCurrentChainAndWakeUpChainedTasks() {
+		RuntimeChain oldChain = this.streamChain;
+
+		if (oldChain != null) {
+			dropCurrentChain();
+
+			for (RuntimeChainLink chainLink : oldChain.getChainLinks().subList(
+					1, oldChain.getChainLinks().size())) {
+
+				chainLink.getInputGate().wakeUpTaskThreadIfNecessary();
+			}
+		}
+	}
+
+	@Override
+	public void requestSuspend() throws IOException, InterruptedException {
+		super.requestSuspend(); // put gate in drain mode and send suspend event
+		dropCurrentChainAndWakeUpChainedTasks();
+	}
+
+	@Override
+	public void requestClose() throws IOException, InterruptedException {
+		super.requestClose();
+		dropCurrentChainAndWakeUpChainedTasks();
 	}
 }

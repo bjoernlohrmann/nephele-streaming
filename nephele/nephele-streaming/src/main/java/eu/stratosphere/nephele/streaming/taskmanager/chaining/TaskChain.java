@@ -22,10 +22,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.Logger;
 
+import eu.stratosphere.nephele.execution.ExecutionState;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.streaming.taskmanager.profiling.TaskInfo;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosStatistic;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosValue;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.QosReporterConfigCenter;
 
 /**
@@ -40,9 +39,6 @@ public class TaskChain {
 			false);
 
 	private final ArrayList<TaskInfo> tasksInChain = new ArrayList<TaskInfo>();
-
-	private final QosStatistic aggregateCpuUtilization = new QosStatistic(
-			TaskInfo.CPU_STATISTIC_WINDOW_SIZE);
 
 	public TaskChain(TaskInfo task) {
 		this.tasksInChain.add(task);
@@ -70,27 +66,34 @@ public class TaskChain {
 		}
 	}
 
-	public void measureCPUUtilizationIfPossible() {
-		if (this.taskControlFlowsUnderManipulation.get()) {
-			return;
-		}
-
-		double aggregateUtilization = 0;
+	public boolean hasCPUUtilizationMeasurements() {
 		for (TaskInfo task : this.tasksInChain) {
-			task.measureCpuUtilization();
-			aggregateUtilization += task.getCPUUtilization();
+			if (!task.hasCPUUtilizationMeasurements()) {
+				return false;
+			}
 		}
 
-		this.aggregateCpuUtilization.addValue(new QosValue(
-				aggregateUtilization, System.currentTimeMillis()));
+		return true;
 	}
 
-	public boolean hasCPUUtilizationMeasurements() {
-		return this.aggregateCpuUtilization.hasValues();
+	public boolean allTasksAreInRunningState() {
+		for (TaskInfo task : this.tasksInChain) {
+			if (task.getExecutionState() != ExecutionState.RUNNING) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	public double getCPUUtilization() {
-		return this.aggregateCpuUtilization.getArithmeticMean();
+		double aggregateUtilization = 0;
+
+		for (TaskInfo task : this.tasksInChain) {
+			aggregateUtilization += task.getCPUUtilization();
+		}
+
+		return aggregateUtilization;
 	}
 
 	public int getNumberOfChainedTasks() {

@@ -262,6 +262,7 @@ public class StreamJobEnvironment {
 				.get(vertexID);
 		
 		TaskProfilingThread.unregisterTask(vertexID);
+		this.chainManager.unregisterTask(vertexID);
 
 		if (qosCoordinator != null) {
 			// shuts down Qos reporting for this vertex

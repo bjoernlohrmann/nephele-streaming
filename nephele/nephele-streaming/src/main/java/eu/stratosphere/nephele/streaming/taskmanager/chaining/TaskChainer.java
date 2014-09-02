@@ -15,11 +15,14 @@
 package eu.stratosphere.nephele.streaming.taskmanager.chaining;
 
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 
 import org.apache.commons.lang3.tuple.Pair;
 
+import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
+import eu.stratosphere.nephele.streaming.message.action.CandidateChainConfig;
 import eu.stratosphere.nephele.streaming.taskmanager.profiling.TaskInfo;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.QosReporterConfigCenter;
 
@@ -35,6 +38,8 @@ public class TaskChainer {
 	 */
 	private final ArrayList<TaskChain> chains = new ArrayList<TaskChain>();
 
+	private final ArrayList<TaskInfo> chainingCandidates;
+
 	private final ExecutorService backgroundWorkers;
 
 	private final QosReporterConfigCenter configCenter;
@@ -43,17 +48,12 @@ public class TaskChainer {
 			ExecutorService backgroundWorkers,
 			QosReporterConfigCenter configCenter) {
 
+		this.chainingCandidates = new ArrayList<TaskInfo>(chainingCandidates);
 		this.backgroundWorkers = backgroundWorkers;
 		this.configCenter = configCenter;
 
 		for (TaskInfo task : chainingCandidates) {
 			this.chains.add(new TaskChain(task));
-		}
-	}
-
-	public void collectCpuUtilizations() {
-		for (TaskChain chain : this.chains) {
-			chain.measureCPUUtilizationIfPossible();
 		}
 	}
 
@@ -207,8 +207,41 @@ public class TaskChainer {
 			if (!flow.hasCPUUtilizationMeasurements()) {
 				return false;
 			}
+
+			if (!flow.allTasksAreInRunningState()) {
+				return false;
+			}
 		}
 		return true;
 	}
 
+	/**
+	 * Reset (unchain) each edge and announce chain status.
+	 */
+	public void resetAndAnnounceAllChaines() throws InterruptedException {
+		ChainingUtil.announceAllTasksUnchained(chains, configCenter);
+
+		this.chains.clear();
+		for (TaskInfo task : chainingCandidates) {
+			this.chains.add(new TaskChain(task));
+		}
+	}
+
+	public boolean containsTask(ExecutionVertexID vertexID) {
+		for (TaskInfo task : this.chainingCandidates) {
+			if (task.getVertexID().equals(vertexID))
+				return true;
+		}
+
+		return false;
+	}
+
+	public CandidateChainConfig toCandidateChainConfig() {
+		LinkedList<ExecutionVertexID> verticies = new LinkedList<ExecutionVertexID>();
+
+		for (TaskInfo task : this.chainingCandidates)
+			verticies.add(task.getVertexID());
+
+		return new CandidateChainConfig(verticies);
+	}
 }
