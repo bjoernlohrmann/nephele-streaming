@@ -211,9 +211,4 @@ public class TaskChainer {
 		return true;
 	}
 
-	public void measureCPUUtilizations() {
-		for (TaskChain chain : this.chains) {
-			chain.measureCPUUtilizationIfPossible();
-		}
-	}
 }
