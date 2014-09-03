@@ -15,11 +15,13 @@
 package eu.stratosphere.nephele.streaming.taskmanager.chaining;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.log4j.Logger;
 
 import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
 import eu.stratosphere.nephele.streaming.message.action.CandidateChainConfig;
@@ -30,6 +32,7 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.QosReporterConf
  * @author Bjoern Lohrmann
  */
 public class TaskChainer {
+	private final static Logger LOG = Logger.getLogger(TaskChainer.class);
 
 	/**
 	 * Holds a list adjacent chains. The order in this list corresponds to their
@@ -62,8 +65,32 @@ public class TaskChainer {
 			return;
 		}
 
+		if (LOG.isDebugEnabled()) {
+			dumpChains();
+		}
+
 		mergeChainsIfPossible();
 		splitChainsIfNecessary();
+	}
+
+	private void dumpChains() {
+		StringBuilder message = new StringBuilder();
+		message.append("Task chaining attemp with chains: \n");
+
+		for (int i = 0; i < this.chains.size(); i++) {
+			TaskChain chain = this.chains.get(i);
+			double unchainedUtilizations[] = new double[chain.getNumberOfChainedTasks()];
+			for (int j = 0; j < chain.getNumberOfChainedTasks(); j++) {
+				unchainedUtilizations[j] = chain.getTask(j).getUnchainedCpuUtilization();
+			}
+
+			message.append(i).append(": ").append(this.chains.get(i))
+					.append(" (cpu = ")
+					.append(this.chains.get(i).getCPUUtilization()).append(", unchained cpu = ")
+					.append(Arrays.toString(unchainedUtilizations))
+					.append(").\n");
+		}
+		LOG.debug(message);
 	}
 
 	/**
