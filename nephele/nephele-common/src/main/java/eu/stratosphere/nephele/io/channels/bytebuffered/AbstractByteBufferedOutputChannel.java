@@ -62,13 +62,11 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 	 */
 	private long amountOfDataTransmitted = 0L;
 
-	/**
-	 * Determines when to release the {@link #dataBuffer}. bufferSizeLimit=0 is
-	 * equivalent to auto-flushing after each record whereas the initial value
-	 * (Integer.MAX_VALUE) implies that we never release the buffer unless it is
-	 * full.
-	 */
-	private int bufferSizeLimit = Integer.MAX_VALUE;
+	private long flushDeadline = -1;
+
+	private long lastFlushDeadlineMissNanos = 0;
+	
+	private int autoflushIntervalMillis = 20;
 
 	private static final Log LOG = LogFactory.getLog(AbstractByteBufferedOutputChannel.class);
 
@@ -159,6 +157,7 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 	 *         thrown if the thread is interrupted while releasing the buffers
 	 */
 	private void releaseWriteBuffer() throws IOException, InterruptedException {
+		flushDeadline = -1;
 		this.outputChannelBroker.releaseWriteBuffer(this.dataBuffer);
 		this.dataBuffer = null;
 
@@ -185,9 +184,17 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 
 		flushSerializationBuffer();
 		
-		if (this.dataBuffer != null
-				&& this.dataBuffer.position() >= this.bufferSizeLimit) {
-			releaseWriteBuffer();
+		if (this.dataBuffer != null) {
+			long now = System.nanoTime();
+			if (flushDeadline == -1) {
+				flushDeadline = now
+						+ autoflushIntervalMillis * 1000000
+						- lastFlushDeadlineMissNanos;
+				
+			} else if (now >= flushDeadline) {
+				lastFlushDeadlineMissNanos = now - flushDeadline;
+				releaseWriteBuffer();
+			}
 		}
 	}
 
@@ -289,17 +296,6 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 
 		return this.amountOfDataTransmitted;
 	}
-
-	/**
-	 * Limits the size of the buffer this channel will write its records to
-	 * before passing them on to the framework.
-	 * 
-	 * @param bufferSize
-	 *            the new limit for the by
-	 */
-	public void limitBufferSize(final int bufferSize) {
-		this.bufferSizeLimit = bufferSize;
-	}
 	
 	public void processPendingEvents() throws IOException, InterruptedException {
 		// channel suspends need to be confirmed by the task thread
@@ -311,5 +307,13 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 			transferEvent(new ChannelSuspendConfirmEvent());
 			this.receivedChannelSuspendEvent = false;
 		}
+	}
+	
+	public void setAutoflushInterval(int newAutoflushIntervalMillis) {
+		this.autoflushIntervalMillis = newAutoflushIntervalMillis;
+	}
+
+	public void limitBufferSize(int newOutputBufferSize) {
+		// do nothing
 	}
 }

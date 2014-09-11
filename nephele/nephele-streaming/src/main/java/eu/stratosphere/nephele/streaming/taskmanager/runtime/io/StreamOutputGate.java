@@ -62,8 +62,6 @@ public final class StreamOutputGate<T extends Record> extends
 	private StreamChannelSelector<T> streamChannelSelector;
 
 	private LinkedBlockingQueue<QosAction> qosActionQueue;
-	
-	private OutputBufferLatencyEnforcer oblEnforcer;
 
 	public StreamOutputGate(final OutputGate<T> wrappedOutputGate,
 			StreamChannelSelector<T> streamChannelSelector) {
@@ -71,7 +69,6 @@ public final class StreamOutputGate<T extends Record> extends
 		this.outputChannels = new HashMap<ChannelID, AbstractOutputChannel<T>>();
 		this.streamChannelSelector = streamChannelSelector;
 		this.qosActionQueue = new LinkedBlockingQueue<QosAction>();
-		this.oblEnforcer = new OutputBufferLatencyEnforcer();
 	}
 
 	public void setQosReportingListener(
@@ -97,7 +94,6 @@ public final class StreamOutputGate<T extends Record> extends
 
 		if (this.streamChain == null) {
 			this.getWrappedOutputGate().writeRecord(record);
-			oblEnforcer.reportRecordEmitted(outputChannel);
 		} else {
 			this.streamChain.writeRecord(record);
 		}
@@ -136,9 +132,7 @@ public final class StreamOutputGate<T extends Record> extends
 			return;
 		}
 		
-		this.oblEnforcer.setTargetOutputBufferLatency(
-				channel.getChannelIndex(),
-				action.getOutputBufferLatencyTarget());
+		channel.setAutoflushInterval(action.getOutputBufferLatencyTarget() * 2);		
 	}
 
 	private void dropCurrentChain() {
@@ -170,17 +164,7 @@ public final class StreamOutputGate<T extends Record> extends
 	}
 
 	private void limitBufferSize(LimitBufferSizeAction lbsa) {
-		ChannelID channelID = lbsa.getSourceChannelID();
-
-		AbstractByteBufferedOutputChannel<T> channel = (AbstractByteBufferedOutputChannel<T>) this.outputChannels
-				.get(channelID);
-
-		if (channel == null) {
-			LOG.error("Cannot find output channel with ID " + channelID);
-			return;
-		}
-
-		channel.limitBufferSize(lbsa.getBufferSize());
+		// do nothing
 	}
 
 	public void reportRecordEmitted(final T record, int outputChannel) {
@@ -216,7 +200,6 @@ public final class StreamOutputGate<T extends Record> extends
 						connectedChannelID);
 
 		this.outputChannels.put(channelID, channel);
-		this.oblEnforcer.addOutputChannel(channel);
 
 		return channel;
 	}
@@ -234,7 +217,6 @@ public final class StreamOutputGate<T extends Record> extends
 						connectedChannelID);
 
 		this.outputChannels.put(channelID, channel);
-		this.oblEnforcer.addOutputChannel(channel);
 		return channel;
 	}
 	
