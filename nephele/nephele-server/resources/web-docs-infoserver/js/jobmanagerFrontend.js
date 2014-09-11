@@ -56,7 +56,8 @@ $(".cancel").live("click", function() {
 $(".scaleUp").live("click", function() {
 	var jobid = $(this).attr("data-job");
 	var groupVertexName = $(this).attr("data-groupvertex-name");
-	$.ajax({ url : "/scale?mode=up&job=" + jobid + "&groupVertexName=" + groupVertexName, type : "GET",
+	var count = $(this).attr("data-count");
+	$.ajax({ url : "/scale?mode=up&job=" + jobid + "&groupVertexName=" + groupVertexName + "&count=" + count, type : "GET",
         success: function() { poll() },
         error: function(data, msg, bla) { alert("failure: " + data.response); }
 	});
@@ -65,7 +66,8 @@ $(".scaleUp").live("click", function() {
 $(".scaleDown").live("click", function() {
 	var jobid = $(this).attr("data-job");
 	var groupVertexName = $(this).attr("data-groupvertex-name");
-	$.ajax({ url : "/scale?mode=down&job=" + jobid + "&groupVertexName=" + groupVertexName, type : "GET",
+	var count = $(this).attr("data-count");
+	$.ajax({ url : "/scale?mode=down&job=" + jobid + "&groupVertexName=" + groupVertexName + "&count=" + count, type : "GET",
         success: function() { poll() },
         error: function(data, msg, bla) { alert("failure: " + data.response); }
 	});
@@ -193,6 +195,12 @@ function fillTable(table, json) {
 							+ "</div></div></td>\
 						</tr><tr>\
 						<td colspan=9 id=\"_"+groupvertex.groupvertexid+"\" style=\"display:none\">\
+                            <center>\
+								<a class=\"scaleUp btn\" href=\"#\" data-job=\""+job.jobid+"\" data-groupvertex=\""+groupvertex.groupvertexid+"\" data-groupvertex-name=\""+groupvertex.groupvertexname+"\" data-count=\"1\">scale up (1)</a>\
+								<a class=\"scaleUp btn\" href=\"#\" data-job=\""+job.jobid+"\" data-groupvertex=\""+groupvertex.groupvertexid+"\" data-groupvertex-name=\""+groupvertex.groupvertexname+"\" data-count=\"5\">scale up (5)</a>\
+								<a class=\"scaleDown btn\" href=\"#\" data-job=\""+job.jobid+"\" data-groupvertex=\""+groupvertex.groupvertexid+"\" data-groupvertex-name=\""+groupvertex.groupvertexname+"\" data-count=\"1\">scale down (1)</a>\
+								<a class=\"scaleDown btn\" href=\"#\" data-job=\""+job.jobid+"\" data-groupvertex=\""+groupvertex.groupvertexid+"\" data-groupvertex-name=\""+groupvertex.groupvertexname+"\" data-count=\"5\">scale down (5)</a>\
+                            </center>\
 							<table class=\"subtable\">\
 							  	<tr>\
 							  		<th>Name</th>\
@@ -209,10 +217,6 @@ function fillTable(table, json) {
        							</tr>";
 							});
 							jobtable += "</table>\
-                            <center>\
-								<a class=\"scaleUp btn\" href=\"#\" data-job=\""+job.jobid+"\" data-groupvertex=\""+groupvertex.groupvertexid+"\" data-groupvertex-name=\""+groupvertex.groupvertexname+"\">scale up</a>\
-								<a class=\"scaleDown btn\" href=\"#\" data-job=\""+job.jobid+"\" data-groupvertex=\""+groupvertex.groupvertexid+"\" data-groupvertex-name=\""+groupvertex.groupvertexname+"\">scale down</a>\
-                            </center>\
 						</td></tr>";
 						});
 
