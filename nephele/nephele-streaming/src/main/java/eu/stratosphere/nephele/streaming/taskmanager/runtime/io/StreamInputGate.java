@@ -162,6 +162,7 @@ public final class StreamInputGate<T extends Record> extends
       this.taskThreadHalted.notify();
       LOG.info("Task thread " + Thread.currentThread().getName() + " has halted");
       this.taskThreadHalted.wait();
+      this.taskThreadHalted.set(false);
       LOG.info("Task thread " + Thread.currentThread().getName() + " is awake again.");
     }
   }
