@@ -50,9 +50,11 @@ public class ConstraintUtil {
 	 * @param maxLatencyInMillis
 	 * @param jobGraph
 	 * @throws IOException
-	 *             If the sequence begins with an input vertex or ends with an
-	 *             output vertex, or if something goes wrong while serializing
-	 *             the constraint.
+	 *             If something goes wrong while serializing the constraints
+	 *             (shouldn't happen).
+	 * @throws IllegalArgumentException
+	 *             If constraints could not be constructed to to invalid
+	 *             input parameters.
 	 */
 	public static void defineLatencyConstraint(JobGraphSequence sequence,
 			long maxLatencyInMillis, JobGraph jobGraph) throws IOException {
@@ -75,14 +77,14 @@ public class ConstraintUtil {
 	}
 
 	private static void ensurePreconditions(JobGraphSequence sequence,
-			JobGraph jobGraph) throws IOException {
+			JobGraph jobGraph) {
 
 		if (sequence.getFirst().isVertex()) {
 			for (Iterator<AbstractJobInputVertex> iter = jobGraph
 					.getInputVertices(); iter.hasNext();) {
 				if (sequence.getFirst().getVertexID()
 						.equals(iter.next().getID())) {
-					throw new IOException(
+					throw new IllegalArgumentException(
 							"Cannot define latency constraint that includes an input vertex. ");
 				}
 			}
@@ -93,7 +95,7 @@ public class ConstraintUtil {
 					.getOutputVertices(); iter.hasNext();) {
 				if (sequence.getLast().getVertexID()
 						.equals(iter.next().getID())) {
-					throw new IOException(
+					throw new IllegalArgumentException(
 							"Cannot define latency constraint that includes an output vertex. ");
 				}
 			}
@@ -130,13 +132,20 @@ public class ConstraintUtil {
 	}
 
 	/**
-	 * Convenience method equivalent to invoking {@see
+	 * Finds all possible sequences starting and ending with the given edges. The given
+	 * edges must be forward pointing {@link JobEdge} objects.
+	 * 
+	 * Currently this is a convenience method equivalent to invoking {@see
 	 * #defineAllLatencyConstraintsBetween(AbstractJobVertex, AbstractJobVertex,
 	 * long, boolean, int, boolean, int) with excluded begin and end vertex.
+	 * 
 	 */
 	public static void defineAllLatencyConstraintsBetween(JobEdge beginEdge,
 			JobEdge endEdge, long maxLatencyInMillis) throws IOException {
 
+		ensureForwardEdge(beginEdge);
+		ensureForwardEdge(endEdge);
+		
 		AbstractJobVertex exludedBeginVertex = beginEdge.getConnectedVertex()
 				.getBackwardConnection(beginEdge.getIndexOfInputGate())
 				.getConnectedVertex();
@@ -147,13 +156,48 @@ public class ConstraintUtil {
 				exludedEndVertex, maxLatencyInMillis, false, -1, false, -1);
 	}
 
+	private static void ensureForwardEdge(JobEdge edge) {
+
+		boolean isForwardEdge = false;
+
+		// try to treat edge as an forward pointing edge
+		AbstractJobVertex edgeTarget = edge.getConnectedVertex();
+		if (edgeTarget.getBackwardConnection(edge.getIndexOfInputGate()) != null) {
+			JobEdge maybeBackwardEdge = edgeTarget.getBackwardConnection(edge
+					.getIndexOfInputGate());
+			if (maybeBackwardEdge != null) {
+				AbstractJobVertex maybeEdgeSource = maybeBackwardEdge
+						.getConnectedVertex();
+				if (hasForwardEdge(maybeEdgeSource, edge)) {
+					isForwardEdge = true;
+				}
+			}
+		}
+
+		if (!isForwardEdge) {
+			throw new IllegalArgumentException(
+					"Backward job graph edge specified. You must specify forward edges for constraint");
+		}
+	}
+
+	private static boolean hasForwardEdge(AbstractJobVertex maybeEdgeSource,
+			JobEdge edge) {
+
+		for (int i = 0; i < maybeEdgeSource.getNumberOfForwardConnections(); i++) {
+			if (maybeEdgeSource.getForwardConnection(i) == edge) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	/**
-	 * Convenience method that finds all possible sequences between the given
-	 * begin and end vertex, and invokes {@see
-	 * #defineLatencyConstraint(JobGraphSequence, long, JobGraph)} on each. This
-	 * is done using depth first traversal of the job graph, hence only invoke
-	 * this method if the vertices of the graph have already been fully
-	 * connected.
+	 * Finds all possible sequences between the given begin and end vertex, and
+	 * invokes {@see #defineLatencyConstraint(JobGraphSequence, long, JobGraph)}
+	 * on each. This is done using depth first traversal of the job graph, hence
+	 * only invoke this method if the vertices of the graph have already been
+	 * fully connected.
 	 * 
 	 * @param begin
 	 *            The vertex to start the depth first traversal from. Note that
@@ -188,9 +232,11 @@ public class ConstraintUtil {
 	 *            the the output gate index to use for the last element (which
 	 *            is the end vertex) of the latency constrained sequences.
 	 * @throws IOException
-	 *             If begin is an input vertex and includeBeginVertex=true, or
-	 *             if end is an output vertex and includeEndVertex=true, or if
-	 *             something goes wrong while serializing the constraints.
+	 *             If something goes wrong while serializing the constraints
+	 *             (shouldn't happen).
+	 * @throws IllegalArgumentException
+	 *             If constraints could not be constructed to to invalid
+	 *             input parameters.
 	 */
 	public static void defineAllLatencyConstraintsBetween(
 			AbstractJobVertex begin, AbstractJobVertex end,
@@ -203,7 +249,7 @@ public class ConstraintUtil {
 				endVertexOutputGate);
 
 		if (sequences.isEmpty()) {
-			throw new IOException(
+			throw new IllegalArgumentException(
 					"Could not find any sequences between the given vertices. Are the vertices connected?");
 		}
 
@@ -227,6 +273,20 @@ public class ConstraintUtil {
 
 		JobGraphSequence stack = new JobGraphSequence();
 		List<JobGraphSequence> toReturn = new LinkedList<JobGraphSequence>();
+		
+		if (includeBeginVertex
+				&& begin.getNumberOfBackwardConnections() <= beginVertexInputGate) {
+			throw new IllegalArgumentException(String.format(
+					"Invalid input gate index %d specified for vertex %s",
+					beginVertexInputGate, begin.getName()));
+		}
+
+		if (includeEndVertex
+				&& end.getNumberOfForwardConnections() <= endVertexOutputGate) {
+			throw new IllegalArgumentException(String.format(
+					"Invalid output gate index %d specified for vertex %s",
+					endVertexOutputGate, end.getName()));
+		}
 
 		for (int i = 0; i < begin.getNumberOfForwardConnections(); i++) {
 			if (includeBeginVertex) {

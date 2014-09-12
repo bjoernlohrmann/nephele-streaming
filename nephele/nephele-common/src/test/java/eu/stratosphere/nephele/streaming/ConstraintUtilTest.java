@@ -74,12 +74,40 @@ public class ConstraintUtilTest {
 		this.taskVertex3.connectTo(this.outputVertex);
 	}
 
+	@Test(expected=IllegalArgumentException.class)
+	public void testIllegalBeginInputGateIndex() throws IOException {
+		// taskVertex1 has no input gate 37
+		ConstraintUtil.defineAllLatencyConstraintsBetween(this.taskVertex1, 37,
+				this.taskVertex2, 0, 999);
+	}
+	
+	@Test(expected=IllegalArgumentException.class)
+	public void testIllegalBeginInputGateIndex2() throws IOException {
+		// taskVertex1 has no input gate 1
+		ConstraintUtil.defineAllLatencyConstraintsBetween(this.taskVertex1, 1,
+				this.taskVertex2, 0, 999);
+	}
+	
+	@Test(expected=IllegalArgumentException.class)
+	public void testIllegalEndOutputGateIndex() throws IOException {
+		// taskVertex2 has no output gate 37
+		ConstraintUtil.defineAllLatencyConstraintsBetween(this.taskVertex1, 0,
+				this.taskVertex2, 37, 999);
+	}
+	
+	@Test(expected=IllegalArgumentException.class)
+	public void testIllegalEndOutputGateIndex2() throws IOException {
+		// taskVertex2 has no output gate 2
+		ConstraintUtil.defineAllLatencyConstraintsBetween(this.taskVertex1, 0,
+				this.taskVertex2, 2, 999);
+	}
+
 	@Test
 	public void testDefineAllBetweenVertices() throws IOException {
 		assertEquals(0, ConstraintUtil.getConstraints(this.jobGraph.getJobConfiguration()).size());
 		
-		ConstraintUtil.defineAllLatencyConstraintsBetween(this.taskVertex1, 37,
-				this.taskVertex2, 41, 999);
+		ConstraintUtil.defineAllLatencyConstraintsBetween(this.taskVertex1, 0,
+				this.taskVertex2, 1, 999);
 		
 		List<JobGraphLatencyConstraint> constraints = ConstraintUtil
 				.getConstraints(this.jobGraph.getJobConfiguration());
@@ -102,14 +130,28 @@ public class ConstraintUtilTest {
 		assertEquals(this.taskVertex2.getID(), second.getTargetVertexID());
 		assertEquals(this.taskVertex2.getID(), third.getVertexID());
 		
-		assertEquals(37, first.getInputGateIndex());
+		assertEquals(0, first.getInputGateIndex());
 		assertEquals(1, first.getOutputGateIndex());
 		assertEquals(1, second.getOutputGateIndex());
 		assertEquals(0, second.getInputGateIndex());
 		assertEquals(0, third.getInputGateIndex());
-		assertEquals(41, third.getOutputGateIndex());
+		assertEquals(1, third.getOutputGateIndex());
 		
 		assertEquals(999, constraint.getLatencyConstraintInMillis());
+	}
+	
+	@Test(expected=IllegalArgumentException.class)
+	public void testIllegalEdgeSpecified() throws IOException {
+		JobEdge edge1 = this.taskVertex1.getBackwardConnection(0);
+		JobEdge edge2 = this.taskVertex1.getForwardConnection(1);
+		ConstraintUtil.defineAllLatencyConstraintsBetween(edge1, edge2, 999);
+	}
+	
+	@Test(expected=IllegalArgumentException.class)
+	public void testIllegalEdgeSpecified2() throws IOException {
+		JobEdge edge1 = this.inputVertex.getForwardConnection(0);
+		JobEdge edge2 = this.taskVertex2.getBackwardConnection(0);
+		ConstraintUtil.defineAllLatencyConstraintsBetween(edge1, edge2, 999);
 	}
 	
 	@Test
