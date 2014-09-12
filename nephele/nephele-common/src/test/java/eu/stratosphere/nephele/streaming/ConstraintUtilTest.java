@@ -195,6 +195,46 @@ public class ConstraintUtilTest {
 	}
 	
 	@Test
+	public void testDefineOneConstraintBetweenEdges() throws IOException {
+		assertEquals(0, ConstraintUtil.getConstraints(this.jobGraph.getJobConfiguration()).size());
+		
+		JobEdge edge1 = this.inputVertex.getForwardConnection(1);
+		JobEdge edge2 = this.taskVertex3.getForwardConnection(0);
+		ConstraintUtil.defineAllLatencyConstraintsBetween(edge1, edge2, 999);
+		
+		List<JobGraphLatencyConstraint> constraints = ConstraintUtil
+				.getConstraints(this.jobGraph.getJobConfiguration());
+		
+		assertEquals(1, constraints.size());
+		JobGraphLatencyConstraint constraint = constraints.get(0);
+		assertTrue(constraint.getID() != null);
+		
+		assertEquals(3, constraint.getSequence().size());
+		SequenceElement<JobVertexID> first = constraint.getSequence().get(0);
+		SequenceElement<JobVertexID> second = constraint.getSequence().get(1);
+		SequenceElement<JobVertexID> third = constraint.getSequence().get(2);
+		
+		assertFalse(first.isVertex());
+		assertTrue(second.isVertex());
+		assertFalse(third.isVertex());
+		
+		assertEquals(this.inputVertex.getID(), first.getSourceVertexID());
+		assertEquals(this.taskVertex3.getID(), first.getTargetVertexID());
+		assertEquals(this.taskVertex3.getID(), second.getVertexID());
+		assertEquals(this.taskVertex3.getID(), third.getSourceVertexID());
+		assertEquals(this.outputVertex.getID(), third.getTargetVertexID());
+		
+		assertEquals(1, first.getOutputGateIndex());
+		assertEquals(0, first.getInputGateIndex());
+		assertEquals(0, second.getInputGateIndex());
+		assertEquals(0, second.getOutputGateIndex());
+		assertEquals(0, third.getOutputGateIndex());
+		assertEquals(1, third.getInputGateIndex());
+		
+		assertEquals(999, constraint.getLatencyConstraintInMillis());
+	}
+	
+	@Test
 	public void testDefineAllBetweenVerticesBig() throws IOException {
 		assertEquals(0,
 				ConstraintUtil.getConstraints(this.jobGraph.getJobConfiguration()).size());
