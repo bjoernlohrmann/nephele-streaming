@@ -130,6 +130,7 @@ public class QosLogger {
 		}
 		builder.append('\n');
 		this.writer.write(builder.toString());
+		this.writer.flush();
 	}
 
 	public void close() throws IOException {
