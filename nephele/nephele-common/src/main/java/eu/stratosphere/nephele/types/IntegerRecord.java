@@ -24,7 +24,7 @@ import java.io.IOException;
  * 
  * @author warneke
  */
-public class IntegerRecord implements Record {
+public class IntegerRecord extends AbstractTaggableRecord {
 
 	/**
 	 * The integer value represented by the record.
@@ -72,6 +72,7 @@ public class IntegerRecord implements Record {
 	 */
 	@Override
 	public void read(final DataInput in) throws IOException {
+		super.read(in);
 
 		// Simply read the value from the stream
 		this.value = in.readInt();
@@ -82,7 +83,7 @@ public class IntegerRecord implements Record {
 	 */
 	@Override
 	public void write(final DataOutput out) throws IOException {
-
+		super.write(out);
 		// Simply write the value to the stream
 		out.writeInt(this.value);
 	}

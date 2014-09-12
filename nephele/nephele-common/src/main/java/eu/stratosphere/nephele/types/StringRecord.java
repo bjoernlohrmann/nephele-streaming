@@ -46,7 +46,7 @@ import java.util.Arrays;
  * Also includes utilities for serializing/deserialing a string, coding/decoding a string, checking if a byte array
  * contains valid UTF8 code, calculating the length of an encoded string.
  */
-public class StringRecord implements Record {
+public class StringRecord extends AbstractTaggableRecord {
 
 	private static final ThreadLocal<CharsetEncoder> ENCODER_FACTORY = new ThreadLocal<CharsetEncoder>() {
 		protected CharsetEncoder initialValue() {
@@ -287,6 +287,7 @@ public class StringRecord implements Record {
 	 * deserialize
 	 */
 	public void read(final DataInput in) throws IOException {
+		super.read(in);
 		final int newLength = in.readInt();
 		setCapacity(newLength, false);
 		in.readFully(this.bytes, 0, newLength);
@@ -319,6 +320,7 @@ public class StringRecord implements Record {
 	 * @see Writable#writeTo(DataOutput)
 	 */
 	public void write(final DataOutput out) throws IOException {
+		super.write(out);
 		out.writeInt(this.length);
 		out.write(this.bytes, 0, this.length);
 	}
