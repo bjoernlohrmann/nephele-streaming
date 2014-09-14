@@ -14,16 +14,6 @@
  **********************************************************************************************************************/
 package eu.stratosphere.nephele.streaming;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import java.io.IOException;
-import java.util.List;
-
-import org.junit.Before;
-import org.junit.Test;
-
 import eu.stratosphere.nephele.jobgraph.JobEdge;
 import eu.stratosphere.nephele.jobgraph.JobGraph;
 import eu.stratosphere.nephele.jobgraph.JobGraphDefinitionException;
@@ -31,6 +21,15 @@ import eu.stratosphere.nephele.jobgraph.JobInputVertex;
 import eu.stratosphere.nephele.jobgraph.JobOutputVertex;
 import eu.stratosphere.nephele.jobgraph.JobTaskVertex;
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
+import org.junit.Before;
+import org.junit.Test;
+
+import java.io.IOException;
+import java.util.List;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 /**
  * @author Bjoern Lohrmann
@@ -57,13 +56,13 @@ public class ConstraintUtilTest {
 	@Before
 	public void setUp() throws JobGraphDefinitionException {
 		this.jobGraph = new JobGraph("Test Job");
-		this.inputVertex = new JobInputVertex(this.jobGraph);
-		this.taskVertex1 = new JobTaskVertex(this.jobGraph);
-		this.taskVertex2 = new JobTaskVertex(this.jobGraph);
-		this.taskVertex3 = new JobTaskVertex(this.jobGraph);
-		this.outputVertex = new JobOutputVertex(this.jobGraph);
-		this.outputVertex2 = new JobOutputVertex(this.jobGraph);
-		this.outputVertex3 = new JobOutputVertex(this.jobGraph);
+		this.inputVertex = new JobInputVertex("in1", this.jobGraph);
+		this.taskVertex1 = new JobTaskVertex("task1", this.jobGraph);
+		this.taskVertex2 = new JobTaskVertex("task2", this.jobGraph);
+		this.taskVertex3 = new JobTaskVertex("task3", this.jobGraph);
+		this.outputVertex = new JobOutputVertex("out1", this.jobGraph);
+		this.outputVertex2 = new JobOutputVertex("out2", this.jobGraph);
+		this.outputVertex3 = new JobOutputVertex("out3", this.jobGraph);
 		
 		this.inputVertex.connectTo(this.taskVertex1);
 		this.inputVertex.connectTo(this.taskVertex3);
@@ -195,7 +194,11 @@ public class ConstraintUtilTest {
 	}
 	
 	@Test
-	public void testDefineOneConstraintBetweenEdges() throws IOException {
+	public void testDefineOneConstraintBetweenEdges() throws IOException, JobGraphDefinitionException {
+
+		// so both ends can be tested (beginOutputGate and endInputGate)
+		taskVertex3.connectTo(taskVertex2);
+
 		assertEquals(0, ConstraintUtil.getConstraints(this.jobGraph.getJobConfiguration()).size());
 		
 		JobEdge edge1 = this.inputVertex.getForwardConnection(1);
@@ -204,7 +207,7 @@ public class ConstraintUtilTest {
 		
 		List<JobGraphLatencyConstraint> constraints = ConstraintUtil
 				.getConstraints(this.jobGraph.getJobConfiguration());
-		
+
 		assertEquals(1, constraints.size());
 		JobGraphLatencyConstraint constraint = constraints.get(0);
 		assertTrue(constraint.getID() != null);
@@ -240,7 +243,7 @@ public class ConstraintUtilTest {
 				ConstraintUtil.getConstraints(this.jobGraph.getJobConfiguration()).size());
 		
 		ConstraintUtil.defineAllLatencyConstraintsBetween(this.inputVertex,
-				this.outputVertex, 1000, false, -1, false, -1);
+				this.outputVertex, 1000);
 		
 		List<JobGraphLatencyConstraint> constraints = ConstraintUtil
 				.getConstraints(this.jobGraph.getJobConfiguration());

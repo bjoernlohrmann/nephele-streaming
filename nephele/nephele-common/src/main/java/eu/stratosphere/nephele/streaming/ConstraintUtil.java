@@ -14,6 +14,14 @@
  **********************************************************************************************************************/
 package eu.stratosphere.nephele.streaming;
 
+import eu.stratosphere.nephele.configuration.Configuration;
+import eu.stratosphere.nephele.jobgraph.AbstractJobInputVertex;
+import eu.stratosphere.nephele.jobgraph.AbstractJobOutputVertex;
+import eu.stratosphere.nephele.jobgraph.AbstractJobVertex;
+import eu.stratosphere.nephele.jobgraph.JobEdge;
+import eu.stratosphere.nephele.jobgraph.JobGraph;
+import eu.stratosphere.nephele.util.SerializableArrayList;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -22,14 +30,6 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-
-import eu.stratosphere.nephele.configuration.Configuration;
-import eu.stratosphere.nephele.jobgraph.AbstractJobInputVertex;
-import eu.stratosphere.nephele.jobgraph.AbstractJobOutputVertex;
-import eu.stratosphere.nephele.jobgraph.AbstractJobVertex;
-import eu.stratosphere.nephele.jobgraph.JobEdge;
-import eu.stratosphere.nephele.jobgraph.JobGraph;
-import eu.stratosphere.nephele.util.SerializableArrayList;
 
 /**
  * This class contains utility methods to simplify the construction of
@@ -103,58 +103,77 @@ public class ConstraintUtil {
 	}
 
 	/**
-	 * Convenience method equivalent to invoking {@see
-	 * #defineAllLatencyConstraintsBetween(AbstractJobVertex, AbstractJobVertex,
-	 * long, boolean, int, boolean, int) with all boolean parameters set to
-	 * false.
+	 * Defines a constraint between two vertices (begin and end vertex excluded).
 	 */
 	public static void defineAllLatencyConstraintsBetween(
 			AbstractJobVertex begin, AbstractJobVertex end,
 			long maxLatencyInMillis) throws IOException {
 
-		defineAllLatencyConstraintsBetween(begin, end, maxLatencyInMillis,
-				false, -1, false, -1);
+		int constraintsDefined = 0;
+		for (int i = 0; i < begin.getNumberOfForwardConnections(); i++) {
+			for (int j = 0; j < end.getNumberOfBackwardConnections(); j++) {
+				constraintsDefined += defineAllLatencyConstraintsBetweenHelper(
+						begin, end, maxLatencyInMillis,
+						-1, i, j, -1);
+			}
+		}
+		if (constraintsDefined == 0) {
+			throw new IllegalArgumentException(
+					"Could not find any sequences between the given vertices. Are the vertices connected?");
+		}
 	}
 
 	/**
-	 * Convenience method equivalent to invoking {@see
-	 * #defineAllLatencyConstraintsBetween(AbstractJobVertex, AbstractJobVertex,
-	 * long, boolean, int, boolean, int) with all boolean parameters set to
-	 * true.
+	 * Defines a constraint between two vertices (begin and end vertex included).
 	 */
 	public static void defineAllLatencyConstraintsBetween(
 			AbstractJobVertex begin, int beginInputGateIndex,
 			AbstractJobVertex end, int endOutputGateIndex,
 			long maxLatencyInMillis) throws IOException {
 
-		defineAllLatencyConstraintsBetween(begin, end, maxLatencyInMillis,
-				true, beginInputGateIndex, true, endOutputGateIndex);
+		int constraintsDefined = 0;
+		for (int i = 0; i < begin.getNumberOfForwardConnections(); i++) {
+			for (int j = 0; j < end.getNumberOfBackwardConnections(); j++) {
+				constraintsDefined += defineAllLatencyConstraintsBetweenHelper(
+						begin, end, maxLatencyInMillis,
+						beginInputGateIndex, i, j, endOutputGateIndex);
+			}
+		}
+		if (constraintsDefined == 0) {
+			throw new IllegalArgumentException(
+					"Could not find any sequences between the given vertices. Are the vertices connected?");
+		}
 	}
 
 	/**
 	 * Finds all possible sequences starting and ending with the given edges. The given
 	 * edges must be forward pointing {@link JobEdge} objects.
-	 * 
-	 * Currently this is a convenience method equivalent to invoking {@see
-	 * #defineAllLatencyConstraintsBetween(AbstractJobVertex, AbstractJobVertex,
-	 * long, boolean, int, boolean, int) with excluded begin and end vertex.
-	 * 
 	 */
 	public static void defineAllLatencyConstraintsBetween(JobEdge beginEdge,
 			JobEdge endEdge, long maxLatencyInMillis) throws IOException {
 
 		ensureForwardEdge(beginEdge);
 		ensureForwardEdge(endEdge);
-		
-		AbstractJobVertex exludedBeginVertex = beginEdge.getConnectedVertex()
+
+		AbstractJobVertex excludedBeginVertex = beginEdge.getConnectedVertex()
 				.getBackwardConnection(beginEdge.getIndexOfInputGate())
 				.getConnectedVertex();
 
-		AbstractJobVertex exludedEndVertex = endEdge.getConnectedVertex();
+		AbstractJobVertex excludedEndVertex = endEdge.getConnectedVertex();
 
-		defineAllLatencyConstraintsBetween(exludedBeginVertex,
-				exludedEndVertex, maxLatencyInMillis, false, -1, false, -1);
+		int endInputGate = endEdge.getIndexOfInputGate();
+		int beginOutputGate = beginEdge.getConnectedVertex().getBackwardConnection(beginEdge.getIndexOfInputGate())
+				.getIndexOfInputGate();
+
+		int constraintsDefined = defineAllLatencyConstraintsBetweenHelper(
+				excludedBeginVertex, excludedEndVertex, maxLatencyInMillis,
+				-1, beginOutputGate, endInputGate, -1);
+		if (constraintsDefined == 0) {
+			throw new IllegalArgumentException(
+					"Could not find any sequences between the given vertices. Are the vertices connected?");
+		}
 	}
+
 
 	private static void ensureForwardEdge(JobEdge edge) {
 
@@ -193,70 +212,64 @@ public class ConstraintUtil {
 	}
 
 	/**
-	 * Finds all possible sequences between the given begin and end vertex, and
-	 * invokes {@see #defineLatencyConstraint(JobGraphSequence, long, JobGraph)}
-	 * on each. This is done using depth first traversal of the job graph, hence
-	 * only invoke this method if the vertices of the graph have already been
-	 * fully connected.
-	 * 
+	 * Finds all possible sequences between the given begin and end vertex, and invokes {@link
+	 * #defineLatencyConstraint(JobGraphSequence, long, JobGraph)} on each. This is done using depth first traversal of
+	 * the job graph, hence only invoke this method if the vertices of the graph have already been fully connected.
+	 *
 	 * @param begin
-	 *            The vertex to start the depth first traversal from. Note that
-	 *            if begin is an input vertex, you must set includeBeginVertex
-	 *            to false.
+	 * 		The vertex to start the depth first traversal from. Note that if begin is an input vertex, you must set
+	 * 		beginInputGate to -1.
 	 * @param end
-	 *            The vertex where the depth first traversal ends. Note that if
-	 *            end is an output vertex, you must set includeEndVertex to
-	 *            false.
+	 * 		The vertex where the depth first traversal ends. Note that if end is an output vertex, you must set endOutputGate
+	 * 		to -1.
 	 * @param maxLatencyInMillis
-	 *            See {@see #define(List, long, boolean, boolean)}.
-	 * @param includeBeginVertex
-	 *            If true, then the begin vertex will be the first element of
-	 *            the found sequences. In this case you must specify a valid
-	 *            beginVertexInputGate (which implies the begin vertex must not
-	 *            be an input vertex because they have no input gates). If
-	 *            false, then edge(s) originating from the begin vertex will be
-	 *            the first sequence elements.
-	 * @param beginVertexInputGate
-	 *            If includeBeginVertex=true, the beginVertexInputGate specifies
-	 *            the the input gate index to use for the first element (which
-	 *            is the begin vertex) of the latency constrained sequences.
-	 * @param includeEndVertex
-	 *            If true, then the end vertex will be the last element of the
-	 *            found sequences. In this case you must specify a valid
-	 *            endVertexOutputGate (which implies the end vertex must not be
-	 *            an output vertex because they have no output gates). If false
-	 *            then edge(s) arriving at the end vertex will be the last
-	 *            sequence elements.
-	 * @param endVertexOutputGate
-	 *            If includeEndVertex=true, the endVertexOutputGate specifies
-	 *            the the output gate index to use for the last element (which
-	 *            is the end vertex) of the latency constrained sequences.
+	 * 		See {@link #defineLatencyConstraint(JobGraphSequence, long, JobGraph)}.
+	 * @param beginInputGate
+	 * 		If beginInputGate != -1, then the begin vertex will be the first element of the found sequences. The
+	 * 		beginInputGate specifies the input gate index to use for the first element (which is the begin vertex) of the
+	 * 		latency constrained sequences. If beginInputGate == -1, then the edge originating from the output gate with index
+	 * 		beginOutputGate of the begin vertex will be the first sequence elements.
+	 * @param beginOutputGate
+	 * 		The output gate index of the begin vertex from which the edge should start.
+	 * @param endInputGate
+	 * 		The inout gate index of the end vertex to which the last edge should connect.
+	 * @param endOutputGate
+	 * 		If endOutputGate != -1, then the end vertex will be the last element of the found sequences. The
+	 * 		endVertexOutputGate specifies the  output gate index to use for the last element (which is the end vertex) of the
+	 * 		latency constrained sequences. If endOutputGate == -1 then the edge arriving at the input gate with index
+	 * 		endOutputGate of the end vertex will be the last sequence elements.
 	 * @throws IOException
-	 *             If something goes wrong while serializing the constraints
-	 *             (shouldn't happen).
+	 * 		If something goes wrong while serializing the constraints (shouldn't happen).
 	 * @throws IllegalArgumentException
-	 *             If constraints could not be constructed to to invalid
-	 *             input parameters.
+	 * 		If constraints could not be constructed to to invalid input parameters.
 	 */
 	public static void defineAllLatencyConstraintsBetween(
-			AbstractJobVertex begin, AbstractJobVertex end,
-			long maxLatencyInMillis, boolean includeBeginVertex,
-			int beginVertexInputGate, boolean includeEndVertex,
-			int endVertexOutputGate) throws IOException {
+			AbstractJobVertex begin, AbstractJobVertex end, long maxLatencyInMillis,
+			int beginInputGate, int beginOutputGate, int endInputGate, int endOutputGate) throws IOException {
 
-		List<JobGraphSequence> sequences = findAllSequencesBetween(begin, end,
-				includeBeginVertex, beginVertexInputGate, includeEndVertex,
-				endVertexOutputGate);
+		int constraintsDefined = defineAllLatencyConstraintsBetweenHelper(
+				begin, end, maxLatencyInMillis,
+				beginInputGate, beginOutputGate, endInputGate, endOutputGate);
 
-		if (sequences.isEmpty()) {
+		if (constraintsDefined == 0) {
 			throw new IllegalArgumentException(
 					"Could not find any sequences between the given vertices. Are the vertices connected?");
 		}
+	}
+
+	private static int defineAllLatencyConstraintsBetweenHelper(
+			AbstractJobVertex begin, AbstractJobVertex end, long maxLatencyInMillis,
+			int beginInputGate, int beginOutputGate, int endInputGate, int endOutputGate) throws IOException {
+
+		List<JobGraphSequence> sequences = findAllSequencesBetween(begin, end,
+				beginInputGate, beginOutputGate, endInputGate, endOutputGate);
 
 		for (JobGraphSequence sequence : sequences) {
 			defineLatencyConstraint(sequence, maxLatencyInMillis,
 					begin.getJobGraph());
 		}
+
+		return sequences.size();
 	}
 
 	/**
@@ -266,47 +279,50 @@ public class ConstraintUtil {
 	 * e_(i+1) will be edges.
 	 * 
 	 */
-	private static List<JobGraphSequence> findAllSequencesBetween(
-			AbstractJobVertex begin, AbstractJobVertex end,
-			boolean includeBeginVertex, int beginVertexInputGate,
-			boolean includeEndVertex, int endVertexOutputGate) {
-
+	private static List<JobGraphSequence> findAllSequencesBetween(AbstractJobVertex begin, AbstractJobVertex end,
+			int beginInputGate, int beginOutputGate, int endInputGate, int endOutputGate) {
 		JobGraphSequence stack = new JobGraphSequence();
 		List<JobGraphSequence> toReturn = new LinkedList<JobGraphSequence>();
-		
-		if (includeBeginVertex
-				&& begin.getNumberOfBackwardConnections() <= beginVertexInputGate) {
+
+		if (begin.getNumberOfBackwardConnections() <= beginInputGate) {
 			throw new IllegalArgumentException(String.format(
 					"Invalid input gate index %d specified for vertex %s",
-					beginVertexInputGate, begin.getName()));
+					beginInputGate, begin.getName()));
 		}
 
-		if (includeEndVertex
-				&& end.getNumberOfForwardConnections() <= endVertexOutputGate) {
+		if (begin.getNumberOfForwardConnections() <= beginOutputGate) {
+			throw new IllegalArgumentException(String.format(
+					"Invalid input gate index %d specified for vertex %s",
+					beginOutputGate, begin.getName()));
+		}
+
+		if (end.getNumberOfBackwardConnections() <= endInputGate) {
 			throw new IllegalArgumentException(String.format(
 					"Invalid output gate index %d specified for vertex %s",
-					endVertexOutputGate, end.getName()));
+					endInputGate, end.getName()));
 		}
 
-		for (int i = 0; i < begin.getNumberOfForwardConnections(); i++) {
-			if (includeBeginVertex) {
-				stack.addVertex(begin.getID(), begin.getName(), beginVertexInputGate, i);
-			}
-
-			depthFirstSequenceEnumerate(begin.getForwardConnection(i), stack,
-					toReturn, end);
-
-			if (includeBeginVertex) {
-				stack.removeLast();
-			}
+		if (end.getNumberOfForwardConnections() <= endOutputGate) {
+			throw new IllegalArgumentException(String.format(
+					"Invalid output gate index %d specified for vertex %s",
+					endOutputGate, end.getName()));
 		}
 
-		if (includeEndVertex) {
+
+		if (beginInputGate != -1) {
+			stack.addVertex(begin.getID(), begin.getName(), beginInputGate, beginOutputGate);
+		}
+
+		depthFirstSequenceEnumerate(begin.getForwardConnection(beginOutputGate), stack,
+				toReturn, end, endInputGate);
+
+		if (endOutputGate != -1) {
 			for (JobGraphSequence sequence : toReturn) {
 				sequence.addVertex(end.getID(), end.getName(), sequence.getLast()
-						.getInputGateIndex(), endVertexOutputGate);
+						.getInputGateIndex(), endOutputGate);
 			}
 		}
+
 		return toReturn;
 	}
 
@@ -321,7 +337,7 @@ public class ConstraintUtil {
 	 */
 	private static void depthFirstSequenceEnumerate(JobEdge forwardEdge,
 			JobGraphSequence stack, List<JobGraphSequence> resultAccumulator,
-			AbstractJobVertex end) {
+			AbstractJobVertex end, int endInputGate) {
 
 		AbstractJobVertex edgeTarget = forwardEdge.getConnectedVertex();
 		JobEdge backwardEdge = edgeTarget.getBackwardConnection(forwardEdge
@@ -333,7 +349,10 @@ public class ConstraintUtil {
 
 		if (edgeTarget == end) {
 			// recursion ends here
-			resultAccumulator.add((JobGraphSequence) stack.clone());
+			if (forwardEdge.getIndexOfInputGate() == endInputGate) {
+				// only add stack to result if the last edge connects to the given input gate index of the end vertex
+				resultAccumulator.add((JobGraphSequence) stack.clone());
+			}
 		} else {
 			// recurse further
 			for (int i = 0; i < edgeTarget.getNumberOfForwardConnections(); i++) {
@@ -342,7 +361,7 @@ public class ConstraintUtil {
 				stack.addVertex(edgeTarget.getID(), edgeTarget.getName(),
 						forwardEdge.getIndexOfInputGate(), i);
 				depthFirstSequenceEnumerate(nextEdge, stack, resultAccumulator,
-						end);
+						end, endInputGate);
 				stack.removeLast();
 			}
 		}
