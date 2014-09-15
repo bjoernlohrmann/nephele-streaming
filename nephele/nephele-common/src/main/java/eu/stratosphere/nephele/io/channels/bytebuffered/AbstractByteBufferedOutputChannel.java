@@ -191,7 +191,9 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 						+ autoflushIntervalMillis * 1000000
 						- lastFlushDeadlineMissNanos;
 				
-			} else if (now >= flushDeadline) {
+			}
+			
+			if (now >= flushDeadline) {
 				lastFlushDeadlineMissNanos = now - flushDeadline;
 				releaseWriteBuffer();
 			}
