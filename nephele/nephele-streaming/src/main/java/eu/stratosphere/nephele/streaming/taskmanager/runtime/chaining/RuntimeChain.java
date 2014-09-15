@@ -35,6 +35,10 @@ public final class RuntimeChain {
 	private final AtomicBoolean tasksSuccessfullyChained = new AtomicBoolean(
 			false);
 
+	private Queue<Record> nextRecords = new ArrayDeque<Record>();
+
+	private Queue<Record> records = new ArrayDeque<Record>();
+
 	public RuntimeChain(List<RuntimeChainLink> chainLinks) {
 
 		if (chainLinks.size() < 2) {
@@ -47,37 +51,46 @@ public final class RuntimeChain {
 
 	public void writeRecord(final Record record) throws IOException {
 		try {
-			this.executeChainableTasks(record, 1);
+			this.executeChainableTasks(record);
 		} catch (Exception e) {
 			throw new IOException(StringUtils.stringifyException(e));
 		}
 	}
 
 	@SuppressWarnings({"rawtypes", "unchecked"})
-	private void executeChainableTasks(Record record, int indexInChain)
+	private void executeChainableTasks(Record record)
 			throws Exception {
 
-		RuntimeChainLink chainLink = this.chainLinks.get(indexInChain);
-		StreamOutputGate outputGate = chainLink.getOutputGate();
+		nextRecords.offer(record);
+		for (int i = 1; i < chainLinks.size() - 1; i++) {
+			RuntimeChainLink chainLink = chainLinks.get(i);
+			StreamInputGate inputGate = chainLink.getInputGate();
+			StreamOutputGate outputGate = chainLink.getOutputGate();
+			IocTask iocTask = chainLink.getIocTask();
 
-		chainLink.getInputGate().reportRecordReceived(record, 0);
+			Record nextRecord;
+			while ((nextRecord = nextRecords.poll()) != null) {
+				inputGate.reportRecordReceived(nextRecord, 0);
+				iocTask.invokeChainableMethod(nextRecord, records);
+			}
 
+			// copy all records for the next iteration
+			Record tempRecord;
+			while ((tempRecord = records.poll()) != null) {
+				outputGate.reportRecordEmitted(tempRecord, 0);
+				nextRecords.offer(RecordUtils.createCopy(tempRecord));
+			}
+		}
+
+		// last task in chain
+		RuntimeChainLink chainLink = chainLinks.get(chainLinks.size() - 1);
+		StreamInputGate inputGate = chainLink.getInputGate();
 		IocTask iocTask = chainLink.getIocTask();
 
-		boolean isLastInChain = indexInChain == this.chainLinks.size() - 1;
-		if (isLastInChain) {
-			iocTask.invokeChainableMethod(record);
-		} else {
-
-			Queue<Record> records = new ArrayDeque<Record>();
-			iocTask.invokeChainableMethod(record, records);
-
-			Record outputRecord;
-			while ((outputRecord = records.poll()) != null) {
-				outputGate.reportRecordEmitted(outputRecord);
-				this.executeChainableTasks(RecordUtils.createCopy(outputRecord),
-						indexInChain + 1);
-			}
+		Record lastRecord;
+		while ((lastRecord = nextRecords.poll()) != null) {
+			inputGate.reportRecordReceived(lastRecord, 0);
+			iocTask.invokeChainableMethod(lastRecord);
 		}
 	}
 
