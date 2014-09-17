@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Queue;
 import java.util.Set;
 
 /**
@@ -269,7 +270,7 @@ public abstract class IocTask extends AbstractTask {
 	 * @param buffer the buffer for the result
 	 * @param <T>    type of the record
 	 */
-	public <T extends Record> void invokeChainableMethod(T record, List<T> buffer)
+	public <T extends Record> void invokeChainableMethod(T record, Queue<T> buffer)
 			throws InvocationTargetException, IllegalAccessException, IOException, InterruptedException {
 		MemoryCollector<T> memoryCollector = new MemoryCollector<T>();
 		invokeChainableMethod(record, memoryCollector);
