@@ -15,13 +15,6 @@
 
 package eu.stratosphere.nephele.streaming.taskmanager;
 
-import java.io.IOException;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import eu.stratosphere.nephele.configuration.Configuration;
 import eu.stratosphere.nephele.configuration.GlobalConfiguration;
 import eu.stratosphere.nephele.execution.RuntimeEnvironment;
@@ -36,6 +29,12 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.StreamJobEnviro
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.StreamTaskEnvironment;
 import eu.stratosphere.nephele.taskmanager.Task;
 import eu.stratosphere.nephele.taskmanager.runtime.RuntimeTask;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import java.io.IOException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * Task manager plugin that implements Qos reporting and management.
@@ -55,13 +54,13 @@ public class StreamTaskManagerPlugin implements TaskManagerPlugin {
 	 * Provides access to the configuration entry which defines the interval in
 	 * which records shall be tagged.
 	 */
-	public static final String TAGGING_INTERVAL_KEY = PluginManager
-			.prefixWithPluginNamespace("streaming.qosreporter.tagginginterval");
+	public static final String SAMPLING_PROBABILITY_KEY = PluginManager
+			.prefixWithPluginNamespace("streaming.qosreporter.samplingprobability");
 
 	/**
-	 * The default tagging interval.
+	 * The default sampling probability in percent.
 	 */
-	public static final int DEFAULT_TAGGING_INTERVAL = 7;
+	public static final int DEFAULT_SAMPLING_PROBABILITY = 10;
 
 	/**
 	 * Provides access to the configuration entry which defines the interval in
@@ -84,9 +83,9 @@ public class StreamTaskManagerPlugin implements TaskManagerPlugin {
 	private final ConcurrentMap<JobID, StreamJobEnvironment> streamJobEnvironments = new ConcurrentHashMap<JobID, StreamJobEnvironment>();
 
 	/**
-	 * The tagging interval as specified in the plugin configuration.
+	 * The sampling probability as specified in the plugin configuration.
 	 */
-	private final int defaultTaggingInterval;
+	private final int defaultSamplingProbability;
 
 	/**
 	 * The aggregation interval as specified in the plugin configuration.
@@ -94,14 +93,14 @@ public class StreamTaskManagerPlugin implements TaskManagerPlugin {
 	private final long defaultAggregationInterval;
 
 	public StreamTaskManagerPlugin() {
-		this.defaultTaggingInterval = GlobalConfiguration.getInteger(
-				TAGGING_INTERVAL_KEY, DEFAULT_TAGGING_INTERVAL);
+		this.defaultSamplingProbability = GlobalConfiguration.getInteger(
+				SAMPLING_PROBABILITY_KEY, DEFAULT_SAMPLING_PROBABILITY);
 		this.defaultAggregationInterval = GlobalConfiguration.getLong(
 				AGGREGATION_INTERVAL_KEY, DEFAULT_AGGREGATION_INTERVAL);
 
 		LOG.info(String
 				.format("Configured tagging interval is every %d records / Aggregation interval is %d millis ",
-						this.defaultTaggingInterval,
+						this.defaultSamplingProbability,
 						this.defaultAggregationInterval));
 
 		INSTANCE = this;
@@ -262,11 +261,11 @@ public class StreamTaskManagerPlugin implements TaskManagerPlugin {
 
 	/**
 	 * 
-	 * @return The default tagging interval configured in the streaming plugin's
+	 * @return The default sampling probability configured in the streaming plugin's
 	 *         configuration.
 	 */
-	public static int getDefaultTaggingInterval() {
-		return getInstance().defaultTaggingInterval;
+	public static int getDefaultSamplingProbability() {
+		return getInstance().defaultSamplingProbability;
 	}
 
 }

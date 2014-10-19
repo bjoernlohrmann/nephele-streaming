@@ -14,11 +14,6 @@
  **********************************************************************************************************************/
 package eu.stratosphere.nephele.streaming.taskmanager.qosreporter;
 
-import java.util.HashMap;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import eu.stratosphere.nephele.execution.Environment;
 import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
 import eu.stratosphere.nephele.jobgraph.JobID;
@@ -37,6 +32,10 @@ import eu.stratosphere.nephele.streaming.taskmanager.profiling.TaskProfilingThre
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosManagerThread;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.StreamTaskEnvironment;
 import eu.stratosphere.nephele.taskmanager.runtime.RuntimeTask;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import java.util.HashMap;
 
 /**
  * This class implements the Qos management and reporting for the vertices and
@@ -76,8 +75,8 @@ public class StreamJobEnvironment {
 		QosReporterConfigCenter reporterConfig = new QosReporterConfigCenter();
 		reporterConfig.setAggregationInterval(StreamTaskManagerPlugin
 				.getDefaultAggregationInterval());
-		reporterConfig.setTaggingInterval(StreamTaskManagerPlugin
-				.getDefaultTaggingInterval());
+		reporterConfig.setSamplingProbability(StreamTaskManagerPlugin
+				.getDefaultSamplingProbability());
 
 		this.qosReportForwarder = new QosReportForwarderThread(jobID,
 				reporterConfig);
@@ -123,14 +122,14 @@ public class StreamJobEnvironment {
 				.getJobConfiguration()
 				.getLong(StreamTaskManagerPlugin.AGGREGATION_INTERVAL_KEY,
 						StreamTaskManagerPlugin.getDefaultAggregationInterval());
-		int taggingInterval = taskEnvironment.getJobConfiguration().getInteger(
-				StreamTaskManagerPlugin.TAGGING_INTERVAL_KEY,
-				StreamTaskManagerPlugin.getDefaultTaggingInterval());
+		int samplingProbability = taskEnvironment.getJobConfiguration().getInteger(
+				StreamTaskManagerPlugin.SAMPLING_PROBABILITY_KEY,
+				StreamTaskManagerPlugin.getDefaultSamplingProbability());
 
 		this.qosReportForwarder.getConfigCenter().setAggregationInterval(
 				aggregationInterval);
-		this.qosReportForwarder.getConfigCenter().setTaggingInterval(
-				taggingInterval);
+		this.qosReportForwarder.getConfigCenter().setSamplingProbability(
+				samplingProbability);
 	}
 
 	public synchronized void shutdownEnvironment() {

@@ -66,12 +66,16 @@ public class VertexStatisticsReportManager {
 
 		private long lastSampleReadTime;
 
+		private SamplingManager samplingManager;
+
 		public VertexQosReporter(QosReporterID.Vertex reporterID, int runtimeInputGateIndex, int runtimeOutputGateIndex,
 				SamplingStrategy samplingStrategy) {
 			this.reporterID = reporterID;
 			this.runtimeInputGateIndex = runtimeInputGateIndex;
 			this.runtimeOutputGateIndex = runtimeOutputGateIndex;
 			this.samplingStrategy = samplingStrategy;
+			this.samplingManager = new SamplingManager(
+					VertexStatisticsReportManager.this.reportForwarder.getConfigCenter().getSamplingProbability() / 100.0);
 
 			this.currentReportingProbeCounter = 0;
 			this.reportingProbeInterval = 1;
@@ -123,6 +127,7 @@ public class VertexStatisticsReportManager {
 			this.amountSamples = 0;
 			this.sampleTimes = 0;
 			this.lastSampleReadTime = 0;
+			this.samplingManager.reset();
 
 			setTimeOfReports(now);
 		}
@@ -142,7 +147,11 @@ public class VertexStatisticsReportManager {
 			}
 
 			if (samplingStrategy == SamplingStrategy.READ_READ && lastSampleReadTime != 0) {
-				sample();
+				// we have a viable latency measurement but should we sample it?
+				if (samplingManager.shouldSample()) {
+					sample();
+				}
+				lastSampleReadTime = 0;
 			}
 
 			this.sendReportIfDue();
@@ -153,7 +162,11 @@ public class VertexStatisticsReportManager {
 				this.outputGateEmitCounter++;
 
 				if (samplingStrategy == SamplingStrategy.READ_WRITE && lastSampleReadTime != 0) {
-					sample();
+					// we have a viable latency measurement but should we sample it?
+					if (samplingManager.shouldSample()) {
+						sample();
+					}
+					lastSampleReadTime = 0;
 				}
 			} else if (samplingStrategy == SamplingStrategy.READ_WRITE) {
 				// reset sample when emitting from another output gate
@@ -166,7 +179,6 @@ public class VertexStatisticsReportManager {
 		private void sample() {
 			amountSamples++;
 			sampleTimes += System.currentTimeMillis() - lastSampleReadTime;
-			lastSampleReadTime = 0;
 		}
 	}
 

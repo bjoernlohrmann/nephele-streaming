@@ -14,11 +14,6 @@
  **********************************************************************************************************************/
 package eu.stratosphere.nephele.streaming.taskmanager.qosreporter;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
-
 import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
 import eu.stratosphere.nephele.instance.InstanceConnectionInfo;
 import eu.stratosphere.nephele.io.AbstractID;
@@ -27,6 +22,11 @@ import eu.stratosphere.nephele.io.channels.ChannelID;
 import eu.stratosphere.nephele.streaming.message.action.EdgeQosReporterConfig;
 import eu.stratosphere.nephele.streaming.message.action.VertexQosReporterConfig;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Instances of this class keep track of the Qos reporter configuration of a job
@@ -53,7 +53,7 @@ public class QosReporterConfigCenter {
 
 	private volatile long aggregationInterval;
 
-	private volatile int taggingInterval;
+	private volatile int samplingProbability;
 
 	public QosReporterConfigCenter() {
 		this.reporterConfigsByExecutionVertex = new HashMap<ExecutionVertexID, Set<VertexQosReporterConfig>>();
@@ -182,22 +182,22 @@ public class QosReporterConfigCenter {
 	}
 
 	/**
-	 * Returns the taggingInterval.
+	 * Returns the samplingProbability.
 	 * 
-	 * @return the taggingInterval
+	 * @return the samplingProbability
 	 */
-	public int getTaggingInterval() {
-		return this.taggingInterval;
+	public int getSamplingProbability() {
+		return this.samplingProbability;
 	}
 
 	/**
-	 * Sets the taggingInterval to the specified value.
+	 * Sets the samplingProbability to the specified value.
 	 * 
-	 * @param taggingInterval
-	 *            the taggingInterval to set
+	 * @param samplingProbability
+	 *            the samplingProbability to set
 	 */
-	public void setTaggingInterval(int taggingInterval) {
-		this.taggingInterval = taggingInterval;
+	public void setSamplingProbability(int samplingProbability) {
+		this.samplingProbability = samplingProbability;
 	}
 
 	public VertexQosReporterConfig getVertexQosReporter(
