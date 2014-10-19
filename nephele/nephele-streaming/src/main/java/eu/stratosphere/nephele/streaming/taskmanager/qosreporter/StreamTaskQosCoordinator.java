@@ -14,12 +14,6 @@
  **********************************************************************************************************************/
 package eu.stratosphere.nephele.streaming.taskmanager.qosreporter;
 
-import java.util.ArrayList;
-import java.util.Set;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import eu.stratosphere.nephele.io.channels.ChannelID;
 import eu.stratosphere.nephele.streaming.message.action.EdgeQosReporterConfig;
 import eu.stratosphere.nephele.streaming.message.action.LimitBufferSizeAction;
@@ -32,6 +26,11 @@ import eu.stratosphere.nephele.streaming.taskmanager.runtime.io.StreamInputGate;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.io.StreamOutputGate;
 import eu.stratosphere.nephele.taskmanager.runtime.RuntimeTask;
 import eu.stratosphere.nephele.types.Record;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import java.util.ArrayList;
+import java.util.Set;
 
 /**
  * An instance of this class implements Qos data reporting for a specific vertex
@@ -156,7 +155,7 @@ public class StreamTaskQosCoordinator implements QosReporterConfigListener {
 		}
 
 		this.vertexStatisticsManager.addReporter(inputGateIndex,
-				outputGateIndex, reporterID);
+				outputGateIndex, reporterID, reporterConfig.getSamplingStrategy());
 
 	}
 

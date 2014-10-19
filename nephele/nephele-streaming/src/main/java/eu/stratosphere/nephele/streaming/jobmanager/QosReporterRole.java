@@ -14,12 +14,13 @@
  **********************************************************************************************************************/
 package eu.stratosphere.nephele.streaming.jobmanager;
 
-import java.util.HashSet;
-import java.util.Set;
-
+import eu.stratosphere.nephele.streaming.SamplingStrategy;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosEdge;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosVertex;
+
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Models a Qos reporter role while computing the Qos setup on the job manager
@@ -37,7 +38,7 @@ public class QosReporterRole {
 
 	public enum ReportingAction {
 		REPORT_TASK_STATS, REPORT_CHANNEL_STATS
-	};
+	}
 
 	private HashSet<QosManagerRole> targetQosManagers;
 
@@ -49,6 +50,8 @@ public class QosReporterRole {
 
 	private int outputGateIndex;
 
+	private SamplingStrategy samplingStrategy;
+
 	private QosEdge edge;
 
 	private QosReporterID reporterID;
@@ -58,7 +61,7 @@ public class QosReporterRole {
 	 * Qos manager.
 	 */
 	public QosReporterRole(QosVertex vertex, int inputGateIndex,
-			int outputGateIndex, QosManagerRole targetQosManager) {
+			int outputGateIndex, SamplingStrategy samplingStrategy, QosManagerRole targetQosManager) {
 
 		this.action = ReportingAction.REPORT_TASK_STATS;
 		this.vertex = vertex;
@@ -66,6 +69,7 @@ public class QosReporterRole {
 		this.targetQosManagers.add(targetQosManager);
 		this.inputGateIndex = inputGateIndex;
 		this.outputGateIndex = outputGateIndex;
+		this.samplingStrategy = samplingStrategy;
 		this.reporterID = this.createReporterRoleID();
 	}
 
@@ -144,6 +148,16 @@ public class QosReporterRole {
 	 */
 	public int getOutputGateIndex() {
 		return this.outputGateIndex;
+	}
+
+
+	/**
+	 * Return the sampling strategy for the vertex.
+	 *
+	 * @return the sampling strategy
+	 */
+	public SamplingStrategy getSamplingStrategy() {
+		return samplingStrategy;
 	}
 
 	/**

@@ -14,14 +14,11 @@
  **********************************************************************************************************************/
 package eu.stratosphere.nephele.streaming.jobmanager;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedList;
-
 import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
 import eu.stratosphere.nephele.instance.InstanceConnectionInfo;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
+import eu.stratosphere.nephele.streaming.SamplingStrategy;
 import eu.stratosphere.nephele.streaming.jobmanager.QosReporterRole.ReportingAction;
 import eu.stratosphere.nephele.streaming.message.action.CandidateChainConfig;
 import eu.stratosphere.nephele.streaming.message.action.DeployInstanceQosRolesAction;
@@ -34,19 +31,22 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosManagerID;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosVertex;
 
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedList;
+
 /**
  * Holds a task manager's Qos roles (Qos manager and reporter) while computing a
  * job's Qos setup on the job manager side.
- * 
+ *
  * @author Bjoern Lohrmann
- * 
  */
 public class TaskManagerQosSetup {
 
 	private InstanceConnectionInfo taskManagerConnectionInfo;
 
 	private HashMap<LatencyConstraintID, QosManagerRole> managerRoles;
-	
+
 	private QosManagerID qosManagerID;
 
 	private HashMap<QosReporterID, QosReporterRole> reporterRoles;
@@ -151,6 +151,7 @@ public class TaskManagerQosSetup {
 
 		int inputGateIndex = reporterRole.getInputGateIndex();
 		int outputGateIndex = reporterRole.getOutputGateIndex();
+		SamplingStrategy samplingStrategy = reporterRole.getSamplingStrategy();
 
 		VertexQosReporterConfig vertexReporter = new VertexQosReporterConfig(
 				vertex.getGroupVertex().getJobVertexID(), vertex.getID(),
@@ -159,7 +160,7 @@ public class TaskManagerQosSetup {
 				inputGateIndex != -1 ? vertex.getInputGate(inputGateIndex)
 						.getGateID() : null, outputGateIndex,
 				outputGateIndex != -1 ? vertex.getOutputGate(outputGateIndex)
-						.getGateID() : null, vertex.getMemberIndex(),
+						.getGateID() : null, samplingStrategy, vertex.getMemberIndex(),
 				vertex.getName());
 
 		return vertexReporter;
@@ -185,8 +186,8 @@ public class TaskManagerQosSetup {
 		EdgeQosReporterConfig edgeReporter = new EdgeQosReporterConfig(
 				edge.getSourceChannelID(), edge.getTargetChannelID(),
 				getQosManagerConnectionInfos(reporterRole), edge
-						.getOutputGate().getGateID(), edge.getInputGate()
-						.getGateID(), edge.getOutputGateEdgeIndex(),
+				.getOutputGate().getGateID(), edge.getInputGate()
+				.getGateID(), edge.getOutputGateEdgeIndex(),
 				edge.getInputGateEdgeIndex(), edge.toString());
 
 		return edgeReporter;

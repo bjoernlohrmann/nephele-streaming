@@ -14,24 +14,24 @@
  **********************************************************************************************************************/
 package eu.stratosphere.nephele.streaming.message.action;
 
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.IOException;
-
 import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
 import eu.stratosphere.nephele.instance.InstanceConnectionInfo;
 import eu.stratosphere.nephele.io.GateID;
 import eu.stratosphere.nephele.io.IOReadableWritable;
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
+import eu.stratosphere.nephele.streaming.SamplingStrategy;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGate;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosVertex;
 
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
+
 /**
  * Describes a Qos reporter role for a vertex (task).
- * 
+ *
  * @author Bjoern Lohrmann
- * 
  */
 public class VertexQosReporterConfig implements IOReadableWritable {
 
@@ -51,6 +51,8 @@ public class VertexQosReporterConfig implements IOReadableWritable {
 
 	private GateID outputGateID;
 
+	private SamplingStrategy samplingStrategy;
+
 	private int memberIndex;
 
 	private String name;
@@ -59,10 +61,9 @@ public class VertexQosReporterConfig implements IOReadableWritable {
 	}
 
 	/**
-	 * 
 	 * Initializes VertexQosReporterConfig. Dummy reporter configs can be
 	 * created by prividing -1 gate indices and null gate IDs.
-	 * 
+	 *
 	 * @param groupVertexID
 	 * @param vertexID
 	 * @param qosManagers
@@ -74,6 +75,7 @@ public class VertexQosReporterConfig implements IOReadableWritable {
 	 *            If outputGateIndex is -1, outputGateID must be null (and vice
 	 *            versa).
 	 * @param outputGateID
+	 * @param samplingStrategy
 	 * @param memberIndex
 	 * @param name
 	 */
@@ -82,12 +84,9 @@ public class VertexQosReporterConfig implements IOReadableWritable {
 			InstanceConnectionInfo reporterInstance,
 			InstanceConnectionInfo[] qosManagers, int inputGateIndex,
 			GateID inputGateID, int outputGateIndex, GateID outputGateID,
-			int memberIndex, String name) {
+			SamplingStrategy samplingStrategy, int memberIndex, String name) {
 
-		if (inputGateIndex == -1 && inputGateID != null || inputGateIndex != -1
-				&& inputGateID == null || outputGateIndex != -1
-				&& outputGateID == null || outputGateIndex != -1
-				&& outputGateID == null) {
+		if (inputGateIndex == -1 ^ inputGateID == null || outputGateIndex == -1 ^ outputGateID == null) {
 
 			throw new RuntimeException(
 					"If inputGateIndex/outputGateIndex is (not) -1, the respective gate ID must (not) be null. This is a bug.");
@@ -101,6 +100,7 @@ public class VertexQosReporterConfig implements IOReadableWritable {
 		this.inputGateID = inputGateID;
 		this.outputGateIndex = outputGateIndex;
 		this.outputGateID = outputGateID;
+		this.samplingStrategy = samplingStrategy;
 		this.memberIndex = memberIndex;
 		this.name = name;
 	}
@@ -111,7 +111,7 @@ public class VertexQosReporterConfig implements IOReadableWritable {
 
 	/**
 	 * Returns the groupVertexID.
-	 * 
+	 *
 	 * @return the groupVertexID
 	 */
 	public JobVertexID getGroupVertexID() {
@@ -120,7 +120,7 @@ public class VertexQosReporterConfig implements IOReadableWritable {
 
 	/**
 	 * Returns the vertexID.
-	 * 
+	 *
 	 * @return the vertexID
 	 */
 	public ExecutionVertexID getVertexID() {
@@ -129,7 +129,7 @@ public class VertexQosReporterConfig implements IOReadableWritable {
 
 	/**
 	 * Returns the reporterInstance.
-	 * 
+	 *
 	 * @return the reporterInstance
 	 */
 	public InstanceConnectionInfo getReporterInstance() {
@@ -138,7 +138,7 @@ public class VertexQosReporterConfig implements IOReadableWritable {
 
 	/**
 	 * Returns the qosManagers.
-	 * 
+	 *
 	 * @return the qosManagers
 	 */
 	public InstanceConnectionInfo[] getQosManagers() {
@@ -147,7 +147,7 @@ public class VertexQosReporterConfig implements IOReadableWritable {
 
 	/**
 	 * Returns the inputGateIndex.
-	 * 
+	 *
 	 * @return the inputGateIndex
 	 */
 	public int getInputGateIndex() {
@@ -156,7 +156,7 @@ public class VertexQosReporterConfig implements IOReadableWritable {
 
 	/**
 	 * Returns the outputGateIndex.
-	 * 
+	 *
 	 * @return the outputGateIndex
 	 */
 	public int getOutputGateIndex() {
@@ -165,7 +165,7 @@ public class VertexQosReporterConfig implements IOReadableWritable {
 
 	/**
 	 * Returns the inputGateID.
-	 * 
+	 *
 	 * @return the inputGateID
 	 */
 	public GateID getInputGateID() {
@@ -174,7 +174,7 @@ public class VertexQosReporterConfig implements IOReadableWritable {
 
 	/**
 	 * Returns the outputGateID.
-	 * 
+	 *
 	 * @return the outputGateID
 	 */
 	public GateID getOutputGateID() {
@@ -182,8 +182,17 @@ public class VertexQosReporterConfig implements IOReadableWritable {
 	}
 
 	/**
+	 * Return the sampling strategy.
+	 *
+	 * @return the sampling strategy.
+	 */
+	public SamplingStrategy getSamplingStrategy() {
+		return samplingStrategy;
+	}
+
+	/**
 	 * Returns the memberIndex.
-	 * 
+	 *
 	 * @return the memberIndex
 	 */
 	public int getMemberIndex() {
@@ -192,7 +201,7 @@ public class VertexQosReporterConfig implements IOReadableWritable {
 
 	/**
 	 * Returns the name.
-	 * 
+	 *
 	 * @return the name
 	 */
 	public String getName() {
@@ -244,6 +253,8 @@ public class VertexQosReporterConfig implements IOReadableWritable {
 			this.outputGateID.write(out);
 		}
 
+		out.writeUTF(samplingStrategy.toString());
+
 		out.writeInt(this.memberIndex);
 		out.writeUTF(this.name);
 	}
@@ -279,6 +290,8 @@ public class VertexQosReporterConfig implements IOReadableWritable {
 			this.outputGateID = new GateID();
 			this.outputGateID.read(in);
 		}
+
+		this.samplingStrategy = SamplingStrategy.valueOf(in.readUTF());
 
 		this.memberIndex = in.readInt();
 		this.name = in.readUTF();
