@@ -19,6 +19,7 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 
 import eu.stratosphere.nephele.io.IOReadableWritable;
@@ -109,5 +110,46 @@ public class JobGraphSequence extends LinkedList<SequenceElement<JobVertexID>>
 
 	public Collection<JobVertexID> getVerticesInSequence() {
 		return this.verticesInSequence;
+	}
+
+	/**
+	 * Returns an order list of vertices including external start/end vertex if
+	 * requested and this sequence start/ends with an edge.
+	 */
+	public Collection<JobVertexID> getVerticesForSequenceOrdered(boolean includeExternalStartEndVertex) {
+		LinkedList<JobVertexID> vertices = new LinkedList<JobVertexID>();
+
+		if (includeExternalStartEndVertex && getFirst().isEdge())
+			vertices.add(getFirst().getSourceVertexID());
+
+		for (SequenceElement<JobVertexID> element : this) {
+			if (element.isVertex())
+				vertices.add(element.getVertexID());
+		}
+
+		if (includeExternalStartEndVertex && getLast().isEdge())
+			vertices.add(getLast().getTargetVertexID());
+
+		return vertices;
+	}
+
+	public SequenceElement<JobVertexID> getFirstVertex() {
+		for (Iterator<SequenceElement<JobVertexID>> it = iterator(); it.hasNext();) {
+			SequenceElement<JobVertexID> current = it.next();
+			if (current.isVertex())
+				return current;
+		}
+
+		return null;
+	}
+
+	public SequenceElement<JobVertexID> getLastVertex() {
+		for (Iterator<SequenceElement<JobVertexID>> it = descendingIterator(); it.hasNext();) {
+			SequenceElement<JobVertexID> current = it.next();
+			if (current.isVertex())
+				return current;
+		}
+
+		return null;
 	}
 }

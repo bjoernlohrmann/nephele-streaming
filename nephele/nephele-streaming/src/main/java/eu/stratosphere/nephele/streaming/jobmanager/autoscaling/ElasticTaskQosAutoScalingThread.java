@@ -19,6 +19,7 @@ import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.jobmanager.JobManager;
+import eu.stratosphere.nephele.jobmanager.web.QosStatisticsServlet;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
 import eu.stratosphere.nephele.streaming.message.AbstractQosMessage;
@@ -32,13 +33,14 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraph;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGroupEdge;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGroupVertex;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosManagerID;
+import eu.stratosphere.nephele.streaming.web.QosJobWebStatistic;
 
 public class ElasticTaskQosAutoScalingThread extends Thread {
 
 	private static final Log LOG = LogFactory
 			.getLog(ElasticTaskQosAutoScalingThread.class);
 
-	private JobID jobID;
+	private final JobID jobID;
 
 	private final LinkedBlockingQueue<AbstractSerializableQosMessage> qosMessages = new LinkedBlockingQueue<AbstractSerializableQosMessage>();
 
@@ -50,7 +52,13 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 
 	private final HashMap<LatencyConstraintID, QosConstraintSummaryAggregator> aggregators = new HashMap<LatencyConstraintID, QosConstraintSummaryAggregator>();
 
+	private final HashMap<LatencyConstraintID, LatencyConstraintCpuLoadSummaryAggregator> cpuLoadAggregators = new HashMap<LatencyConstraintID, LatencyConstraintCpuLoadSummaryAggregator>();
+
 	private final HashMap<LatencyConstraintID, QosLogger> qosLoggers = new HashMap<LatencyConstraintID, QosLogger>();
+
+	private final HashMap<LatencyConstraintID, CpuLoadLogger> cpuLoadLoggers = new HashMap<LatencyConstraintID, CpuLoadLogger>();
+
+	private final QosJobWebStatistic webStatistic;
 
 	private final HashMap<JobVertexID, Integer> vertexTopologicalScores = new HashMap<JobVertexID, Integer>();
 
@@ -65,6 +73,10 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 		this.timeOfLastScaling = 0;
 		this.timeOfNextScaling = 0;
 
+		long loggingInterval = GlobalConfiguration.getLong(
+				QosManagerThread.QOSMANAGER_ADJUSTMENTINTERVAL_KEY,
+				QosManagerThread.DEFAULT_ADJUSTMENTINTERVAL);
+
 		HashMap<LatencyConstraintID, JobGraphLatencyConstraint> qosConstraints = new HashMap<LatencyConstraintID, JobGraphLatencyConstraint>();
 
 		for (LatencyConstraintID constraintID : qosGraphs.keySet()) {
@@ -72,21 +84,24 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 					.getConstraintByID(constraintID);
 
 			qosConstraints.put(constraintID, constraint);
-			aggregators.put(constraintID, new QosConstraintSummaryAggregator(
-					constraint, qosManagers));
+			aggregators.put(constraintID,
+					new QosConstraintSummaryAggregator(execGraph, constraint, qosManagers));
+			cpuLoadAggregators.put(constraintID,
+					new LatencyConstraintCpuLoadSummaryAggregator(execGraph, constraint));
 
 			try {
-				qosLoggers.put(constraintID,
-							new QosLogger(
-								constraint,
-								GlobalConfiguration.getLong(QosManagerThread.QOSMANAGER_ADJUSTMENTINTERVAL_KEY,
-										QosManagerThread.DEFAULT_ADJUSTMENTINTERVAL)));
-			} catch (IOException e) {
-				LOG.error("Exception in QosLogger", e);
+				qosLoggers.put(constraintID, new QosLogger(constraint, loggingInterval));
+				cpuLoadLoggers.put(constraintID, new CpuLoadLogger(execGraph, constraint, loggingInterval));
+
+			} catch (Exception e) {
+				LOG.error("Exception while initiliazing loggers", e);
 			}
 		}
 
 		scalingPolicy = new SimpleScalingPolicy(execGraph, qosConstraints);
+
+		webStatistic = new QosJobWebStatistic(execGraph, loggingInterval, qosConstraints);
+		QosStatisticsServlet.putStatistic(this.jobID, webStatistic);
 
 		fillVertexTopologicalScores(qosGraphs);
 
@@ -156,9 +171,13 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 				if (scalingIsDue(now)) {
 					List<QosConstraintSummary> constraintSummaries = aggregateConstraintSummaries();
 					logConstraintSummaries(constraintSummaries);
-					Map<JobVertexID, Integer> scalingActions = scalingPolicy
-							.getScalingActions(constraintSummaries,
-									taskCpuLoads);
+
+					Map<LatencyConstraintID, LatencyConstraintCpuLoadSummary> cpuLoadSummaries =
+							summarizeCpuUtilizations(taskCpuLoads);
+					logCpuLoadSummaries(cpuLoadSummaries);
+
+					Map<JobVertexID, Integer> scalingActions = scalingPolicy.getScalingActions(
+							constraintSummaries, taskCpuLoads, cpuLoadSummaries);
 					applyScalingActions(scalingActions);
 
 					timeOfLastScaling = System.currentTimeMillis();
@@ -222,6 +241,7 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 
 	private void logConstraintSummaries(
 			List<QosConstraintSummary> constraintSummaries) {
+
 		for (QosConstraintSummary constraintSummary : constraintSummaries) {
 			QosLogger logger = qosLoggers.get(constraintSummary
 					.getLatencyConstraintID());
@@ -229,8 +249,41 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 			if (logger != null) {
 				try {
 					logger.logSummary(constraintSummary);
+
 				} catch (IOException e) {
 					LOG.error("Error during QoS logging", e);
+				}
+			}
+		}
+
+		webStatistic.logConstraintSummaries(constraintSummaries);
+	}
+
+	private Map<LatencyConstraintID, LatencyConstraintCpuLoadSummary> summarizeCpuUtilizations(Map<ExecutionVertexID, TaskCpuLoadChange> taskCpuLoads)
+			throws UnexpectedVertexExecutionStateException {
+
+		HashMap<LatencyConstraintID, LatencyConstraintCpuLoadSummary> summaries = new HashMap<LatencyConstraintID, LatencyConstraintCpuLoadSummary>();
+
+		for (LatencyConstraintID constraint : this.cpuLoadAggregators.keySet()) {
+			LatencyConstraintCpuLoadSummaryAggregator aggregator = this.cpuLoadAggregators.get(constraint);
+			summaries.put(constraint, aggregator.summarizeCpuUtilizations(taskCpuLoads));
+		}
+
+		return summaries;
+	}
+
+	private void logCpuLoadSummaries(Map<LatencyConstraintID, LatencyConstraintCpuLoadSummary> summaries) {
+		this.webStatistic.logCpuLoadSummaries(summaries);
+
+		for (LatencyConstraintID constraint : summaries.keySet()) {
+			CpuLoadLogger logger = this.cpuLoadLoggers.get(constraint);
+
+			if (logger != null) {
+				try {
+					logger.logCpuLoads(summaries.get(constraint));
+
+				} catch (IOException e) {
+					LOG.error("Error during cpu load logging", e);
 				}
 			}
 		}
@@ -241,7 +294,15 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 			try {
 				logger.close();
 			} catch (IOException e) {
-				// ignore
+				LOG.warn("Failure while closing qos logger!", e);
+			}
+		}
+
+		for (CpuLoadLogger logger : cpuLoadLoggers.values()) {
+			try {
+				logger.close();
+			} catch (IOException e) {
+				LOG.warn("Failure while closing cpu load logger!", e);
 			}
 		}
 
@@ -251,6 +312,8 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 		taskCpuLoads.clear();
 		vertexTopologicalScores.clear();
 		scalingPolicy = null;
+
+		QosStatisticsServlet.removeJob(this.jobID);
 	}
 
 	private boolean scalingIsDue(long now) {

@@ -32,7 +32,7 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.QosConst
  * 
  * @author Bjoern Lohrmann
  */
-public class QosLogger {
+public class QosLogger extends AbstractQosLogger {
 	/**
 	 * Provides access to the configuration entry which defines the log file
 	 * location.
@@ -44,10 +44,9 @@ public class QosLogger {
 
 	private BufferedWriter writer;
 
-	private long loggingInterval;
 
 	public QosLogger(JobGraphLatencyConstraint constraint, long loggingInterval) throws IOException {
-		this.loggingInterval = loggingInterval;
+		super(loggingInterval);
 
 		String logFile = GlobalConfiguration.getString(LOGFILE_PATTERN_KEY, DEFAULT_LOGFILE_PATTERN);
 		if (logFile.contains("%s")) {
@@ -57,11 +56,11 @@ public class QosLogger {
 		this.writeHeaders(constraint.getSequence());
 	}
 
-
+	@Override
 	public void logSummary(QosConstraintSummary summary) throws IOException {
 
 		StringBuilder builder = new StringBuilder();
-		builder.append(this.getLogTimestamp());
+		builder.append(this.getLogTimestamp() / 1000);
 		builder.append(';');
 		builder.append(summary.getNoOfSequences());
 		builder.append(';');
@@ -94,11 +93,6 @@ public class QosLogger {
 
 	private String formatDouble(double doubleValue) {
 		return String.format("%.2f", doubleValue);
-	}
-
-	private Object getLogTimestamp() {
-		return QosUtils.alignToInterval(System.currentTimeMillis(),
-				this.loggingInterval) / 1000;
 	}
 
 	private void writeHeaders(JobGraphSequence jobGraphSequence) throws IOException {

@@ -57,14 +57,19 @@ public class ConstraintUtil {
 	 *             input parameters.
 	 */
 	public static void defineLatencyConstraint(JobGraphSequence sequence,
-			long maxLatencyInMillis, JobGraph jobGraph) throws IOException {
+			long maxLatencyInMillis, JobGraph jobGraph, String name) throws IOException {
 
 		ensurePreconditions(sequence, jobGraph);
 
 		JobGraphLatencyConstraint constraint = new JobGraphLatencyConstraint(
-				sequence, maxLatencyInMillis);
+				sequence, maxLatencyInMillis, name);
 
 		addConstraint(constraint, jobGraph);
+	}
+
+	public static void defineLatencyConstraint(JobGraphSequence sequence,
+			long maxLatencyInMillis, JobGraph jobGraph) throws IOException {
+		defineLatencyConstraint(sequence, maxLatencyInMillis, jobGraph, generateConstraintName(sequence, jobGraph));
 	}
 
 	public static void addConstraint(JobGraphLatencyConstraint constraint,
@@ -107,20 +112,27 @@ public class ConstraintUtil {
 	 */
 	public static void defineAllLatencyConstraintsBetween(
 			AbstractJobVertex begin, AbstractJobVertex end,
-			long maxLatencyInMillis) throws IOException {
+			long maxLatencyInMillis, String name) throws IOException {
 
 		int constraintsDefined = 0;
 		for (int i = 0; i < begin.getNumberOfForwardConnections(); i++) {
 			for (int j = 0; j < end.getNumberOfBackwardConnections(); j++) {
 				constraintsDefined += defineAllLatencyConstraintsBetweenHelper(
 						begin, end, maxLatencyInMillis,
-						-1, i, j, -1);
+						-1, i, j, -1, name);
 			}
 		}
 		if (constraintsDefined == 0) {
 			throw new IllegalArgumentException(
 					"Could not find any sequences between the given vertices. Are the vertices connected?");
 		}
+	}
+
+	public static void defineAllLatencyConstraintsBetween(
+			AbstractJobVertex begin, AbstractJobVertex end,
+			long maxLatencyInMillis) throws IOException {
+
+		defineAllLatencyConstraintsBetween(begin, end, maxLatencyInMillis, generateConstraintName(begin, end, false));
 	}
 
 	/**
@@ -129,14 +141,14 @@ public class ConstraintUtil {
 	public static void defineAllLatencyConstraintsBetween(
 			AbstractJobVertex begin, int beginInputGateIndex,
 			AbstractJobVertex end, int endOutputGateIndex,
-			long maxLatencyInMillis) throws IOException {
+			long maxLatencyInMillis, String name) throws IOException {
 
 		int constraintsDefined = 0;
 		for (int i = 0; i < begin.getNumberOfForwardConnections(); i++) {
 			for (int j = 0; j < end.getNumberOfBackwardConnections(); j++) {
 				constraintsDefined += defineAllLatencyConstraintsBetweenHelper(
 						begin, end, maxLatencyInMillis,
-						beginInputGateIndex, i, j, endOutputGateIndex);
+						beginInputGateIndex, i, j, endOutputGateIndex, name);
 			}
 		}
 		if (constraintsDefined == 0) {
@@ -145,12 +157,21 @@ public class ConstraintUtil {
 		}
 	}
 
+	public static void defineAllLatencyConstraintsBetween(
+			AbstractJobVertex begin, int beginInputGateIndex,
+			AbstractJobVertex end, int endOutputGateIndex,
+			long maxLatencyInMillis) throws IOException {
+
+		defineAllLatencyConstraintsBetween(begin, beginInputGateIndex, end, endOutputGateIndex,
+				maxLatencyInMillis, generateConstraintName(begin, end, true));
+	}
+
 	/**
 	 * Finds all possible sequences starting and ending with the given edges. The given
 	 * edges must be forward pointing {@link JobEdge} objects.
 	 */
 	public static void defineAllLatencyConstraintsBetween(JobEdge beginEdge,
-			JobEdge endEdge, long maxLatencyInMillis) throws IOException {
+			JobEdge endEdge, long maxLatencyInMillis, String name) throws IOException {
 
 		ensureForwardEdge(beginEdge);
 		ensureForwardEdge(endEdge);
@@ -167,13 +188,18 @@ public class ConstraintUtil {
 
 		int constraintsDefined = defineAllLatencyConstraintsBetweenHelper(
 				excludedBeginVertex, excludedEndVertex, maxLatencyInMillis,
-				-1, beginOutputGate, endInputGate, -1);
+				-1, beginOutputGate, endInputGate, -1, name);
 		if (constraintsDefined == 0) {
 			throw new IllegalArgumentException(
 					"Could not find any sequences between the given vertices. Are the vertices connected?");
 		}
 	}
 
+	public static void defineAllLatencyConstraintsBetween(JobEdge beginEdge,
+			JobEdge endEdge, long maxLatencyInMillis) throws IOException {
+
+		defineAllLatencyConstraintsBetween(beginEdge, endEdge, maxLatencyInMillis, generateConstraintName(beginEdge, endEdge));
+	}
 
 	private static void ensureForwardEdge(JobEdge edge) {
 
@@ -245,11 +271,12 @@ public class ConstraintUtil {
 	 */
 	public static void defineAllLatencyConstraintsBetween(
 			AbstractJobVertex begin, AbstractJobVertex end, long maxLatencyInMillis,
-			int beginInputGate, int beginOutputGate, int endInputGate, int endOutputGate) throws IOException {
+			int beginInputGate, int beginOutputGate, int endInputGate, int endOutputGate,
+			String name) throws IOException {
 
 		int constraintsDefined = defineAllLatencyConstraintsBetweenHelper(
 				begin, end, maxLatencyInMillis,
-				beginInputGate, beginOutputGate, endInputGate, endOutputGate);
+				beginInputGate, beginOutputGate, endInputGate, endOutputGate, name);
 
 		if (constraintsDefined == 0) {
 			throw new IllegalArgumentException(
@@ -257,16 +284,25 @@ public class ConstraintUtil {
 		}
 	}
 
-	private static int defineAllLatencyConstraintsBetweenHelper(
+	public static void defineAllLatencyConstraintsBetween(
 			AbstractJobVertex begin, AbstractJobVertex end, long maxLatencyInMillis,
 			int beginInputGate, int beginOutputGate, int endInputGate, int endOutputGate) throws IOException {
+
+		defineAllLatencyConstraintsBetweenHelper(begin, end, maxLatencyInMillis,
+				beginInputGate, beginOutputGate, endInputGate, endOutputGate, generateConstraintName(begin, end, true));
+	}
+
+	private static int defineAllLatencyConstraintsBetweenHelper(
+			AbstractJobVertex begin, AbstractJobVertex end, long maxLatencyInMillis,
+			int beginInputGate, int beginOutputGate, int endInputGate, int endOutputGate,
+			String name) throws IOException {
 
 		List<JobGraphSequence> sequences = findAllSequencesBetween(begin, end,
 				beginInputGate, beginOutputGate, endInputGate, endOutputGate);
 
 		for (JobGraphSequence sequence : sequences) {
 			defineLatencyConstraint(sequence, maxLatencyInMillis,
-					begin.getJobGraph());
+					begin.getJobGraph(), name);
 		}
 
 		return sequences.size();
@@ -397,4 +433,45 @@ public class ConstraintUtil {
 		return toReturn;
 	}
 
+	/** Generate constraint name from given vertices names. */
+	public static String generateConstraintName(String beginVertex, String endVertex, boolean vertexIncluded) {
+		return beginVertex + " -> " + endVertex	+ " (start/end vertex " + (vertexIncluded ? "included" : "excluded") + ")";
+	}
+
+	public static String generateConstraintName(AbstractJobVertex begin, AbstractJobVertex end, boolean vertexIncluded) {
+		return generateConstraintName(begin.getName(), end.getName(), vertexIncluded);
+	}
+
+	public static String generateConstraintName(JobEdge beginEdge, JobEdge endEdge) {
+		if (beginEdge.getConnectedVertex().getBackwardConnection(beginEdge.getIndexOfInputGate()) == null)
+			throw new IllegalArgumentException("Can't find predecessor vertex.");
+
+		AbstractJobVertex excludedStartVertex =
+				beginEdge.getConnectedVertex().getBackwardConnection(beginEdge.getIndexOfInputGate()).getConnectedVertex();
+
+		return generateConstraintName(excludedStartVertex.getName(), endEdge.getConnectedVertex().getName(), false);
+	}
+
+	public static String generateConstraintName(JobGraphSequence sequence) {
+		return generateConstraintName(sequence.getFirstVertex().getName(), sequence.getLastVertex().getName(), true);
+	}
+
+	public static String generateConstraintName(JobGraphSequence sequence, JobGraph jobGraph) {
+		String beginVertex;
+		String endVertex;
+
+		if (sequence.getFirst().isVertex()) {
+			beginVertex = sequence.getFirst().getName();
+		} else {
+			beginVertex = jobGraph.findVertexByID(sequence.getFirst().getSourceVertexID()).getName();
+		}
+
+		if (sequence.getLast().isVertex()) {
+			endVertex = sequence.getLast().getName();
+		} else {
+			endVertex = jobGraph.findVertexByID(sequence.getLast().getTargetVertexID()).getName();
+		}
+
+		return generateConstraintName(beginVertex, endVertex, sequence.getFirst().isVertex());
+	}
 }

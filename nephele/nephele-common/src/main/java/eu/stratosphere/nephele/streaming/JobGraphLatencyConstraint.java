@@ -45,6 +45,8 @@ public class JobGraphLatencyConstraint implements IOReadableWritable {
 
 	private long latencyConstraintInMillis;
 
+	private String name;
+
 	/**
 	 * Public parameterless constructor for deserialization.
 	 */
@@ -52,11 +54,17 @@ public class JobGraphLatencyConstraint implements IOReadableWritable {
 	}
 
 	public JobGraphLatencyConstraint(JobGraphSequence sequence,
-			long latencyConstraintInMillis) {
+			long latencyConstraintInMillis, String name) {
 
 		this.constraintID = new LatencyConstraintID();
 		this.sequence = sequence;
 		this.latencyConstraintInMillis = latencyConstraintInMillis;
+		this.name = name;
+	}
+
+	public JobGraphLatencyConstraint(JobGraphSequence sequence,
+			long latencyConstraintInMillis) {
+		this(sequence, latencyConstraintInMillis, ConstraintUtil.generateConstraintName(sequence));
 	}
 
 	/**
@@ -86,6 +94,15 @@ public class JobGraphLatencyConstraint implements IOReadableWritable {
 		return this.latencyConstraintInMillis;
 	}
 
+	/**
+	 * Returns the constraint name.
+	 *
+	 * @return the constraint name
+	 */
+	public String getName() {
+		return name;
+	}
+
 	/*
 	 * (non-Javadoc)
 	 * 
@@ -97,6 +114,7 @@ public class JobGraphLatencyConstraint implements IOReadableWritable {
 		this.constraintID.write(out);
 		this.sequence.write(out);
 		out.writeLong(this.latencyConstraintInMillis);
+		out.writeUTF(this.name);
 	}
 
 	/*
@@ -112,5 +130,6 @@ public class JobGraphLatencyConstraint implements IOReadableWritable {
 		this.sequence = new JobGraphSequence();
 		this.sequence.read(in);
 		this.latencyConstraintInMillis = in.readLong();
+		this.name = in.readUTF();
 	}
 }

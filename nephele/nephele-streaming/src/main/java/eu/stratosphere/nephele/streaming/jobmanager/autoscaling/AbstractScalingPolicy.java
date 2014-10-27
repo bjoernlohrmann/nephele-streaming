@@ -10,7 +10,6 @@ import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
-import eu.stratosphere.nephele.streaming.SequenceElement;
 import eu.stratosphere.nephele.streaming.message.TaskCpuLoadChange;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.QosConstraintSummary;
 
@@ -37,16 +36,18 @@ public abstract class AbstractScalingPolicy {
 
 	public Map<JobVertexID, Integer> getScalingActions(
 			List<QosConstraintSummary> constraintSummaries,
-			Map<ExecutionVertexID, TaskCpuLoadChange> taskCpuLoads)
+			Map<ExecutionVertexID, TaskCpuLoadChange> taskCpuLoads,
+			Map<LatencyConstraintID, LatencyConstraintCpuLoadSummary> cpuLoadsSummaryAggreators)
 			throws UnexpectedVertexExecutionStateException {
 
 		Map<JobVertexID, Integer> scalingActions = new HashMap<JobVertexID, Integer>();
 
 		for (QosConstraintSummary constraintSummary : constraintSummaries) {
 			collectScalingActionsForConstraint(
-					qosConstraints.get(constraintSummary
-							.getLatencyConstraintID()), constraintSummary,
-					taskCpuLoads, scalingActions);
+					qosConstraints.get(constraintSummary.getLatencyConstraintID()),
+					constraintSummary, taskCpuLoads,
+					cpuLoadsSummaryAggreators.get(constraintSummary.getLatencyConstraintID()),
+					scalingActions);
 		}
 
 		return scalingActions;
@@ -56,6 +57,7 @@ public abstract class AbstractScalingPolicy {
 			JobGraphLatencyConstraint constraint,
 			QosConstraintSummary constraintSummary,
 			Map<ExecutionVertexID, TaskCpuLoadChange> taskCpuLoads,
+			LatencyConstraintCpuLoadSummary summarizedCpuUtilizations,
 			Map<JobVertexID, Integer> scalingActions)
 			throws UnexpectedVertexExecutionStateException;
 
@@ -66,51 +68,6 @@ public abstract class AbstractScalingPolicy {
 				groupVertex.getMinElasticNumberOfRunningSubtasks(),
 				Math.min(newNoOfSubtasks,
 						groupVertex.getMaxElasticNumberOfRunningSubtasks()));
-	}
-
-	protected Map<JobVertexID, GroupVertexCpuLoadSummary> summarizeCpuUtilizations(
-			JobGraphLatencyConstraint constraint,
-			Map<ExecutionVertexID, TaskCpuLoadChange> taskCpuLoads)
-			throws UnexpectedVertexExecutionStateException {
-
-		Map<JobVertexID, GroupVertexCpuLoadSummary> toReturn = new HashMap<JobVertexID, GroupVertexCpuLoadSummary>();
-
-		for (SequenceElement<JobVertexID> seqElem : constraint.getSequence()) {
-			if (seqElem.isEdge()) {
-
-				JobVertexID sourceVertexID = seqElem.getSourceVertexID();
-				if (!toReturn.containsKey(sourceVertexID)) {
-					toReturn.put(
-							sourceVertexID,
-							new GroupVertexCpuLoadSummary(taskCpuLoads, execGraph
-									.getExecutionGroupVertex(sourceVertexID)));
-				}
-
-				JobVertexID targetVertexID = seqElem.getTargetVertexID();
-				if (!toReturn.containsKey(targetVertexID)) {
-					toReturn.put(
-							targetVertexID,
-							new GroupVertexCpuLoadSummary(taskCpuLoads, execGraph
-									.getExecutionGroupVertex(targetVertexID)));
-				}
-
-			}
-		}
-
-		return toReturn;
-	}
-
-
-	protected int getNoOfRunningTasks(ExecutionGroupVertex sendingGroupVertex) {
-		int noOfSendingTasks;
-		if (sendingGroupVertex.hasElasticNumberOfRunningSubtasks()) {
-			noOfSendingTasks = sendingGroupVertex
-					.getCurrentElasticNumberOfRunningSubtasks();
-		} else {
-			noOfSendingTasks = sendingGroupVertex
-					.getCurrentNumberOfGroupMembers();
-		}
-		return noOfSendingTasks;
 	}
 
 	protected ExecutionGraph getExecutionGraph() {

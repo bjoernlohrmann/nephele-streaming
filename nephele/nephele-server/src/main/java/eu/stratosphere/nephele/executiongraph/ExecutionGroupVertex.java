@@ -991,4 +991,11 @@ public final class ExecutionGroupVertex {
 	public boolean hasElasticNumberOfRunningSubtasks() {
 		return this.minElasticNumberOfRunningSubtasks != -1;
 	}
+
+	public int getNumberOfRunningSubstasks() {
+		if (hasElasticNumberOfRunningSubtasks())
+			return getCurrentElasticNumberOfRunningSubtasks();
+		else
+			return getCurrentNumberOfGroupMembers();
+	}
 }

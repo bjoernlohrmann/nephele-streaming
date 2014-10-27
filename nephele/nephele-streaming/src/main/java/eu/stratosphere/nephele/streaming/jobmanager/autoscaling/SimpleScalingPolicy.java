@@ -40,17 +40,17 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 			JobGraphLatencyConstraint constraint,
 			QosConstraintSummary constraintSummary,
 			Map<ExecutionVertexID, TaskCpuLoadChange> taskCpuLoads,
+			LatencyConstraintCpuLoadSummary summarizedCpuUtilizations,
 			Map<JobVertexID, Integer> scalingActions)
 			throws UnexpectedVertexExecutionStateException {
 
-		Map<JobVertexID, GroupVertexCpuLoadSummary> summarizedCpuUtilizations = summarizeCpuUtilizations(
-				constraint, taskCpuLoads);
-		
+		int edgeIndex = 0;
+		double[][] memberStats = constraintSummary.getAggregatedMemberStatistics();
+		int[] taskDop = constraintSummary.getTaskDop();
+
 		for (SequenceElement<JobVertexID> seqElem : constraint.getSequence()) {
 			if (seqElem.isEdge()) {
 
-				ExecutionGroupVertex senderGroupVertex = getExecutionGraph()
-						.getExecutionGroupVertex(seqElem.getSourceVertexID());
 				ExecutionGroupVertex consumerGroupVertex = getExecutionGraph()
 						.getExecutionGroupVertex(seqElem.getTargetVertexID());
 
@@ -58,18 +58,10 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 					continue;
 				}
 
-				double[][] memberStats = constraintSummary
-						.getAggregatedMemberStatistics();
-				double recordSendRate = memberStats[seqElem
-						.getIndexInSequence()][2]
-						* getNoOfRunningTasks(senderGroupVertex);
-				double recordConsumptionRate = memberStats[seqElem
-						.getIndexInSequence()][3]
-						* getNoOfRunningTasks(consumerGroupVertex);
+				double recordSendRate = memberStats[seqElem.getIndexInSequence()][2] * taskDop[edgeIndex];
+				double recordConsumptionRate = memberStats[seqElem.getIndexInSequence()][3] * taskDop[edgeIndex + 1];
 
-				
-				GroupVertexCpuLoadSummary cpuLoadSummary = summarizedCpuUtilizations
-						.get(seqElem.getTargetVertexID());
+				GroupVertexCpuLoadSummary cpuLoadSummary = summarizedCpuUtilizations.get(seqElem.getTargetVertexID());
 				
 				LOG.debug(String.format("sendRate: %.1f | consumeRate: %.1f | avgCpuUtil: %.1f | hi:%d med:%d lo:%d\n",
 						recordSendRate, recordConsumptionRate, cpuLoadSummary.getAvgCpuUtilization(),
@@ -103,6 +95,8 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 					addScaleDownAction(seqElem, constraintSummary,
 							cpuLoadSummary.getAvgCpuUtilization() / 100.0, scalingActions);
 				}
+
+				edgeIndex++;
 			}
 		}
 		LOG.debug(scalingActions.toString());
@@ -115,8 +109,9 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 		// midpoint between medium and high cpu load thresholds
 		double targetCpuUtil = (CpuLoadClassifier.MEDIUM_THRESHOLD_PERCENT + CpuLoadClassifier.HIGH_THRESHOLD_PERCENT) / 200.0;
 
-		int noOfSenderTasks = getNoOfRunningTasks(getExecutionGraph()
-				.getExecutionGroupVertex(edge.getSourceVertexID()));
+		int noOfSenderTasks = getExecutionGraph()
+				.getExecutionGroupVertex(edge.getSourceVertexID())
+				.getNumberOfRunningSubstasks();
 
 		double[] edgeStats = constraintSummary.getAggregatedMemberStatistics()[edge
 				.getIndexInSequence()];
@@ -140,7 +135,7 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 
 		// merge with possibly existing scaling action from another constraint
 		int scalingAction = newNoOfConsumerTasks
-				- getNoOfRunningTasks(consumer);
+				- consumer.getNumberOfRunningSubstasks();
 		if (scalingAction != 0) {
 			if (scalingActions.containsKey(consumer.getJobVertexID())) {
 				scalingAction = Math.max(scalingAction,
@@ -160,7 +155,7 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 		ExecutionGroupVertex consumer = getExecutionGraph()
 				.getExecutionGroupVertex(edge.getTargetVertexID());
 
-		int noOfConsumerTasks = getNoOfRunningTasks(consumer);
+		int noOfConsumerTasks = consumer.getNumberOfRunningSubstasks();
 
 		double avgConsumeRate = constraintSummary
 				.getAggregatedMemberStatistics()[edge.getIndexInSequence()][3];
@@ -179,7 +174,7 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 
 		// merge with possibly existing scaling action from another constraint
 		int scalingAction = newNoOfConsumerTasks
-				- getNoOfRunningTasks(consumer);
+				- consumer.getNumberOfRunningSubstasks();
 		if (scalingAction != 0) {
 			if (scalingActions.containsKey(consumer.getJobVertexID())) {
 				scalingAction = Math.min(scalingAction,

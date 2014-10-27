@@ -22,6 +22,8 @@ public class QosConstraintSummary implements IOReadableWritable {
 	/**
 	 * Each subarray aggregates data for a {@link QosGroupVertex} or a
 	 * {@link QosGroupEdge}.
+	 *
+	 * @see #getAggregatedMemberStatistics()
 	 */
 	private double[][] aggregatedMemberStats;
 
@@ -36,6 +38,8 @@ public class QosConstraintSummary implements IOReadableWritable {
 	private int noOfSequencesBelowConstraint;
 
 	private int noOfSequencesAboveConstraint;
+
+	private int[] taskDop;
 
 	private boolean isFinalized;
 	
@@ -127,6 +131,11 @@ public class QosConstraintSummary implements IOReadableWritable {
 		
 		this.aggregatedMemberStats[indexInSequence][2] = totalEmissionRate;
 		this.aggregatedMemberStats[indexInSequence][4] = noOfEmittingVertices;
+	}
+
+	/** @see #getTaskDop() */
+	public void setTaskDop(int[] taskDop) {
+		this.taskDop = taskDop;
 	}
 
 	public void mergeOtherSummary(QosConstraintSummary constraintSummary) {
@@ -298,6 +307,15 @@ public class QosConstraintSummary implements IOReadableWritable {
 		return noOfSequencesBelowConstraint;
 	}
 	
+	/**
+	 * Contains task dop of #edges + 1 tasks.
+	 *
+	 * If sequence starts/ends with an edge, this array contains source/target
+	 * task too (which is not part of this sequence).
+	 */
+	public int[] getTaskDop() {
+		return taskDop;
+	}
 	
 	public boolean hasData() {
 		return noOfSequences > 0;
@@ -322,6 +340,7 @@ public class QosConstraintSummary implements IOReadableWritable {
 		aggregatedTotalLatency = 0;
 		minTotalLatency = Double.MAX_VALUE;
 		maxTotalLatency = Double.MIN_VALUE;
+		taskDop = new int[0];
 		isFinalized = false;
 	}
 

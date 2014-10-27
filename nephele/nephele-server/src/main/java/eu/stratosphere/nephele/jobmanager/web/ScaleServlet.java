@@ -67,6 +67,8 @@ public class ScaleServlet extends HttpServlet {
 			} else
 				throw new RuntimeException("Mode parameter missing.");
 
+			resp.getWriter().print("{ \"result\": \"ok\" }");
+
 		} catch (Exception e) {
 			resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 			resp.getWriter().print(e.getMessage());

@@ -115,10 +115,12 @@ public class WebInfoServer {
 		servletContext.addServlet(new ServletHolder(new LogfileInfoServlet(new File(basePath+"/log"))), "/logInfo");
 		servletContext.addServlet(new ServletHolder(new ScaleServlet(jobmanager)), "/scale");
 		servletContext.addServlet(new ServletHolder(new SetupInfoServlet(jobmanager)), "/setupInfo");
+		servletContext.addServlet(new ServletHolder(new QosStatisticsServlet()), "/qos-statistics");
 
 		// ----- the handler serving all the static files -----
 		ResourceHandler resourceHandler = new ResourceHandler();
 		resourceHandler.setDirectoriesListed(false);
+		resourceHandler.setAliases(true); // serve symlinks
 		resourceHandler.setResourceBase(webDir.getAbsolutePath());
 
 		// ----- add the handlers to the list handler -----
