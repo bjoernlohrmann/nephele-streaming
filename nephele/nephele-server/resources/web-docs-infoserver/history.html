@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Nephele Streaming - Analyze Job</title>
+    <title>Nephele Streaming - History</title>
 
     <!-- Common css and scripts -->
     <link rel="stylesheet" href="css/bootstrap.css" />
@@ -16,9 +16,7 @@
     <script src="js/common.js"></script>
 
     <!-- Page specific scripts -->
-    <link rel="stylesheet" href="css/timeline.css">
-    <script src="js/timeline.js"></script>
-    <script src="js/analyzer.js"></script>
+    <script src="js/history.js"></script>
   </head>
 
   <body>
@@ -70,48 +68,24 @@
       <div class="container-fluid">
 
         <div class="page-header">
-          <h1>History <small>Analyze a recent job</small></h1>
+          <h1>History <small>Overview about recent jobs</small></h1>
         </div>
 
-        <div class="panel panel-primary">
-            <div class="panel-heading">
-                <h3 id="jobtitle" class="panel-title"> Running Jobs</h3>
-            </div>
-            <div id="jobs" class="panel-body">
-                <div id="started">
-                   Scheduled: <span id="time"></span>
-                </div>
-                <div id="runtime">
-                   Runtime: <span id="run"></span>
-                </div>
-                <div id="endstatus">
-                   Status: <span id="status"></span>
-                </div>
-                <p id="control">
-                   <div class="btn-group">
-                    <button id="flow" type="button" class="btn btn-info">Flow Layout</button>
-                    <button id="stack" type="button" class="btn btn-info">Stack Layout</button>
-                   </div>
-                </p>
-                <div id="job_timeline"></div>
-           </div>
+        <div id="jobs-finished" class="panel panel-green">
+          <div class="panel-heading"><h3 class="panel-title"><i class="fa fa-check"></i> Jobs Finished</h3></div>
+          <div class="list-group">
+          </div>
         </div>
 
-        <div class="panel panel-primary">
-          <div class="panel-heading">
-            <h3 class="panel-title">Tasks</h3> 
-          </div>
-          <div id="vertices" class="panel-body">
-            Select a task by clicking on the corresponding bar in the Job Overview section.
+        <div id="jobs-canceled" class="panel panel-yellow">
+          <div class="panel-heading"><h3 class="panel-title"><i class="fa fa-eraser"></i> Jobs Canceled</h3></div>
+          <div class="list-group">
           </div>
         </div>
-        
-        <div class="panel panel-primary">
-          <div class="panel-heading">
-            <div class="panel-title">Accumulator Results</div>
-          </div>
-          <div id="accumulators" class="panel-body">
-            The job does not have any accumulators
+
+        <div id="jobs-failed" class="panel panel-red">
+          <div class="panel-heading"><h3 class="panel-title"><i class="fa fa-flash"></i> Jobs Failed</h3></div>
+          <div class="list-group">
           </div>
         </div>
 

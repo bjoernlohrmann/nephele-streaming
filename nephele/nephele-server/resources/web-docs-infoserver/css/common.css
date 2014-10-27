@@ -1,0 +1,128 @@
+/*!
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+.opensub {
+	cursor: pointer
+}
+
+/* sb-admin bugfix */
+body { 
+    background: #fff;
+}
+#page-wrapper {
+    padding: 0px;
+}
+@media(min-width: 768px) {
+    .side-nav {
+        width: 225px;
+        height: 2000px;
+        border-right: 1px solid #080808;
+    }
+    #page-wrapper {
+        padding-left: 225px; /* 225px = side-nav */
+    }
+}
+
+/* navbar logo */
+nav .navbar-brand-img {
+  padding: 5px 0px 5px 15px;
+}
+
+nav .navbar-brand-img img {
+  height: 40px;
+}
+
+/* Add some space after col size buttons */
+.col-btn {
+    margin-bottom: 20px;
+}
+
+/* Center button groups in button toolbars */
+.btn-toolbar.text-center > .btn-group {
+    margin-bottom: 10px;
+    float: none;
+}
+
+/* show list-group links as normal links (using default bootstrap link colors) */
+.list-group a {
+    color: #428bca;
+}
+.list-group a:hover {
+    color: #2a6496;
+    text-decoration: underline;
+}
+
+.list-group .constraint .list-group-item:first-child {
+  background-color: #f5f5f5;
+  border-color: #ddd;
+  border-top-width: 1px;
+}
+.qos-chart-box {
+    height: 300px;
+    position: relative;
+    padding: 15px 35px 25px 35px;
+}
+
+.axis-label {
+  position: absolute;
+}
+.left-axis-label {
+  left: 0px;
+  top: 50%;
+  bottom: 50%;
+  -moz-transform: translate(-50%) rotate(270deg);
+  -webkit-transform: translate(-50%) rotate(270deg);
+  -o-transform: translate(-50%) rotate(270deg);
+  -ms-transform: translate(-50%) rotate(270deg);
+}
+.right-axis-label {
+  right: 0px;
+  top: 50%;
+  bottom: 50%;
+  -moz-transform: translate(50%) rotate(90deg);
+  -webkit-transform: translate(50%) rotate(90deg);
+  -o-transform: translate(50%) rotate(90deg);
+  -ms-transform: translate(50%) rotate(90deg);
+}
+.bottom-axis-label {
+  bottom: 5px;
+  left: 0;
+  width: 100%;
+  text-align: center;
+}
+
+.chart {
+  width: 100%;
+  height: 100%;
+}
+
+#chart-tooltip {
+  position: absolute;
+  display: none;
+  border: 1px solid #949494;
+  padding 2px;
+  background-color: #F8F8F8;
+  opacity: 0.9;
+}
+#chart-tooltip table {
+  margin-bottom: 0px;
+}
+#chart-tooltip table td {
+  font-size: smaller;
+  padding: 2px;
+}

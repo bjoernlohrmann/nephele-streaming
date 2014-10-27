@@ -1,84 +1,147 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html>
-<head>
-	<title>Stratosphere JobManager</title>
-	<meta http-equiv="content-type" content="text/html; charset=UTF-8" />
-	<link rel="stylesheet" type="text/css" href="css/nephelefrontend.css" />
-	<script type="text/javascript" src="js/jquery.js"></script>
-	<script type="text/javascript" src="js/jcanvas.min.js"></script>
-	<script type="text/javascript" src="js/jquery.flot.min.js"></script>
-	<script type="text/javascript" src="js/helpers.js"></script>
-	<script type="text/javascript" src="js/jobmanagerFrontend.js"></script>
-</head>
-<body>
-	<div id="page-sidebar">
-		<div id="header-logo">
-			<img width="230" alt="Stratosphere Logo"
-				src="img/StratosphereLogo.png" /> <i class="opacity-80">v2.0</i>
-		</div>
-		<div class="scrollable-content active" id="sidebar-menu"
-			style="overflow: hidden; height: 130px;">
-			<ul style="">
-				<li class="current-page"><a title="Dashboard" href="index.html">
-						Job Manager </a></li>
-				<li><a title="Components" target="_blank" href="/logInfo">
-						Log </a></li>
-				<li><a title="Components" target="_blank"
-					href="/logInfo?get=stdout"> Stdout </a></li>
-			</ul>
-		</div>
-	</div>
-	<div id="page-main">
-		<div id="page-main-wrapper">
-			<div id="page-content">
-				<!-- the main panel with the jobs list and the preview pane -->
-				<div class="contentbox">
-					<h3 class="contentbox-header">
-						<span>Running Jobs</span>
-					</h3>
-					<div id="jobs" class="contentbox-wrapper"></div>
-				</div>
-				<div class="col2">
-					<div class="contentbox">
-						<h3 class="contentbox-header">
-							<span>Job History</span>
-						</h3>
-						<div class="contentbox-wrapper">
-							<ul id="jobsArchive"></ul>
-						</div>
-					</div>
-				</div>
-				<div class="col2 col2-2">
-					<div class="contentbox">
-						<h3 class="contentbox-header">
-							<span>Statistics</span>
-						</h3>
-						<div class="contentbox-wrapper">
-							<div class="infobox border-green">
-								<b>Task Managers</b> <span id="stat-taskmanagers" class="stats">
-								</span>
-							</div>
-							<br style="clear: both" />
-							<div class="infobox border-orange">
-								<b>Jobs Finished</b> <span id="jobs-finished" class="stats">
-								</span>
-							</div>
-							<div class="infobox border-blue">
-								<b>Jobs Failed</b> <span id="jobs-failed" class="stats">
-								</span>
-							</div>
-							<div class="infobox border-red">
-								<b>Jobs Canceled</b> <span id="jobs-canceled" class="stats">
-								</span>
-							</div>
-							<br style="clear: both" />
-						</div>
-					</div>
-				</div>
-				<br style="clear: both" />
-			</div>
-		</div>
-	</div>
-</body>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Nephele Streaming - Dashboard</title>
+
+    <!-- Common css and scripts -->
+    <link rel="stylesheet" href="css/bootstrap.css" />
+    <link rel="stylesheet" href="css/sb-admin.css" />
+    <link rel="stylesheet" href="css/font-awesome.min.css" />
+    <link rel="stylesheet" href="css/common.css" />
+    <script src="js/jquery.min.js"></script>
+    <script src="js/bootstrap.js"></script>
+    <script src="js/common.js"></script>
+
+    <!-- Page specific scripts -->
+    <script src="js/jcanvas.min.js"></script>
+    <script src="js/dashboard.js"></script>
+  </head>
+
+  <body>
+    <nav class='navbar navbar-inverse navbar-fixed-top' role='navigation'>
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+
+        <a class="navbar-brand" href="index.html">Nephele Streaming</a>
+      </div><!-- /.navbar-header -->
+   
+      <div class="collapse navbar-collapse">
+        <!-- Logging dropdown -->
+        <ul class="nav navbar-nav navbar-right">
+          <li class="dropdown user-dropdown">
+            <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+              <i class="fa fa-archive"></i> Log Files <span class="caret"></span>
+            </a>
+            <ul class="dropdown-menu">
+              <li><a href="logInfo"><i class="fa fa-keyboard-o"></i> Log Info</a></li>
+              <li><a href="logInfo?get=stdout"><i class="fa fa-keyboard-o"></i> Stdout</a></li>
+            </ul>
+          </li>
+        </ul>
+
+        <!-- Sidebar -->
+        <ul class="nav navbar-nav side-nav"> 
+           <li class="active"><a href="index.html"><i class="fa fa-dashboard"></i> Dashboard</a></li> 
+           <li><a href="history.html"><i class="fa fa-bar-chart-o"></i> History</a></li> 
+           <li><a href="configuration.html"><i class="fa fa-keyboard-o"></i> Configuration</a></li> 
+           <li><a href="taskmanagers.html"><i class="fa fa-building-o"></i> Task Managers</a></li> 
+           <li><a href="qos-statistics.html"><i class="fa fa-area-chart"></i> QoS Statistics</a></li> 
+        </ul>
+      </div><!-- /.navbar-collapse -->
+    </nav>
+
+    <div id="page-wrapper">
+      <div class="container-fluid">
+
+        <div class="page-header">
+          <h1>Dashboard Nephele Streaming<small id="version"></small></h1>
+        </div>
+
+        <div class="row">
+          <div class="col-lg-3 col-sm-6 col-btn">
+            <a class="btn btn-info btn-block" href="taskmanagers.html">
+              <div class="row">
+                <div class="col-xs-6 text-left">
+                  <i class="fa fa-info fa-5x"></i>
+                </div>
+                <div class="col-xs-6 text-right">
+                  <div class="huge" id="stat-taskmanagers"></div>
+                  Task Manager
+                </div>
+              </div>
+            </a>
+          </div>
+
+          <div class="col-lg-3 col-sm-6 col-btn">
+            <a class="btn btn-success btn-block" href="history.html#jobs-finished">
+              <div class="row">
+                <div class="col-xs-6 text-left">
+                  <i class="fa fa-check fa-5x"></i>
+                </div>
+                <div class="col-xs-6 text-right">
+                  <div class="huge" id="jobs-finished-count"></div>
+                  Jobs Finished
+                </div>
+              </div>
+            </a>
+          </div>
+
+          <div class="col-lg-3 col-sm-6 col-btn">
+            <a class="btn btn-warning btn-block" href="history.html#jobs-canceled">
+              <div class="row">
+                <div class="col-xs-6 text-left">
+                  <i class="fa fa-eraser fa-5x"></i>
+                </div>
+                <div class="col-xs-6 text-right">
+                  <div class="huge" id="jobs-canceled-count"></div>
+                  Jobs Canceled
+                </div>
+              </div>
+            </a>
+          </div>
+
+          <div class="col-lg-3 col-sm-6 col-btn">
+            <a class="btn btn-danger btn-block" href="history.html#jobs-failed">
+              <div class="row">
+                <div class="col-xs-6 text-left">
+                  <i class="fa fa-flash fa-5x"></i>
+                </div>
+                <div class="col-xs-6 text-right">
+                  <div class="huge" id="jobs-failed-count"></div>
+                  Jobs Failed
+                </div>
+              </div>
+            </a>
+          </div>
+        </div><!-- /.row -->
+
+        <div class="row">
+          <div class="col-lg-12">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  <i class="fa fa-play"></i> Running Jobs
+                  <i class="fa fa-spinner fa-spin pull-right poll-job-loading-icon"></i>
+                </h3>
+              </div>
+              <div class="panel-body">
+                <p id="rJpH">There are currently no running jobs, but you can analyze your old jobs in the <a href="history.html">history</a>.<p>
+                <div id="jobs" class="contentbox-wrapper"></div>
+              </div>
+            </div>
+          </div>
+        </div><!-- /.row -->
+
+      </div><!-- /.container-fluid -->
+    </div><!-- /#page-wrapper -->
+
+  </body>
 </html>

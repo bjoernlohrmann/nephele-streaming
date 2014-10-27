@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Nephele Streaming - QoS Statistics</title>
+
+    <!-- Common css and scripts -->
+    <link rel="stylesheet" href="../css/bootstrap.css" />
+    <link rel="stylesheet" href="../css/sb-admin.css" />
+    <link rel="stylesheet" href="../css/font-awesome.min.css" />
+    <link rel="stylesheet" href="../css/common.css" />
+    <script src="../js/jquery.min.js"></script>
+    <script src="../js/bootstrap.js"></script>
+    <script src="../js/common.js"></script>
+
+    <!-- Page specific scripts -->
+    <script src="js/jquery.flot.js"></script>
+    <script src="js/jquery.flot.time.js"></script>
+    <script src="js/jquery.flot.stack.js"></script>
+    <script src="js/jquery.flot.fillbetween.js"></script>
+    <script src="js/jquery.flot.crosshair.js"></script>
+    <script src="js/jquery.flot.navigate.js"></script>
+    <script src="js/jquery.flot.navigate-utils.js"></script>
+    <script src="js/qos-statistics.js"></script>
+  </head>
+
+  <body>
+    <nav class='navbar navbar-inverse navbar-fixed-top' role='navigation'>
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+
+        <a class="navbar-brand" href="index.html">Nephele Streaming</a>
+      </div><!-- /.navbar-header -->
+   
+      <div class="collapse navbar-collapse">
+        <!-- Logging dropdown -->
+        <ul class="nav navbar-nav navbar-right">
+          <li class="dropdown user-dropdown">
+            <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+              <i class="fa fa-archive"></i> Log Files <span class="caret"></span>
+            </a>
+            <ul class="dropdown-menu">
+              <li><a href="logInfo"><i class="fa fa-keyboard-o"></i> Log Info</a></li>
+              <li><a href="logInfo?get=stdout"><i class="fa fa-keyboard-o"></i> Stdout</a></li>
+            </ul>
+          </li>
+        </ul>
+
+        <!-- Sidebar -->
+        <ul class="nav navbar-nav side-nav"> 
+           <li><a href="index.html"><i class="fa fa-dashboard"></i> Dashboard</a></li> 
+           <li><a href="history.html"><i class="fa fa-bar-chart-o"></i> History</a></li> 
+           <li><a href="configuration.html"><i class="fa fa-keyboard-o"></i> Configuration</a></li> 
+           <li><a href="taskmanagers.html"><i class="fa fa-building-o"></i> Task Managers</a></li> 
+           <li class="active"><a href="qos-statistics.html"><i class="fa fa-area-chart"></i> QoS Statistics</a></li> 
+        </ul>
+      </div><!-- /.navbar-collapse -->
+    </nav>
+
+    <div id="page-wrapper">
+      <div class="container-fluid">
+
+        <div class="page-header">
+          <h1>
+            QoS Statistics
+            <small id="job-title">Detailed job statistics</small>
+
+            <div class="btn-group pull-right hidden">
+              <button type="button" class="btn btn-primary btn-lg dropdown-toggle" data-toggle="dropdown">
+                All Jobs
+                <span class="caret"></span>
+              </button>
+              <ul class="dropdown-menu" role="menu" id="job-overview-dropdown">
+              </ul>
+            </div>
+          </h1>
+        </div>
+
+        <div id="loading-banner">
+          <i class="fa fa-spinner fa-spin"></i> Loading...
+        </div>
+
+        <div class="panel-group" id="jobs">
+        </div>
+
+      </div><!-- /.container-fluid -->
+    </div><!-- /#page-wrapper -->
+
+    <div id="chart-tooltip" />
+  </body>
+</html>
