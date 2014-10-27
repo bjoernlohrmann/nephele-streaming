@@ -1148,4 +1148,9 @@ public class ClusterManager implements InstanceManager {
 	public int getNumberOfTaskTrackers() {
 		return this.registeredHosts.size();
 	}
+
+	@Override
+	public Map<InstanceConnectionInfo, ? extends AbstractInstance> getInstances() {
+		return this.registeredHosts;
+	}
 }

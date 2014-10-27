@@ -272,4 +272,9 @@ public final class TestInstanceManager implements InstanceManager {
 	public int getNumberOfTaskTrackers() {
 		throw new IllegalStateException("getNumberOfTaskTrackers called on TestInstanceManager");
 	}
+
+	@Override
+	public Map<InstanceConnectionInfo, ? extends AbstractInstance> getInstances() {
+		throw new IllegalStateException("getInstances called on TestInstanceManager");
+	}
 }

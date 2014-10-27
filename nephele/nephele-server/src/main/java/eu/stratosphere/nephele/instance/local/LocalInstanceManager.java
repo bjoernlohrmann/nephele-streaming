@@ -404,4 +404,15 @@ public class LocalInstanceManager implements InstanceManager {
 	public int getNumberOfTaskTrackers() {
 		return (this.localInstance == null) ? 0 : 1; // this instance manager can have at most one TaskTracker
 	}
+
+	@Override
+	public Map<InstanceConnectionInfo, ? extends AbstractInstance> getInstances() {
+		if (this.localInstance == null) {
+			return new SerializableHashMap<InstanceConnectionInfo, AbstractInstance>();
+		} else {
+			Map<InstanceConnectionInfo, LocalInstance> result = new SerializableHashMap<InstanceConnectionInfo, LocalInstance>();
+			result.put(this.localInstance.getInstanceConnectionInfo(), this.localInstance);
+			return result;
+		}
+	}
 }

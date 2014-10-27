@@ -1387,6 +1387,10 @@ public class JobManager implements DeploymentManager, ExtendedManagementProtocol
 		return this.instanceManager.getNumberOfTaskTrackers();
 	}
 	
+	public Map<InstanceConnectionInfo, ? extends AbstractInstance> getInstances() {
+		return this.instanceManager.getInstances();
+	}
+
 	/**
 	 * {@inheritDoc}
 	 */

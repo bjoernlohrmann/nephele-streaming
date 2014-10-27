@@ -208,6 +208,11 @@ public class ExecutionGraphTest {
 			return 0;
 		}
 
+		@Override
+		public Map<InstanceConnectionInfo, ? extends AbstractInstance> getInstances() {
+			throw new IllegalStateException("getInstances called on TestInstanceManager");
+		}
+
 	}
 
 	private static final InstanceManager INSTANCE_MANAGER = new TestInstanceManager();

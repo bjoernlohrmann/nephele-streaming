@@ -114,7 +114,7 @@ public class WebInfoServer {
 		servletContext.addServlet(new ServletHolder(new JobmanagerInfoServlet(jobmanager)), "/jobsInfo");
 		servletContext.addServlet(new ServletHolder(new LogfileInfoServlet(new File(basePath+"/log"))), "/logInfo");
 		servletContext.addServlet(new ServletHolder(new ScaleServlet(jobmanager)), "/scale");
-
+		servletContext.addServlet(new ServletHolder(new SetupInfoServlet(jobmanager)), "/setupInfo");
 
 		// ----- the handler serving all the static files -----
 		ResourceHandler resourceHandler = new ResourceHandler();

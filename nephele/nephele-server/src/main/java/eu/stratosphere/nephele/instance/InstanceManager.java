@@ -169,4 +169,6 @@ public interface InstanceManager {
 	 * @return the number of available (registered) TaskTrackers
 	 */
 	int getNumberOfTaskTrackers();
+
+	Map<InstanceConnectionInfo, ? extends AbstractInstance> getInstances();
 }
