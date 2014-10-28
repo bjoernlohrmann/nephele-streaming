@@ -285,20 +285,25 @@ function fillTable(table, json) {
  * Generates a button group with scale up and down buttons.
  */
 function createScaleButtonGroup(job, groupvertex) {
-    var maxUp = groupvertex.SUSPENDED;
-    var maxDown = groupvertex.RUNNING - 1; // keep at least one running
+    if (job.elasticScaleParameters[groupvertex.groupvertexid]) {
+        var min = job.elasticScaleParameters[groupvertex.groupvertexid].min;
+        var current = job.elasticScaleParameters[groupvertex.groupvertexid].current;
+        var max = job.elasticScaleParameters[groupvertex.groupvertexid].max;
 
-    return '<div class="btn-toolbar text-center" role="toolbar">'
-        + '<div class="btn-group">'
-          + createScaleButton(job, groupvertex, 'up', maxUp, 1)
-          + createScaleButton(job, groupvertex, 'up', maxUp, 5)
-          + createScaleButton(job, groupvertex, 'up', maxUp, 10)
-        + '</div>'
-        + '<div class="btn-group">'
-          + createScaleButton(job, groupvertex, 'down', maxDown, 1)
-          + createScaleButton(job, groupvertex, 'down', maxDown, 5)
-          + createScaleButton(job, groupvertex, 'down', maxDown, 10)
-        + '</div></div>';
+        return '<div class="btn-toolbar text-center" role="toolbar" data-groupvertex="' + groupvertex.groupvertexid + '" data-scale-min="' + min + '" data-scale-max="' + max + '">'
+            + '<div class="btn-group">'
+              + createScaleButton(job, groupvertex, 'up', max - current, 1)
+              + createScaleButton(job, groupvertex, 'up', max - current, 5)
+              + createScaleButton(job, groupvertex, 'up', max - current, 10)
+            + '</div>'
+            + '<div class="btn-group">'
+              + createScaleButton(job, groupvertex, 'down', current - min, 1)
+              + createScaleButton(job, groupvertex, 'down', current - min, 5)
+              + createScaleButton(job, groupvertex, 'down', current - min, 10)
+            + '</div></div>';
+    } else {
+        return '';
+    }
 }
 
 function createScaleButton(job, groupvertex, mode, max, count) {
@@ -314,14 +319,16 @@ function createScaleButton(job, groupvertex, mode, max, count) {
 }
 
 function updateScaleButtons(groupvertexId) {
-    var max = {
+    var min = $('[data-groupvertex="' + groupvertexId + '"][data-scale-min]').data('scale-min');
+    var max = $('[data-groupvertex="' + groupvertexId + '"][data-scale-max]').data('scale-max');
+    var limits = {
         up: $('tr[data-groupvertex="' + groupvertexId + '"] .suspended').attr('val'),
-        down: $('tr[data-groupvertex="' + groupvertexId + '"] .running').attr('val')
+        down: $('tr[data-groupvertex="' + groupvertexId + '"] .running').attr('val') - min
     };
     $.each(['up', 'down'], function(_, mode) {
         $.each([1, 5, 10], function (_, count) {
             var btn = $('.btn-scale-groupvertex[data-groupvertex="' + groupvertexId + '"][data-mode="' + mode + '"][data-count="' + count + '"]');
-            if (count > max[mode])
+            if (count > limits[mode])
                 btn.addClass('disabled');
             else
                 btn.removeClass('disabled');

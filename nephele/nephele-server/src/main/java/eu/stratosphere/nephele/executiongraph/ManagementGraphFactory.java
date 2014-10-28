@@ -28,6 +28,7 @@ import eu.stratosphere.nephele.managementgraph.ManagementGateID;
 import eu.stratosphere.nephele.managementgraph.ManagementGraph;
 import eu.stratosphere.nephele.managementgraph.ManagementGroupEdge;
 import eu.stratosphere.nephele.managementgraph.ManagementGroupVertex;
+import eu.stratosphere.nephele.managementgraph.ManagementGroupVertexID;
 import eu.stratosphere.nephele.managementgraph.ManagementStage;
 import eu.stratosphere.nephele.managementgraph.ManagementVertex;
 
@@ -78,8 +79,10 @@ public class ManagementGraphFactory {
 			for (int i = 0; i < executionStage.getNumberOfStageMembers(); i++) {
 
 				final ExecutionGroupVertex groupVertex = executionStage.getStageMember(i);
-				final ManagementGroupVertex managementGroupVertex = new ManagementGroupVertex(parent, groupVertex
-					.getName());
+				final ManagementGroupVertexID managementGroupVertexID = new ManagementGroupVertexID();
+				managementGroupVertexID.setID(groupVertex.getJobVertexID());
+				final ManagementGroupVertex managementGroupVertex = new ManagementGroupVertex(parent,
+						managementGroupVertexID, groupVertex.getName());
 
 				groupMap.put(groupVertex, managementGroupVertex);
 			}

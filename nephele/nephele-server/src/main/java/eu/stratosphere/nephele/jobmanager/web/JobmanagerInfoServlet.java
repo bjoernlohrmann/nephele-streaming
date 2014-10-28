@@ -21,8 +21,10 @@ import eu.stratosphere.nephele.event.job.ExecutionStateChangeEvent;
 import eu.stratosphere.nephele.event.job.JobEvent;
 import eu.stratosphere.nephele.event.job.RecentJobEvent;
 import eu.stratosphere.nephele.execution.ExecutionState;
+import eu.stratosphere.nephele.executiongraph.ExecutionGroupVertex;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.jobgraph.JobStatus;
+import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.jobmanager.JobManager;
 import eu.stratosphere.nephele.managementgraph.ManagementGraph;
 import eu.stratosphere.nephele.managementgraph.ManagementGraphIterator;
@@ -125,7 +127,29 @@ public class JobmanagerInfoServlet extends HttpServlet {
 				
 				wrt.write(groupVertex.toJson());
 			}
-			wrt.write("]");
+			wrt.write("],");
+
+			wrt.write("\"elasticScaleParameters\": {");
+			JobVertexID groupVertexId = new JobVertexID();
+			first = true;
+			for (ManagementGroupVertex groupVertex : jobManagementGraph.getGroupVerticesInTopologicalOrder()) {
+				groupVertexId.setID(groupVertex.getID());
+				ExecutionGroupVertex executionGroupVertex = jobmanager.getExecutionGroupVertex(jobEvent.getJobID(), groupVertexId);
+				if (executionGroupVertex.hasElasticNumberOfRunningSubtasks()) {
+					if (first)
+						first = false;
+					else
+						wrt.write(",");
+
+					wrt.write("\"" + groupVertexId + "\": { ");
+					wrt.write("\"min\": " + executionGroupVertex.getMinElasticNumberOfRunningSubtasks() + ",");
+					wrt.write("\"current\": " + executionGroupVertex.getCurrentElasticNumberOfRunningSubtasks() + ",");
+					wrt.write("\"max\": " + executionGroupVertex.getMaxElasticNumberOfRunningSubtasks());
+					wrt.write("}");
+				}
+			}
+			wrt.write("}");
+
 			wrt.write("}");
 			
 			//Write seperator between json objects

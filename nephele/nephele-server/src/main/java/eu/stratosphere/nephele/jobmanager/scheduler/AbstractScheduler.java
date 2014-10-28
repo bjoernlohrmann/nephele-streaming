@@ -911,6 +911,18 @@ public abstract class AbstractScheduler implements InstanceListener {
 		} while (dirty);
 	}
 
+	public ExecutionGroupVertex getExecutionGroupVertex(JobID jobID, JobVertexID jobVertexID) {
+		final ExecutionGraph graph = getExecutionGraphByID(jobID);
+		ExecutionStage stage = graph.getCurrentExecutionStage();
+		for (int i = 0; i < stage.getNumberOfStageMembers(); i++) {
+			if (stage.getStageMember(i).getJobVertexID().equals(jobVertexID)) {
+				return stage.getStageMember(i);
+			}
+		}
+
+		throw new RuntimeException("Can't find vertex with given id.");
+	}
+
 	public JobVertexID getJobVertexIdByName(JobID jobID, String jobVertexName) {
 		final ExecutionGraph graph = getExecutionGraphByID(jobID);
 		ExecutionStage stage = graph.getCurrentExecutionStage();

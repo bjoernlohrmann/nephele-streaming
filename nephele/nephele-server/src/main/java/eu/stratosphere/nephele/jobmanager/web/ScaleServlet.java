@@ -52,11 +52,10 @@ public class ScaleServlet extends HttpServlet {
 				noOfSubtasks = Integer.parseInt(req.getParameter("count"));
 
 			JobVertexID vertexId = null;
-			if (req.getParameter("groupVertexName") != null)
+			if (req.getParameter("groupVertex") != null)
+				vertexId = JobVertexID.fromHexString(req.getParameter("groupVertex"));
+			else if (req.getParameter("groupVertexName") != null)
 				vertexId = this.jobmanager.getJobVertexIdByName(jobId, req.getParameter("groupVertexName"));
-			else if (req.getParameter("groupVertex") != null)
-				// TODO: use id's instead of names
-				throw new RuntimeException("Not implemented. Use groupVertexName instead.");
 			else
 				throw new RuntimeException("Group vertex name required.");
 

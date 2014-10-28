@@ -82,6 +82,7 @@ import eu.stratosphere.nephele.execution.librarycache.LibraryCacheManager;
 import eu.stratosphere.nephele.executiongraph.ExecutionEdge;
 import eu.stratosphere.nephele.executiongraph.ExecutionGraph;
 import eu.stratosphere.nephele.executiongraph.ExecutionGraphIterator;
+import eu.stratosphere.nephele.executiongraph.ExecutionGroupVertex;
 import eu.stratosphere.nephele.executiongraph.ExecutionVertex;
 import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
 import eu.stratosphere.nephele.executiongraph.GraphConversionException;
@@ -1427,6 +1428,10 @@ public class JobManager implements DeploymentManager, ExtendedManagementProtocol
 
 	public void scaleDownElasticTask(JobID jobID, JobVertexID jobVertexID, final int noOfSubtasksToStart) throws Exception {
 		this.scheduler.scaleDownElasticTask(jobID, jobVertexID, noOfSubtasksToStart);
+	}
+
+	public ExecutionGroupVertex getExecutionGroupVertex(JobID jobID, JobVertexID jobVertexID) {
+		return this.scheduler.getExecutionGroupVertex(jobID, jobVertexID);
 	}
 
 	public JobVertexID getJobVertexIdByName(JobID jobID, String jobVertexName) {

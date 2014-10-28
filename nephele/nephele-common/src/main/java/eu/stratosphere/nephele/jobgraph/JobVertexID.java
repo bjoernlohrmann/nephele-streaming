@@ -15,6 +15,8 @@
 
 package eu.stratosphere.nephele.jobgraph;
 
+import javax.xml.bind.DatatypeConverter;
+
 import eu.stratosphere.nephele.io.AbstractID;
 
 /**
@@ -24,4 +26,15 @@ import eu.stratosphere.nephele.io.AbstractID;
  */
 public class JobVertexID extends AbstractID {
 
+	public JobVertexID() {
+		super();
+	}
+
+	public JobVertexID(final byte[] bytes) {
+		super(bytes);
+	}
+
+	public static JobVertexID fromHexString(final String hexString) {
+		return new JobVertexID(DatatypeConverter.parseHexBinary(hexString));
+	}
 }
