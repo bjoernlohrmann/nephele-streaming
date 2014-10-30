@@ -155,7 +155,9 @@ public class SequenceElement<T extends AbstractID> implements
 	public void read(DataInput in) throws IOException {
 		this.isVertex = in.readBoolean();
 		try {
-			this.samplingStrategy = SamplingStrategy.valueOf(in.readUTF());
+			if (this.isVertex) {
+				this.samplingStrategy = SamplingStrategy.valueOf(in.readUTF());
+			}
 			this.idClass = (Class<T>) Class.forName(in.readUTF());
 			this.sourceVertexID = this.idClass.newInstance();
 			this.sourceVertexID.read(in);

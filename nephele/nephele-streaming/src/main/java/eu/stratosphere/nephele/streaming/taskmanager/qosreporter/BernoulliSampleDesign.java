@@ -2,13 +2,13 @@ package eu.stratosphere.nephele.streaming.taskmanager.qosreporter;
 
 import java.util.concurrent.ThreadLocalRandom;
 
-public class SamplingManager {
+public class BernoulliSampleDesign {
 
 	private boolean firstSample = true;
 	private double samplingProbability;
 
 
-	public SamplingManager(double samplingProbability) {
+	public BernoulliSampleDesign(double samplingProbability) {
 		this.samplingProbability = samplingProbability;
 	}
 

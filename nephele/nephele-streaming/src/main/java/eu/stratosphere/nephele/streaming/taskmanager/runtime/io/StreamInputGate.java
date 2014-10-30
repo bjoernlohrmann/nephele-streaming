@@ -15,12 +15,6 @@
 
 package eu.stratosphere.nephele.streaming.taskmanager.runtime.io;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import org.apache.log4j.Logger;
-
 import eu.stratosphere.nephele.event.task.AbstractTaskEvent;
 import eu.stratosphere.nephele.io.InputChannelResult;
 import eu.stratosphere.nephele.io.InputGate;
@@ -33,6 +27,11 @@ import eu.stratosphere.nephele.plugins.wrapper.AbstractInputGateWrapper;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.listener.InputGateQosReportingListener;
 import eu.stratosphere.nephele.types.AbstractTaggableRecord;
 import eu.stratosphere.nephele.types.Record;
+import org.apache.log4j.Logger;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Wraps Nephele's {@link eu.stratosphere.nephele.io.RuntimeInputGate} to
@@ -96,8 +95,9 @@ public final class StreamInputGate<T extends Record> extends
 
     int channelToReadFrom = -1;
 
-    while (channelToReadFrom == -1) {
-      channelToReadFrom = this.channelChooser.chooseNextAvailableChannel();
+		while (channelToReadFrom == -1) {
+			channelToReadFrom = this.channelChooser.chooseNextAvailableChannel();
+			reportTryingToRead(channelToReadFrom);
 
       if (channelToReadFrom == -1) {
         // traps task thread because it is inside a chain
@@ -139,7 +139,7 @@ public final class StreamInputGate<T extends Record> extends
 
   /**
    * @param record          The record that has been received.
-   * @param sourceChannelID The ID of the source channel (output channel)
+   * @param inputChannel	  The source channel index.
    */
   public void reportRecordReceived(Record record, int inputChannel) {
     if (this.qosCallback != null) {
@@ -148,12 +148,17 @@ public final class StreamInputGate<T extends Record> extends
     }
   }
 
+	public void reportTryingToRead(int inputChannel) {
+		if (this.qosCallback != null) {
+			this.qosCallback.tryingToReadRecord(inputChannel);
+		}
+	}
+
   /**
    * This method should only be called if this input gate is inside a chain
    * and the task thread (doing this call) should therefore be halted (unless
    * interrupted).
    *
-   * @param target
    * @throws InterruptedException if task thread is interrupted.
    */
   private void trapTaskThreadUntilWokenUp() throws InterruptedException {

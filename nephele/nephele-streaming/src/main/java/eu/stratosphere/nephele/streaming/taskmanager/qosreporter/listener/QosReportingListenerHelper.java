@@ -45,6 +45,11 @@ public class QosReportingListenerHelper {
 					AbstractTaggableRecord record) {
 				vertexStatsManager.recordReceived(gateIndex);
 			}
+
+			@Override
+			public void tryingToReadRecord(int inputChannel) {
+				vertexStatsManager.tryingToReadRecord(inputChannel);
+			}
 		};
 		InputGateQosReportingListener oldListener = inputGate
 				.getQosReportingListener();
@@ -103,6 +108,11 @@ public class QosReportingListenerHelper {
 							inputChannelIndexinRuntimeGate, timestampTag);
 				}
 			}
+
+			@Override
+			public void tryingToReadRecord(int inputChannel) {
+				// nothing to do
+			}
 		};
 
 		InputGateQosReportingListener oldListener = inputGate
@@ -153,12 +163,17 @@ public class QosReportingListenerHelper {
 			final InputGateQosReportingListener second) {
 
 		return new InputGateQosReportingListener() {
-
 			@Override
 			public void recordReceived(int inputChannel,
 					AbstractTaggableRecord record) {
 				first.recordReceived(inputChannel, record);
 				second.recordReceived(inputChannel, record);
+			}
+
+			@Override
+			public void tryingToReadRecord(int inputChannel) {
+				first.tryingToReadRecord(inputChannel);
+				second.tryingToReadRecord(inputChannel);
 			}
 		};
 	}

@@ -59,7 +59,7 @@ public class OutputGateReporterManager {
 
 		private int recordsSinceLastTag;
 
-		public SamplingManager samplingManager;
+		public BernoulliSampleDesign bernoulliSampleDesign;
 
 		public OutputChannelChannelStatisticsReporter(
 				QosReporterID.Edge reporterID, int channelIndexInRuntimeGate) {
@@ -71,7 +71,7 @@ public class OutputGateReporterManager {
 			this.currentAmountTransmitted = 0;
 			this.recordsEmittedSinceLastReport = 0;
 			this.recordsSinceLastTag = 0;
-			this.samplingManager = new SamplingManager(
+			this.bernoulliSampleDesign = new BernoulliSampleDesign(
 					OutputGateReporterManager.this.reportForwarder.getConfigCenter().getSamplingProbability() / 100.0);
 		}
 
@@ -166,7 +166,7 @@ public class OutputGateReporterManager {
 			this.amountTransmittedAtLastReport = this.currentAmountTransmitted;
 			this.recordsEmittedSinceLastReport = 0;
 			this.outputBuffersSentSinceLastReport = 0;
-			this.samplingManager.reset();
+			this.bernoulliSampleDesign.reset();
 		}
 
 		private void sendReport(long now) {
@@ -194,7 +194,7 @@ public class OutputGateReporterManager {
 			this.recordsEmittedSinceLastReport++;
 			this.recordsSinceLastTag++;
 
-			if (samplingManager.shouldSample()) {
+			if (bernoulliSampleDesign.shouldSample()) {
 				this.tagRecord(record);
 				this.recordsSinceLastTag = 0;
 			} else {
