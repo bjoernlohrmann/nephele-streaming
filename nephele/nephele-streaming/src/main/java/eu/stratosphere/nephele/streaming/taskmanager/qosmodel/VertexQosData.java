@@ -1,8 +1,8 @@
 package eu.stratosphere.nephele.streaming.taskmanager.qosmodel;
 
-import java.lang.reflect.Array;
-
 import eu.stratosphere.nephele.streaming.message.qosreport.VertexStatistics;
+
+import java.lang.reflect.Array;
 
 /**
  * Instances of this class hold Qos data (currently only latency) of a
@@ -35,15 +35,24 @@ public class VertexQosData {
 	 * may be null.
 	 */
 	private QosStatistic[][] inputOutputGateLatency;
+
+	private QosStatistic[][] inputOutputGateLatencyVariance;
+
+	private QosStatistic[] interArrivalTime;
+
+	private QosStatistic[] interArrivalTimeVariance;
 	
 
 	private final static int DEFAULT_NO_OF_STATISTICS_ENTRIES = 4;
 
 	public VertexQosData(QosVertex vertex) {
 		this.vertex = vertex;
-		this.inputOutputGateLatency = new QosStatistic[1][1];
 		this.inputGateRecordsConsumedPerSec = new QosStatistic[1];
 		this.outputGateRecordsEmittedPerSec = new QosStatistic[1];
+		this.inputOutputGateLatency = new QosStatistic[1][1];
+		this.inputOutputGateLatencyVariance = new QosStatistic[1][1];
+		this.interArrivalTime = new QosStatistic[1];
+		this.interArrivalTimeVariance = new QosStatistic[1];
 	}
 
 	public QosVertex getVertex() {
@@ -53,6 +62,13 @@ public class VertexQosData {
 	public double getLatencyInMillis(int inputGateIndex, int outputGateIndex) {
 		if (inputOutputGateLatency[inputGateIndex][outputGateIndex].hasValues()) {
 			return inputOutputGateLatency[inputGateIndex][outputGateIndex].getArithmeticMean();
+		}
+		return -1;
+	}
+
+	public double getLatencyVarianceInMillis(int inputGateIndex, int outputGateIndex) {
+		if (inputOutputGateLatencyVariance[inputGateIndex][outputGateIndex].hasValues()) {
+			return inputOutputGateLatencyVariance[inputGateIndex][outputGateIndex].getArithmeticMean();
 		}
 		return -1;
 	}
@@ -70,6 +86,21 @@ public class VertexQosData {
 		}
 		return -1;
 	}
+
+	public double getInterArrivalTimeInMillis(int inputGateIndex) {
+		if (interArrivalTime[inputGateIndex].hasValues()) {
+			return interArrivalTime[inputGateIndex].getArithmeticMean();
+		}
+		return -1;
+	}
+
+	public double getInterArrivalTimeVarianceInMillis(int inputGateIndex) {
+		if (interArrivalTimeVariance[inputGateIndex].hasValues()) {
+			return interArrivalTimeVariance[inputGateIndex].getArithmeticMean();
+		}
+		return -1;
+	}
+
 
 	public void prepareForReportsOnGateCombination(int inputGateIndex,
 			int outputGateIndex) {
@@ -133,7 +164,7 @@ public class VertexQosData {
      * @param inputGateIndex the input gate index
      * @param outputGateIndex the output gate index
      * @param timestamp the current timestamp as a long
-     * @param latencyInMillis the current latency in milliseconds as a double
+     * @param measurement the vertex statistics
      */
 	public void addVertexStatisticsMeasurement(int inputGateIndex, int outputGateIndex,
 			long timestamp, VertexStatistics measurement) {
@@ -144,14 +175,20 @@ public class VertexQosData {
 
 			stat.addValue(new QosValue(measurement.getVertexLatency(),
 					timestamp));
-
+			stat.addValue(new QosValue(measurement.getVertexLatencyVariance(),
+					timestamp));
 		}
 
 		if (inputGateIndex != -1) {
 			inputGateRecordsConsumedPerSec[inputGateIndex]
 					.addValue(new QosValue(measurement
 							.getRecordsConsumedPerSec(), timestamp));
-
+			interArrivalTime[inputGateIndex]
+					.addValue(new QosValue(measurement
+							.getInterArrivalTime(), timestamp));
+			interArrivalTimeVariance[inputGateIndex]
+					.addValue(new QosValue(measurement
+							.getInterArrivalTimeVariance(), timestamp));
 		}
 
 		if (outputGateIndex != -1) {

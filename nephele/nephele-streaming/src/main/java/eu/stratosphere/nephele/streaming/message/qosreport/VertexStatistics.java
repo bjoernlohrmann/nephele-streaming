@@ -15,13 +15,12 @@
 
 package eu.stratosphere.nephele.streaming.message.qosreport;
 
+import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
+
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-
-import org.apache.commons.lang3.builder.HashCodeBuilder;
-
-import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
 
 /**
  * This class stores information about the latency as well as record
@@ -32,33 +31,31 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
 public final class VertexStatistics extends AbstractQosReportRecord {
 
 	private QosReporterID.Vertex reporterID;
-
 	private int counter;
-
 	private double vertexLatency;
-
+	private double vertexLatencyVariance;
 	private double recordsConsumedPerSec;
-
 	private double recordsEmittedPerSec;
+	private double interArrivalTime;
+	private double interArrivalTimeVariance;
 
-	/**
-	 * Constructs a new task latency object.
-	 * 
-	 * @param jobID
-	 *            the ID of the job this path latency information refers to
-	 * @param vertexID
-	 *            the ID of the vertex this task latency information refers to
-	 * @param taskLatency
-	 *            the task latency in milliseconds
-	 */
-	public VertexStatistics(final QosReporterID.Vertex reporterID,
-			final double vertexLatency, double recordsConsumedPerSec, double recordEmittedPerSec) {
-
+	public VertexStatistics(QosReporterID.Vertex reporterID, double vertexLatency, double vertexLatencyVariance,
+			double recordsConsumedPerSec, double recordsEmittedPerSec, double interArrivalTime,
+			double interArrivalTimeVariance) {
 		this.reporterID = reporterID;
 		this.vertexLatency = vertexLatency;
+		this.vertexLatencyVariance = vertexLatencyVariance;
 		this.recordsConsumedPerSec = recordsConsumedPerSec;
-		this.recordsEmittedPerSec = recordEmittedPerSec;
+		this.recordsEmittedPerSec = recordsEmittedPerSec;
+		this.interArrivalTime = interArrivalTime;
+		this.interArrivalTimeVariance = interArrivalTimeVariance;
 		this.counter = 1;
+	}
+
+	@Deprecated
+	public VertexStatistics(final QosReporterID.Vertex reporterID,
+			final double vertexLatency, double recordsConsumedPerSec, double recordEmittedPerSec) {
+		this(reporterID, vertexLatency, -1, recordsConsumedPerSec, recordEmittedPerSec, -1, -1);
 	}
 
 	/**
@@ -73,7 +70,7 @@ public final class VertexStatistics extends AbstractQosReportRecord {
 
 	/**
 	 * Returns the task latency in milliseconds.
-	 * 
+	 *
 	 * @return the task latency in milliseconds
 	 */
 	public double getVertexLatency() {
@@ -82,6 +79,10 @@ public final class VertexStatistics extends AbstractQosReportRecord {
 		}
 
 		return this.vertexLatency / this.counter;
+	}
+
+	public double getVertexLatencyVariance() {
+		return vertexLatencyVariance;
 	}
 
 	public double getRecordsConsumedPerSec() {
@@ -100,11 +101,31 @@ public final class VertexStatistics extends AbstractQosReportRecord {
 		return recordsEmittedPerSec / this.counter;
 	}
 
+	public double getInterArrivalTime() {
+		if (interArrivalTime == -1) {
+			return -1;
+		}
+
+		return interArrivalTime / counter;
+	}
+
+	public double getInterArrivalTimeVariance() {
+		if (interArrivalTimeVariance == -1) {
+			return -1;
+		}
+
+		return interArrivalTimeVariance / counter;
+	}
+
 	public void add(VertexStatistics vertexStats) {
 		this.counter++;
 
 		if (vertexLatency != -1) {
 			this.vertexLatency += vertexStats.getVertexLatency();
+		}
+
+		if (vertexLatencyVariance != -1) {
+			this.vertexLatencyVariance = vertexStats.getVertexLatencyVariance();
 		}
 
 		if (recordsConsumedPerSec != -1) {
@@ -114,6 +135,14 @@ public final class VertexStatistics extends AbstractQosReportRecord {
 
 		if (recordsEmittedPerSec != -1) {
 			this.recordsEmittedPerSec += vertexStats.getRecordsEmittedPerSec();
+		}
+
+		if (interArrivalTime != -1) {
+			this.interArrivalTime = vertexStats.getInterArrivalTime();
+		}
+
+		if (interArrivalTimeVariance != -1) {
+			this.interArrivalTimeVariance = vertexStats.getInterArrivalTimeVariance();
 		}
 	}
 
@@ -147,8 +176,11 @@ public final class VertexStatistics extends AbstractQosReportRecord {
 	public void write(final DataOutput out) throws IOException {
 		this.reporterID.write(out);
 		out.writeDouble(this.getVertexLatency());
+		out.writeDouble(this.getVertexLatencyVariance());
 		out.writeDouble(this.getRecordsConsumedPerSec());
 		out.writeDouble(this.getRecordsEmittedPerSec());
+		out.writeDouble(this.getInterArrivalTime());
+		out.writeDouble(this.getInterArrivalTimeVariance());
 	}
 
 	/**
@@ -159,8 +191,11 @@ public final class VertexStatistics extends AbstractQosReportRecord {
 		this.reporterID = new QosReporterID.Vertex();
 		this.reporterID.read(in);
 		this.vertexLatency = in.readDouble();
+		this.vertexLatencyVariance = in.readDouble();
 		this.recordsConsumedPerSec = in.readDouble();
 		this.recordsEmittedPerSec = in.readDouble();
+		this.interArrivalTime = in.readDouble();
+		this.interArrivalTimeVariance = in.readDouble();
 		this.counter = 1;
 	}
 }
