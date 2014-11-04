@@ -19,7 +19,6 @@ import java.util.LinkedList;
 import eu.stratosphere.nephele.executiongraph.ExecutionGraph;
 import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
 import eu.stratosphere.nephele.instance.InstanceConnectionInfo;
-import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
 import eu.stratosphere.nephele.streaming.SequenceElement;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosEdge;
@@ -63,7 +62,7 @@ public class CandidateChainFinder implements QosGraphTraversalListener {
 
 	@Override
 	public void processQosVertex(QosVertex vertex,
-			SequenceElement<JobVertexID> sequenceElem) {
+			SequenceElement sequenceElem) {
 
 		if (this.currentChain.isEmpty()) {
 			tryToStartChain(vertex, sequenceElem);
@@ -73,7 +72,7 @@ public class CandidateChainFinder implements QosGraphTraversalListener {
 	}
 
 	private void appendToOrRestartChain(QosVertex vertex,
-			SequenceElement<JobVertexID> sequenceElem) {
+			SequenceElement sequenceElem) {
 
 		int noOfInputGatesInExecutionGraph = this.executionGraph
 				.getVertexByID(vertex.getID()).getNumberOfInputGates();
@@ -99,7 +98,7 @@ public class CandidateChainFinder implements QosGraphTraversalListener {
 	}
 
 	private void tryToStartChain(QosVertex vertex,
-			SequenceElement<JobVertexID> sequenceElem) {
+			SequenceElement sequenceElem) {
 
 		QosGate outputGate = vertex.getOutputGate(sequenceElem
 				.getOutputGateIndex());
@@ -123,7 +122,7 @@ public class CandidateChainFinder implements QosGraphTraversalListener {
 
 	@Override
 	public void processQosEdge(QosEdge edge,
-			SequenceElement<JobVertexID> sequenceElem) {
+			SequenceElement sequenceElem) {
 		// do nothing
 	}
 

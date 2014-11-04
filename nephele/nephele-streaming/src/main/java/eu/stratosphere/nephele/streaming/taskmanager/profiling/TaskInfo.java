@@ -136,7 +136,7 @@ public class TaskInfo implements ExecutionListener {
 	}
 
 	public synchronized double getCPUUtilization() {
-		return this.cpuUtilization.getArithmeticMean();
+		return this.cpuUtilization.getMean();
 	}
 
 	public  synchronized double getUnchainedCpuUtilization() {

@@ -19,7 +19,6 @@ import java.util.HashSet;
 import java.util.LinkedList;
 
 import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
-import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.streaming.JobGraphSequence;
 import eu.stratosphere.nephele.streaming.SequenceElement;
 
@@ -142,7 +141,7 @@ public class QosGraphTraversal {
 	 */
 	public void traverseForward(boolean includeStartVertex, boolean traverseOnce) {
 
-		Deque<SequenceElement<JobVertexID>> afterDeque = this
+		Deque<SequenceElement> afterDeque = this
 				.getSequenceAfterIncludingStartVertex(this.sequence);
 
 		if (afterDeque.isEmpty()) {
@@ -150,7 +149,7 @@ public class QosGraphTraversal {
 		}
 
 		// do some sanity checking
-		SequenceElement<JobVertexID> firstElem = afterDeque.getFirst();
+		SequenceElement firstElem = afterDeque.getFirst();
 		if (!QosGraphUtil.match(firstElem, this.startVertex)
 				&& !QosGraphUtil.isEdgeAndStartsAtVertex(firstElem,
 						this.startVertex)) {
@@ -182,7 +181,7 @@ public class QosGraphTraversal {
 	}
 
 	public void traverseForwardConditional() {
-		Deque<SequenceElement<JobVertexID>> afterDeque = this
+		Deque<SequenceElement> afterDeque = this
 				.getSequenceAfterIncludingStartVertex(this.sequence);
 
 		if (afterDeque.isEmpty()) {
@@ -190,7 +189,7 @@ public class QosGraphTraversal {
 		}
 
 		// do some sanity checking
-		SequenceElement<JobVertexID> firstElem = afterDeque.getFirst();
+		SequenceElement firstElem = afterDeque.getFirst();
 		if (!QosGraphUtil.match(firstElem, this.startVertex)
 				&& !QosGraphUtil.isEdgeAndStartsAtVertex(firstElem,
 						this.startVertex)) {
@@ -221,14 +220,14 @@ public class QosGraphTraversal {
 	}
 
 	private void traverseForwardConditionalEdge(QosEdge edge,
-			Deque<SequenceElement<JobVertexID>> sequenceDeque) {
+			Deque<SequenceElement> sequenceDeque) {
 
 		if (!this.traversalCondition.shallTraverseEdge(edge,
 				sequenceDeque.getFirst())) {
 			return;
 		}
 
-		SequenceElement<JobVertexID> currentElem = sequenceDeque.removeFirst();
+		SequenceElement currentElem = sequenceDeque.removeFirst();
 
 		this.listener.processQosEdge(edge, currentElem);
 
@@ -241,14 +240,14 @@ public class QosGraphTraversal {
 	}
 
 	private void traverseForwardConditionalVertex(QosVertex vertex,
-			Deque<SequenceElement<JobVertexID>> sequenceDeque) {
+			Deque<SequenceElement> sequenceDeque) {
 
 		if (!this.traversalCondition.shallTraverseVertex(vertex,
 				sequenceDeque.getFirst())) {
 			return;
 		}
 
-		SequenceElement<JobVertexID> currentElem = sequenceDeque.removeFirst();
+		SequenceElement currentElem = sequenceDeque.removeFirst();
 
 		this.listener.processQosVertex(vertex, currentElem);
 
@@ -267,14 +266,14 @@ public class QosGraphTraversal {
 	}
 
 	private void traverseForwardVertex(QosVertex vertex,
-			Deque<SequenceElement<JobVertexID>> sequenceDeque,
+			Deque<SequenceElement> sequenceDeque,
 			boolean traverseOnce) {
 
 		if (traverseOnce && this.traversedVertices.contains(vertex.getID())) {
 			return;
 		}
 
-		SequenceElement<JobVertexID> currentElem = sequenceDeque.removeFirst();
+		SequenceElement currentElem = sequenceDeque.removeFirst();
 
 		this.listener.processQosVertex(vertex, currentElem);
 
@@ -294,10 +293,10 @@ public class QosGraphTraversal {
 	}
 
 	private void traverseForwardEdge(QosEdge edge,
-			Deque<SequenceElement<JobVertexID>> sequenceDeque,
+			Deque<SequenceElement> sequenceDeque,
 			boolean traverseOnce) {
 
-		SequenceElement<JobVertexID> currentElem = sequenceDeque.removeFirst();
+		SequenceElement currentElem = sequenceDeque.removeFirst();
 
 		this.listener.processQosEdge(edge, currentElem);
 
@@ -309,19 +308,19 @@ public class QosGraphTraversal {
 		sequenceDeque.addFirst(currentElem);
 	}
 
-	private LinkedList<SequenceElement<JobVertexID>> getSequenceAfterIncludingStartVertex(
+	private LinkedList<SequenceElement> getSequenceAfterIncludingStartVertex(
 			JobGraphSequence sequence) {
 
 		boolean notInSequence = QosGraphUtil.isEdgeAndEndsAtVertex(
 				sequence.getLast(), this.startVertex);
 		if (notInSequence) {
-			return new LinkedList<SequenceElement<JobVertexID>>();
+			return new LinkedList<SequenceElement>();
 		}
 
-		LinkedList<SequenceElement<JobVertexID>> ret = new LinkedList<SequenceElement<JobVertexID>>(
+		LinkedList<SequenceElement> ret = new LinkedList<SequenceElement>(
 				sequence);
 		while (!ret.isEmpty()) {
-			SequenceElement<JobVertexID> current = ret.getFirst();
+			SequenceElement current = ret.getFirst();
 
 			if (QosGraphUtil.match(current, this.startVertex)
 					|| QosGraphUtil.isEdgeAndStartsAtVertex(current,
@@ -371,7 +370,7 @@ public class QosGraphTraversal {
 	public void traverseBackward(boolean includeStartVertex,
 			boolean traverseOnce) {
 
-		LinkedList<SequenceElement<JobVertexID>> elemsBefore = this
+		LinkedList<SequenceElement> elemsBefore = this
 				.getSequenceBeforeIncludingStartVertex(this.sequence);
 
 		if (elemsBefore.isEmpty()) {
@@ -379,7 +378,7 @@ public class QosGraphTraversal {
 		}
 
 		// do some sanity checking
-		SequenceElement<JobVertexID> lastElem = elemsBefore.getLast();
+		SequenceElement lastElem = elemsBefore.getLast();
 		if (!QosGraphUtil.match(lastElem, this.startVertex)
 				&& !QosGraphUtil.isEdgeAndEndsAtVertex(lastElem,
 						this.startVertex)) {
@@ -410,20 +409,20 @@ public class QosGraphTraversal {
 		}
 	}
 
-	private LinkedList<SequenceElement<JobVertexID>> getSequenceBeforeIncludingStartVertex(
+	private LinkedList<SequenceElement> getSequenceBeforeIncludingStartVertex(
 			JobGraphSequence sequence) {
 
 		boolean notInSequence = QosGraphUtil.isEdgeAndStartsAtVertex(
 				sequence.getFirst(), this.startVertex);
 		if (notInSequence) {
-			return new LinkedList<SequenceElement<JobVertexID>>();
+			return new LinkedList<SequenceElement>();
 		}
 
-		LinkedList<SequenceElement<JobVertexID>> ret = new LinkedList<SequenceElement<JobVertexID>>(
+		LinkedList<SequenceElement> ret = new LinkedList<SequenceElement>(
 				sequence);
 
 		while (!ret.isEmpty()) {
-			SequenceElement<JobVertexID> current = ret.getLast();
+			SequenceElement current = ret.getLast();
 
 			if (QosGraphUtil.match(current, this.startVertex)
 					|| QosGraphUtil.isEdgeAndEndsAtVertex(current,
@@ -438,14 +437,14 @@ public class QosGraphTraversal {
 	}
 
 	private void traverseVertexBackward(QosVertex vertex,
-			Deque<SequenceElement<JobVertexID>> sequenceDeque,
+			Deque<SequenceElement> sequenceDeque,
 			boolean traverseOnce) {
 
 		if (traverseOnce && this.traversedVertices.contains(vertex.getID())) {
 			return;
 		}
 
-		SequenceElement<JobVertexID> currentElem = sequenceDeque.removeLast();
+		SequenceElement currentElem = sequenceDeque.removeLast();
 
 		this.listener.processQosVertex(vertex, currentElem);
 
@@ -465,10 +464,10 @@ public class QosGraphTraversal {
 	}
 
 	private void traverseEdgeBackward(QosEdge edge,
-			Deque<SequenceElement<JobVertexID>> sequenceDeque,
+			Deque<SequenceElement> sequenceDeque,
 			boolean traverseOnce) {
 
-		SequenceElement<JobVertexID> currentElem = sequenceDeque.removeLast();
+		SequenceElement currentElem = sequenceDeque.removeLast();
 
 		this.listener.processQosEdge(edge, currentElem);
 

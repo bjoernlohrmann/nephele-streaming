@@ -1,50 +1,112 @@
 package eu.stratosphere.nephele.streaming.taskmanager.qosreporter.vertex;
 
+import eu.stratosphere.nephele.streaming.message.qosreport.VertexStatistics;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.QosReportForwarderThread;
+import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.Sample;
 
-public class ReadReadReporter extends VertexQosReporter {
-	private long lastSampleReadTime;
-	private boolean retrySample;
+/**
+ * @author Ilya Verbitskiy, Bjoern Lohrmann
+ */
+public class ReadReadReporter implements VertexQosReporter {
 
-	public ReadReadReporter(QosReportForwarderThread reportForwarder, QosReporterID.Vertex reporterID, int
-			runtimeInputGateIndex, int runtimeOutputGateIndex) {
-		super(reportForwarder, reporterID, runtimeInputGateIndex, runtimeOutputGateIndex);
+	private final QosReporterID.Vertex reporterID;
+
+	private final QosReportForwarderThread reportForwarder;
+	
+	private final ReportTimer reportTimer;
+
+	private long emitCounterAtLastReport;
+	private final OutputGateEmitStatistics outputGateEmitCounter;
+
+	private final int runtimeInputGateIndex;
+
+	private final int runtimeOutputGateIndex;
+
+	public ReadReadReporter(QosReportForwarderThread reportForwarder,
+			QosReporterID.Vertex reporterID,
+			ReportTimer reportTimer,
+			int runtimeInputGateIndex,
+			int runtimeOutputGateIndex,
+			InputGateReceiveCounter igReceiveCounter,
+			OutputGateEmitStatistics emitCounter) {
+
+		this.reportForwarder = reportForwarder;
+		this.reporterID = reporterID;
+		this.reportTimer = reportTimer;
+		
+		this.runtimeInputGateIndex = runtimeInputGateIndex;
+		this.runtimeOutputGateIndex = runtimeOutputGateIndex;
+
+		emitCounterAtLastReport = emitCounter.getEmitted();
+		this.outputGateEmitCounter = emitCounter;
+	}
+	
+	public void sendReport(long now, 
+			Sample vertexLatencyMillis,
+			Sample interarrivalTimeMillis,
+			double recordsConsumedPerSec) {
+		
+		double secsPassed = (now - reportTimer.getTimeOfLastReport()) / 1000.0;
+		
+		VertexStatistics toSend = new VertexStatistics(reporterID,
+					vertexLatencyMillis,
+					recordsConsumedPerSec,
+					getRecordsEmittedPerSec(secsPassed),
+					interarrivalTimeMillis);
+		reportForwarder.addToNextReport(toSend);
+	}
+
+	private double getRecordsEmittedPerSec(double secsPassed) {
+		double recordEmittedPerSec = -1;
+		if (outputGateEmitCounter != null) {
+			recordEmittedPerSec = (outputGateEmitCounter.getEmitted() - emitCounterAtLastReport)
+					/ secsPassed;
+			emitCounterAtLastReport = outputGateEmitCounter.getEmitted();
+		}
+		return recordEmittedPerSec;
 	}
 
 	@Override
 	public void recordReceived(int runtimeInputGateIndex) {
-		if (runtimeInputGateIndex == getRuntimeInputGateIndex()) {
-			inputGateReceiveCounter.received();
-			if (retrySample || shouldSample()) {
-				lastSampleReadTime = System.currentTimeMillis();
-				retrySample = true;
-			}
-		} else {
-			lastSampleReadTime = 0;
-		}
-
-		sendReportIfDue();
+		throw new RuntimeException(
+				"Method should never be invoked. This is bug.");
 	}
 
 	@Override
 	public void tryingToReadRecord(int runtimeInputGateIndex) {
-		if (lastSampleReadTime != 0 && retrySample) {
-			// if lastSampleReadTime is set then we should sample
-			addSample(System.currentTimeMillis() - lastSampleReadTime);
-			lastSampleReadTime = 0;
-			retrySample = false;
-		}
-
-		sendReportIfDue();
+		throw new RuntimeException(
+				"Method should never be invoked. This is bug.");
 	}
 
 	@Override
 	public void recordEmitted(int runtimeOutputGateIndex) {
-		if (runtimeOutputGateIndex == getRuntimeOutputGateIndex()) {
-			outputGateEmitCounter.emitted();
-		}
+		throw new RuntimeException(
+				"Method should never be invoked. This is bug.");
+	}
 
-		sendReportIfDue();
+
+	@Override
+	public void inputBufferConsumed(int inputGateIndex, int channelIndex,
+			long bufferInterarrivalTimeNanos, int recordsReadFromBuffer) {
+		throw new RuntimeException(
+				"Method should never be invoked. This is bug.");		
+	}
+	
+	@Override
+	public int getRuntimeInputGateIndex() {
+		return runtimeInputGateIndex;
+	}
+
+
+	@Override
+	public int getRuntimeOutputGateIndex() {
+		return runtimeOutputGateIndex;
+	}
+
+
+	@Override
+	public ReportTimer getReportTimer() {
+		return reportTimer;
 	}
 }

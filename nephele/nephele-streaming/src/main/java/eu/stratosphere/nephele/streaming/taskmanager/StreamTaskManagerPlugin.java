@@ -99,7 +99,7 @@ public class StreamTaskManagerPlugin implements TaskManagerPlugin {
 				AGGREGATION_INTERVAL_KEY, DEFAULT_AGGREGATION_INTERVAL);
 
 		LOG.info(String
-				.format("Configured tagging interval is every %d records / Aggregation interval is %d millis ",
+				.format("Configured sampling probability is %d%% of all records / Aggregation interval is %d millis ",
 						this.defaultSamplingProbability,
 						this.defaultAggregationInterval));
 
@@ -168,7 +168,7 @@ public class StreamTaskManagerPlugin implements TaskManagerPlugin {
 				}
 			}
 		} catch (Exception e) {
-			LOG.error(e);
+			LOG.error("Exception while registering task", e);
 		}
 	}
 

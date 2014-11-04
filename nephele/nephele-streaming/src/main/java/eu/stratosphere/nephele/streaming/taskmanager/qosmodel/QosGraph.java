@@ -226,7 +226,7 @@ public class QosGraph implements IOReadableWritable {
 
 	private void ensureGraphContainsConstrainedVertices(
 			JobGraphLatencyConstraint constraint) {
-		for (SequenceElement<JobVertexID> seqElem : constraint.getSequence()) {
+		for (SequenceElement seqElem : constraint.getSequence()) {
 			if (seqElem.isEdge()) {
 				if (!this.vertexByID.containsKey(seqElem.getSourceVertexID())
 						|| !this.vertexByID.containsKey(seqElem
@@ -255,7 +255,7 @@ public class QosGraph implements IOReadableWritable {
 	//
 	// return new SparseDelegateIterable<QosGroupVertex>(
 	// new Iterator<QosGroupVertex>() {
-	// Iterator<SequenceElement<JobVertexID>> sequenceIter = constraint
+	// Iterator<SequenceElement> sequenceIter = constraint
 	// .getSequence().iterator();
 	// QosGroupVertex current = null;
 	// QosGroupVertex last = null;
@@ -264,7 +264,7 @@ public class QosGraph implements IOReadableWritable {
 	// public boolean hasNext() {
 	// while (this.sequenceIter.hasNext()
 	// && this.current == null) {
-	// SequenceElement<JobVertexID> seqElem = this.sequenceIter
+	// SequenceElement seqElem = this.sequenceIter
 	// .next();
 	// if (!seqElem.isVertex()) {
 	// QosGroupVertex sourceVertex = QosGraph.this.vertexByID

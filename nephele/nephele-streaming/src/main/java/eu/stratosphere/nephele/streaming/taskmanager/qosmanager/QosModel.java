@@ -27,7 +27,6 @@ import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
 import eu.stratosphere.nephele.io.GateID;
 import eu.stratosphere.nephele.io.channels.ChannelID;
 import eu.stratosphere.nephele.jobgraph.JobID;
-import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
 import eu.stratosphere.nephele.streaming.SequenceElement;
@@ -472,7 +471,7 @@ public class QosModel {
 		JobGraphLatencyConstraint constraint = qosGraph
 				.getConstraintByID(constraintSummary.getLatencyConstraintID());
 
-		for (SequenceElement<JobVertexID> seqElem : constraint.getSequence()) {
+		for (SequenceElement seqElem : constraint.getSequence()) {
 			if (seqElem.isVertex()) {
 				continue;
 			}
@@ -487,7 +486,7 @@ public class QosModel {
 	}
 
 	private void setTargetGroupVertexConsumptionRate(
-			SequenceElement<JobVertexID> edge, long inactivityThresholdTime, 
+			SequenceElement edge, long inactivityThresholdTime, 
 			QosConstraintSummary constraintSummary) {
 
 		double consumptionRate = 0;
@@ -511,7 +510,7 @@ public class QosModel {
 	}
 
 	private void setSourceGroupVertexEmissionRate(
-			SequenceElement<JobVertexID> edge, long inactivityThresholdTime, 
+			SequenceElement edge, long inactivityThresholdTime, 
 			QosConstraintSummary constraintSummary) {
 
 		double emissionRate = 0;

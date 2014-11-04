@@ -1,17 +1,20 @@
 package eu.stratosphere.nephele.streaming.taskmanager.qosreporter.vertex;
 
-public class InputGateReceiveCounter {
-	private int received;
 
-	public void received() {
-		received++;
+public class InputGateReceiveCounter {
+
+	private long recordsReceived;
+
+
+	public void recordReceived() {
+		recordsReceived++;
 	}
 
-	public int getReceived() {
-		return received;
+	public long getRecordsReceived() {
+		return recordsReceived;
 	}
 
 	public void reset() {
-		received = 0;
+		recordsReceived = 0;
 	}
 }

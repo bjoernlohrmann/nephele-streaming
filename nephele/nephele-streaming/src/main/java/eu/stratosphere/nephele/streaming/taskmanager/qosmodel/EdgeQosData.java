@@ -49,7 +49,7 @@ public class EdgeQosData {
 
 	public double getChannelLatencyInMillis() {
 		if (this.latencyInMillisStatistic.hasValues()) {
-			return this.latencyInMillisStatistic.getArithmeticMean();
+			return this.latencyInMillisStatistic.getMean();
 		}
 
 		return -1;
@@ -57,7 +57,7 @@ public class EdgeQosData {
 
 	public double getChannelThroughputInMbit() {
 		if (this.throughputInMbitStatistic.hasValues()) {
-			return this.throughputInMbitStatistic.getArithmeticMean();
+			return this.throughputInMbitStatistic.getMean();
 		}
 		return -1;
 	}
@@ -67,21 +67,21 @@ public class EdgeQosData {
 			return 0;
 		}
 		if (this.outputBufferLifetimeStatistic.hasValues()) {
-			return this.outputBufferLifetimeStatistic.getArithmeticMean();
+			return this.outputBufferLifetimeStatistic.getMean();
 		}
 		return -1;
 	}
 
 	public double getRecordsPerBuffer() {
 		if (this.recordsPerBufferStatistic.hasValues()) {
-			return this.recordsPerBufferStatistic.getArithmeticMean();
+			return this.recordsPerBufferStatistic.getMean();
 		}
 		return -1;
 	}
 
 	public double getRecordsPerSecond() {
 		if (this.recordsPerSecondStatistic.hasValues()) {
-			return this.recordsPerSecondStatistic.getArithmeticMean();
+			return this.recordsPerSecondStatistic.getMean();
 		}
 		return -1;
 	}

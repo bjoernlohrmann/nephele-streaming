@@ -222,9 +222,9 @@ public abstract class AbstractInputGateWrapper<T extends Record> implements
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void notifyRecordIsAvailable(final int channelIndex) {
+	public long notifyRecordIsAvailable(final int channelIndex) {
 
-		this.wrappedInputGate.notifyRecordIsAvailable(channelIndex);
+		return this.wrappedInputGate.notifyRecordIsAvailable(channelIndex);
 	}
 
 	/**
@@ -240,8 +240,8 @@ public abstract class AbstractInputGateWrapper<T extends Record> implements
 	 * {@inheritDoc}
 	 */	
 	@Override
-	public void notifyDataUnitConsumed(int channelIndex) {
-		this.wrappedInputGate.notifyDataUnitConsumed(channelIndex);
+	public void notifyDataUnitConsumed(int channelIndex, long interarrivalTimeNanos, int recordsReadFromBuffer) {
+		this.wrappedInputGate.notifyDataUnitConsumed(channelIndex, interarrivalTimeNanos, recordsReadFromBuffer);
 	}
 
 	/**

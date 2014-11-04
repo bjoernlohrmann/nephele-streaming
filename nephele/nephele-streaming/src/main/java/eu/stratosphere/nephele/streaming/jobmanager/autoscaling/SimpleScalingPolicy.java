@@ -44,11 +44,9 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 			Map<JobVertexID, Integer> scalingActions)
 			throws UnexpectedVertexExecutionStateException {
 
-		int edgeIndex = 0;
-		double[][] memberStats = constraintSummary.getAggregatedMemberStatistics();
 		int[] taskDop = constraintSummary.getTaskDop();
-
-		for (SequenceElement<JobVertexID> seqElem : constraint.getSequence()) {
+		
+		for (SequenceElement seqElem : constraint.getSequence()) {
 			if (seqElem.isEdge()) {
 
 				ExecutionGroupVertex consumerGroupVertex = getExecutionGraph()
@@ -102,7 +100,7 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 		LOG.debug(scalingActions.toString());
 	}
 
-	private void addScaleUpAction(SequenceElement<JobVertexID> edge,
+	private void addScaleUpAction(SequenceElement edge,
 			QosConstraintSummary constraintSummary,
 			Map<JobVertexID, Integer> scalingActions) {
 
@@ -145,7 +143,7 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 		}
 	}
 
-	private void addScaleDownAction(SequenceElement<JobVertexID> edge,
+	private void addScaleDownAction(SequenceElement edge,
 			QosConstraintSummary constraintSummary, double consumerCpuUtil,
 			Map<JobVertexID, Integer> scalingActions) {
 

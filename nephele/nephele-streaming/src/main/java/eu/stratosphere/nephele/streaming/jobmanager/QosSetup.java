@@ -102,14 +102,14 @@ public class QosSetup {
 
 			@Override
 			public void processQosVertex(QosVertex vertex,
-					SequenceElement<JobVertexID> sequenceElem) {
+					SequenceElement sequenceElem) {
 				QosSetup.this.addReporterForQosVertex(qosManager, vertex,
 						sequenceElem);
 			}
 
 			@Override
 			public void processQosEdge(QosEdge edge,
-					SequenceElement<JobVertexID> sequenceElem) {
+					SequenceElement sequenceElem) {
 				QosSetup.this.addReportersForQosEdge(qosManager, edge,
 						sequence, sequenceElem);
 			}
@@ -124,7 +124,7 @@ public class QosSetup {
 	}
 
 	private void addReporterForQosVertex(QosManagerRole qosManager,
-			QosVertex vertex, SequenceElement<JobVertexID> sequenceElem) {
+			QosVertex vertex, SequenceElement sequenceElem) {
 
 		InstanceConnectionInfo reporterInstance = vertex.getExecutingInstance();
 
@@ -140,7 +140,7 @@ public class QosSetup {
 
 	private void addReportersForQosEdge(QosManagerRole qosManager,
 			QosEdge edge, JobGraphSequence sequence,
-			SequenceElement<JobVertexID> sequenceElem) {
+			SequenceElement sequenceElem) {
 
 		InstanceConnectionInfo srcReporterInstance = edge.getOutputGate()
 				.getVertex().getExecutingInstance();
@@ -288,7 +288,7 @@ public class QosSetup {
 			HashMap<JobVertexID, Integer> channelCounts) {
 
 		int minChannelCount = Integer.MAX_VALUE;
-		for (SequenceElement<JobVertexID> sequenceElem : qosGraph
+		for (SequenceElement sequenceElem : qosGraph
 				.getConstraints().iterator().next().getSequence()) {
 
 			if (sequenceElem.isEdge()) {
@@ -375,7 +375,7 @@ public class QosSetup {
 		}
 
 		Set<JobVertexID> anchorCandidates = new HashSet<JobVertexID>();
-		for (SequenceElement<JobVertexID> sequenceElem : qosGraph
+		for (SequenceElement sequenceElem : qosGraph
 				.getConstraints().iterator().next().getSequence()) {
 
 			if (sequenceElem.isVertex()) {

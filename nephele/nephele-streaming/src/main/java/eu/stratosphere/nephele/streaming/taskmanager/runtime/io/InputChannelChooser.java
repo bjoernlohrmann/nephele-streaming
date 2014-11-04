@@ -21,11 +21,14 @@ public class InputChannelChooser {
 	private int[] channelInputAvailibilityCounter;
 
 	private int currentChannel;
+	
+	private long lastArrivalTimestamp;
 
 	public InputChannelChooser() {
 		this.channelInputAvailibilityCounter = new int[1];
 		this.channelInputAvailibilityCounter[0] = 0;
 		this.currentChannel = -1;
+		this.lastArrivalTimestamp = System.nanoTime();
 	}
 
 	public boolean hasChannelAvailable() {
@@ -84,11 +87,20 @@ public class InputChannelChooser {
 		this.dequeueIncomingAvailableChannels();
 	}
 
-	public void increaseAvailableInput(int channelIndex) {
+	public long increaseAvailableInput(int channelIndex) {
+		
+		long interarrivalTime;
+		
 		synchronized (this.incomingInputAvailabilities) {
+			long now = System.nanoTime();
+			interarrivalTime = lastArrivalTimestamp - now;
+			lastArrivalTimestamp = now;
+
 			this.incomingInputAvailabilities.add(channelIndex);
 			this.incomingInputAvailabilities.notify();
 		}
+		
+		return interarrivalTime;
 	}
 
 	private void dequeueIncomingAvailableChannels() {

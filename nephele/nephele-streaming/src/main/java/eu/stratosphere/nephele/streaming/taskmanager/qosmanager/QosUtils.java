@@ -75,7 +75,7 @@ public class QosUtils {
 	// .getTargetVertex().getJobVertexID();
 	//
 	// for (JobGraphLatencyConstraint constraint : qosGraph.getConstraints()) {
-	// SequenceElement<JobVertexID> lastSequenceElement = constraint
+	// SequenceElement lastSequenceElement = constraint
 	// .getSequence().getLast();
 	// if (lastSequenceElement.isEdge()
 	// && lastSequenceElement.getSourceVertexID().equals(
@@ -110,7 +110,7 @@ public class QosUtils {
 	// .getSourceVertex().getJobVertexID();
 	//
 	// for (JobGraphLatencyConstraint constraint : qosGraph.getConstraints()) {
-	// SequenceElement<JobVertexID> firstSequenceElement = constraint
+	// SequenceElement firstSequenceElement = constraint
 	// .getSequence().getFirst();
 	// if (firstSequenceElement.isEdge()
 	// && firstSequenceElement.getSourceVertexID().equals(

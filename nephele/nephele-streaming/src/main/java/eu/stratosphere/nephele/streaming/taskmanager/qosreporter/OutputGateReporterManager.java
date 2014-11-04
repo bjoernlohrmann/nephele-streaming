@@ -2,6 +2,7 @@ package eu.stratosphere.nephele.streaming.taskmanager.qosreporter;
 
 import eu.stratosphere.nephele.streaming.message.qosreport.EdgeStatistics;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
+import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.BernoulliSampleDesign;
 import eu.stratosphere.nephele.types.AbstractTaggableRecord;
 
 import java.util.Collections;

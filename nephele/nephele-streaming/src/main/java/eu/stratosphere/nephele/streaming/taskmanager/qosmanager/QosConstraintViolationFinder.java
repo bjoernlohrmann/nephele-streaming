@@ -17,7 +17,6 @@ package eu.stratosphere.nephele.streaming.taskmanager.qosmanager;
 import java.util.ArrayList;
 import java.util.Collections;
 
-import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.JobGraphSequence;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
@@ -119,7 +118,7 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 	 */
 	@Override
 	public boolean shallTraverseEdge(QosEdge edge,
-			SequenceElement<JobVertexID> seqElem) {
+			SequenceElement seqElem) {
 
 		boolean isActive = true;
 
@@ -163,7 +162,7 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 	 */
 	@Override
 	public boolean shallTraverseVertex(QosVertex vertex,
-			SequenceElement<JobVertexID> seqElem) {
+			SequenceElement seqElem) {
 
 		VertexQosData qosData = vertex.getQosData();
 
@@ -185,7 +184,7 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 	 */
 	@Override
 	public void processQosVertex(QosVertex vertex,
-			SequenceElement<JobVertexID> sequenceElem) {
+			SequenceElement sequenceElem) {
 
 		int index = sequenceElem.getIndexInSequence();
 		this.currentSequenceMembers.set(index, vertex);
@@ -223,7 +222,7 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 	 */
 	@Override
 	public void processQosEdge(QosEdge edge,
-			SequenceElement<JobVertexID> sequenceElem) {
+			SequenceElement sequenceElem) {
 
 		int index = sequenceElem.getIndexInSequence();
 		this.currentSequenceMembers.set(index, edge);

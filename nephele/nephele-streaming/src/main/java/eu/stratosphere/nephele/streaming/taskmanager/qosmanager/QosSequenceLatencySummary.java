@@ -1,6 +1,7 @@
 package eu.stratosphere.nephele.streaming.taskmanager.qosmanager;
 
-import eu.stratosphere.nephele.jobgraph.JobVertexID;
+import java.util.List;
+
 import eu.stratosphere.nephele.streaming.JobGraphSequence;
 import eu.stratosphere.nephele.streaming.SequenceElement;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.ValueHistory;
@@ -28,7 +29,7 @@ public class QosSequenceLatencySummary {
 		this.noOfVertices = 0;
 		
 		this.memberLatencies = new double[jobGraphSequence.size()][];
-		for (SequenceElement<JobVertexID> sequenceElement : jobGraphSequence) {
+		for (SequenceElement sequenceElement : jobGraphSequence) {
 			int index = sequenceElement.getIndexInSequence();
 
 			this.inputOutputGateCombinations[index] = new int[2];

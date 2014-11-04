@@ -131,7 +131,7 @@ public class QosReport extends AbstractSerializableQosMessage {
 		if (existing == null) {
 			this.getOrCreateEdgeStatisticsMap().put(reporterID, edgeStats);
 		} else {
-			existing.add(edgeStats);
+			this.getOrCreateEdgeStatisticsMap().put(reporterID, existing.fuseWith(edgeStats));
 		}
 	}
 
@@ -149,7 +149,8 @@ public class QosReport extends AbstractSerializableQosMessage {
 		if (existing == null) {
 			this.getOrCreateVertexStatisticsMap().put(reporterID, vertexStats);
 		} else {
-			existing.add(vertexStats);
+			this.getOrCreateVertexStatisticsMap().put(reporterID,
+					existing.fuseWith(vertexStats));
 		}
 	}
 
@@ -229,7 +230,7 @@ public class QosReport extends AbstractSerializableQosMessage {
 	private void writeVertexLatencies(DataOutput out) throws IOException {
 		if (this.vertexStatistics != null) {
 			out.writeInt(this.vertexStatistics.size());
-			for (VertexStatistics vertexStat: this.vertexStatistics.values()) {
+			for (VertexStatistics vertexStat : this.vertexStatistics.values()) {
 				vertexStat.write(out);
 			}
 		} else {
@@ -301,7 +302,8 @@ public class QosReport extends AbstractSerializableQosMessage {
 		for (int i = 0; i < toRead; i++) {
 			VertexStatistics vertexStat = new VertexStatistics();
 			vertexStat.read(in);
-			this.getOrCreateVertexStatisticsMap().put(vertexStat.getReporterID(), vertexStat);
+			this.getOrCreateVertexStatisticsMap().put(
+					vertexStat.getReporterID(), vertexStat);
 		}
 	}
 

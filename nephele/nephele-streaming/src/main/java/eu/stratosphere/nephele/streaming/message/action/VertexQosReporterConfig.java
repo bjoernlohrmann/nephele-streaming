@@ -252,8 +252,10 @@ public class VertexQosReporterConfig implements IOReadableWritable {
 		if (this.outputGateIndex != -1) {
 			this.outputGateID.write(out);
 		}
-
-		out.writeUTF(samplingStrategy.toString());
+		
+		if (!this.isDummy()) {
+			out.writeUTF(samplingStrategy.toString());
+		}
 
 		out.writeInt(this.memberIndex);
 		out.writeUTF(this.name);
@@ -291,8 +293,10 @@ public class VertexQosReporterConfig implements IOReadableWritable {
 			this.outputGateID.read(in);
 		}
 
-		this.samplingStrategy = SamplingStrategy.valueOf(in.readUTF());
-
+		if (!this.isDummy()) {
+			this.samplingStrategy = SamplingStrategy.valueOf(in.readUTF());
+		}
+		
 		this.memberIndex = in.readInt();
 		this.name = in.readUTF();
 	}

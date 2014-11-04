@@ -30,6 +30,8 @@ public final class TransferEnvelope {
 	private final ChannelID source;
 
 	private final int sequenceNumber;
+	
+	private long interarrivalTimeNanos;
 
 	private EventList eventList;
 
@@ -45,6 +47,7 @@ public final class TransferEnvelope {
 		this.jobID = jobID;
 		this.source = source;
 		this.eventList = eventList;
+		this.interarrivalTimeNanos = -1;
 	}
 
 	public JobID getJobID() {
@@ -71,6 +74,14 @@ public final class TransferEnvelope {
 
 	public int getSequenceNumber() {
 		return this.sequenceNumber;
+	}
+	
+	public long getInterarrivalTimeNanos() {
+		return this.interarrivalTimeNanos;
+	}
+	
+	public void setInterarrivalTimestampNanos(long intearrivalTimeNanos) {
+		this.interarrivalTimeNanos = intearrivalTimeNanos;
 	}
 
 	public void setBuffer(Buffer buffer) {

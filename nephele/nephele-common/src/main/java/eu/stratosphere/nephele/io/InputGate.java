@@ -72,15 +72,21 @@ public interface InputGate<T extends Record> extends Gate<T> {
    * at least one record available.
    *
    * @param channelIndex the index of the channel which has at least one record available
+   * @return the interarrival time in nanos
    */
-  void notifyRecordIsAvailable(int channelIndex);
+  long notifyRecordIsAvailable(int channelIndex);
 
-  /**
-   * Notify the gate that is has consumed a data unit from the channel with the given index
-   *
-   * @param channelIndex the index of the channel from which a data unit has been consumed
-   */
-  void notifyDataUnitConsumed(int channelIndex);
+	/**
+	 * Notify the gate that is has consumed a data unit from the channel with
+	 * the given index
+	 * 
+	 * @param channelIndex
+	 *            the index of the channel from which a data unit has been
+	 *            consumed
+	 * @param recordsReadFromBuffer
+	 * @param interarrivalTimeNanos
+	 */
+  void notifyDataUnitConsumed(int channelIndex, long interarrivalTimeNanos, int recordsReadFromBuffer);
 
   /**
    * Immediately closes the input gate and all its input channels. The corresponding

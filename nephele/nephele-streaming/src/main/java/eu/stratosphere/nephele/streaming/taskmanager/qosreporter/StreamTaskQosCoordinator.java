@@ -21,11 +21,13 @@ import eu.stratosphere.nephele.streaming.message.action.SetOutputLatencyTargetAc
 import eu.stratosphere.nephele.streaming.message.action.VertexQosReporterConfig;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.listener.QosReportingListenerHelper;
+import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.vertex.VertexStatisticsReportManager;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.StreamTaskEnvironment;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.io.StreamInputGate;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.io.StreamOutputGate;
 import eu.stratosphere.nephele.taskmanager.runtime.RuntimeTask;
 import eu.stratosphere.nephele.types.Record;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 

@@ -47,7 +47,7 @@ public class QosGraphFactory {
 		ExecutionGroupVertex currExecVertex = null;
 		QosGroupVertex currGroupVertex = null;
 
-		for (SequenceElement<JobVertexID> sequenceElem : constraint
+		for (SequenceElement sequenceElem : constraint
 				.getSequence()) {
 
 			if (currExecVertex == null) {
@@ -201,13 +201,13 @@ public class QosGraphFactory {
 		QosGraphTraversalListener traversalListener = new QosGraphTraversalListener() {
 			@Override
 			public void processQosVertex(QosVertex vertex,
-					SequenceElement<JobVertexID> sequenceElem) {
+					SequenceElement sequenceElem) {
 				// do nothing
 			}
 
 			@Override
 			public void processQosEdge(QosEdge edge,
-					SequenceElement<JobVertexID> sequenceElem) {
+					SequenceElement sequenceElem) {
 				addMembersAndMemberWiring(edge, toReturn);
 			}
 		};
@@ -278,7 +278,7 @@ public class QosGraphFactory {
 	// HashMap<JobVertexID, QosGroupVertex>(
 	// qosGraph.getNumberOfVertices());
 	//
-	// for (SequenceElement<JobVertexID> sequenceElem : sequence) {
+	// for (SequenceElement sequenceElem : sequence) {
 	// if (sequenceElem.isVertex()) {
 	//
 	// ensureGroupVertexPresence(sequenceElem.getVertexID(),

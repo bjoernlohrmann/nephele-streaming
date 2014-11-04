@@ -14,7 +14,6 @@
  **********************************************************************************************************************/
 package eu.stratosphere.nephele.streaming.taskmanager.qosmodel;
 
-import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.streaming.SequenceElement;
 
 /**
@@ -35,7 +34,7 @@ public interface QosGraphTraversalCondition {
 	 *         traversal should turn around at the given edge.
 	 */
 	public boolean shallTraverseEdge(QosEdge edge,
-			SequenceElement<JobVertexID> sequenceElement);
+			SequenceElement sequenceElement);
 
 	/**
 	 * A callback used during Qos graph traversal, to check whether traversal
@@ -45,6 +44,6 @@ public interface QosGraphTraversalCondition {
 	 *         traversal should turn around at the given vertex.
 	 */
 	public boolean shallTraverseVertex(QosVertex vertex,
-			SequenceElement<JobVertexID> sequenceElement);
+			SequenceElement sequenceElement);
 
 }

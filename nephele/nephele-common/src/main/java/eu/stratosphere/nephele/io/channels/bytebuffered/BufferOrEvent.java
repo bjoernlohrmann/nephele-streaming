@@ -26,14 +26,18 @@ public class BufferOrEvent {
 	
 	private final AbstractEvent event;
 	
-	public BufferOrEvent(Buffer buffer) {
+	private final long interarrivalTimeNanos;
+	
+	public BufferOrEvent(Buffer buffer, long interarrivalTimeNanos) {
 		this.buffer = buffer;
 		this.event = null;
+		this.interarrivalTimeNanos = interarrivalTimeNanos;
 	}
 	
-	public BufferOrEvent(AbstractEvent event) {
+	public BufferOrEvent(AbstractEvent event, long interarrivalTimeNanos) {
 		this.buffer = null;
 		this.event = event;
+		this.interarrivalTimeNanos = interarrivalTimeNanos;
 	}
 	
 	public boolean isBuffer() {
@@ -50,5 +54,9 @@ public class BufferOrEvent {
 	
 	public AbstractEvent getEvent() {
 		return this.event;
+	}
+
+	public long getInterarrivalTimeNanos() {
+		return interarrivalTimeNanos;
 	}
 }

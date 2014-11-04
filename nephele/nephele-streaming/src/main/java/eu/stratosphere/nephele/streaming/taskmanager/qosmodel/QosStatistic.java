@@ -1,52 +1,77 @@
 package eu.stratosphere.nephele.streaming.taskmanager.qosmodel;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedList;
 
 public class QosStatistic {
 
-	private ArrayList<QosValue> sortedByValue;
+	private final LinkedList<QosValue> sortedById;
 
-	private LinkedList<QosValue> sortedById;
-
-	private int statisticWindowSize;
+	private final int statisticWindowSize;
 
 	private int noOfStoredValues;
+	
+	private int sumOfWeights;
 
-	private double sumOfValues;
+	private double sumOfWeightedMeans;
+
+	private double sumOfWeightedVariances;
+
+	private final boolean hasVariance;
+	
+	private QosValue statisticCache;
 
 	public QosStatistic(int statisticWindowSize) {
+		this(statisticWindowSize, false);
+	}
+
+	public QosStatistic(int statisticWindowSize, boolean hasVariance) {
 		this.sortedById = new LinkedList<QosValue>();
-		this.sortedByValue = new ArrayList<QosValue>();
 		this.statisticWindowSize = statisticWindowSize;
+		this.hasVariance = hasVariance;
 		clear();
 	}
-	
+
 	public void clear() {
 		this.noOfStoredValues = 0;
-		this.sumOfValues = 0;
+		this.sumOfWeightedMeans = 0;
+		this.sumOfWeightedVariances = 0;
+		this.sumOfWeights = 0;
 		this.sortedById.clear();
-		this.sortedByValue.clear();
 	}
 
 	public void addValue(QosValue value) {
+		if (value.hasVariance() != hasVariance) {
+			throw new RuntimeException(
+					"Cannot put QosValues without variance into a statistic with variance, or vice versa");
+		}
+
 		QosValue droppedValue = this.insertIntoSortedByTimestamp(value);
 
 		if (droppedValue != null) {
-			this.removeFromSortedByValue(droppedValue);
 			this.noOfStoredValues--;
-			this.sumOfValues -= droppedValue.getValue();
+			this.sumOfWeights -= droppedValue.getWeight();
+			this.sumOfWeightedMeans -= droppedValue.getWeight() * droppedValue.getMean();
+			
+			if (hasVariance) {
+				this.sumOfWeightedVariances -= (droppedValue.getWeight() -1) * droppedValue.getVariance();
+			}
 		}
 
-		this.insertIntoSortedByValue(value);
 		this.noOfStoredValues++;
-		this.sumOfValues += value.getValue();
+		this.sumOfWeights += value.getWeight();
+		this.sumOfWeightedMeans += value.getWeight() * value.getMean();
+
+		if (hasVariance) {
+			this.sumOfWeightedVariances += (value.getWeight() -1) * value.getVariance();
+		}
+		
+		this.statisticCache = null;
 	}
 
 	private QosValue insertIntoSortedByTimestamp(QosValue value) {
 		if (!this.sortedById.isEmpty()
-				&& this.sortedById.getLast().getId() >= value.getId()) {
+				&& this.sortedById.getLast().getTimestamp() >= value
+						.getTimestamp()) {
 			throw new IllegalArgumentException(
 					"Trying to add stale Qos statistic values. This should not happen.");
 		}
@@ -56,52 +81,6 @@ public class QosStatistic {
 			return this.sortedById.removeFirst();
 		}
 		return null;
-	}
-
-	protected void insertIntoSortedByValue(QosValue value) {
-		int insertionIndex = Collections
-				.binarySearch(this.sortedByValue, value);
-		if (insertionIndex < 0) {
-			insertionIndex = -(insertionIndex + 1);
-		}
-
-		this.sortedByValue.add(insertionIndex, value);
-	}
-
-	protected void removeFromSortedByValue(QosValue toRemove) {
-		int removeIndex = Collections
-				.binarySearch(this.sortedByValue, toRemove);
-		if (removeIndex < 0) {
-			throw new IllegalArgumentException(
-					"Trying to drop inexistant Qos statistic value. This should not happen.");
-		}
-		this.sortedByValue.remove(removeIndex);
-	}
-
-	public double getMedianValue() {
-		if (this.noOfStoredValues == 0) {
-			throw new RuntimeException(
-					"Cannot calculate median of empty value set");
-		}
-
-		int medianIndex = this.noOfStoredValues / 2;
-		return this.sortedByValue.get(medianIndex).getValue();
-	}
-
-	public double getMaxValue() {
-		if (this.noOfStoredValues == 0) {
-			throw new RuntimeException(
-					"Cannot calculate the max value of empty value set");
-		}
-		return this.sortedByValue.get(this.noOfStoredValues - 1).getValue();
-	}
-
-	public double getMinValue() {
-		if (this.noOfStoredValues == 0) {
-			throw new RuntimeException(
-					"Cannot calculate the min value of empty value set");
-		}
-		return this.sortedByValue.get(0).getValue();
 	}
 
 	public QosValue getOldestValue() {
@@ -120,13 +99,63 @@ public class QosStatistic {
 		return this.sortedById.getLast();
 	}
 
-	public double getArithmeticMean() {
+	public double getMean() {
 		if (this.noOfStoredValues == 0) {
 			throw new RuntimeException(
 					"Cannot calculate the arithmetic mean of empty value set");
 		}
+		
+		if (statisticCache == null) {
+			refreshStatistic();
+		}
 
-		return this.sumOfValues / this.noOfStoredValues;
+		return statisticCache.getMean();
+	}
+
+	private void refreshStatistic() {
+		
+		double mean;
+		
+		mean = sumOfWeightedMeans / sumOfWeights;
+		
+		if(Math.rint(sumOfWeightedMeans) == sumOfWeightedMeans) {
+			mean = sumOfWeightedMeans / sumOfWeights;
+		} else {			
+			mean = 0;
+			for(QosValue value : sortedById) {
+				mean += (((double)value.getWeight()) / sumOfWeights) * (value.getMean() - mean);
+			}
+		}
+		
+		if (hasVariance()) { 
+			double tgss = 0;
+			for(QosValue value : sortedById) {
+				double meanDiff = value.getMean() - mean;
+				tgss += (meanDiff * meanDiff) * value.getWeight();
+			}
+			double variance = (sumOfWeightedVariances + tgss) / (sumOfWeights -1) ;
+			
+			statisticCache = new QosValue(mean, variance, sumOfWeights, getNewestValue().getTimestamp());
+		} else {
+			statisticCache = new QosValue(mean, sumOfWeights, getNewestValue().getTimestamp());
+		}
+	}
+
+	public boolean hasVariance() {
+		return this.hasVariance;
+	}
+
+	public double getVariance() {
+		if (this.noOfStoredValues == 0) {
+			throw new RuntimeException(
+					"Cannot calculate the variance of empty value set");
+		}
+
+		if (statisticCache == null) {
+			refreshStatistic();
+		}
+
+		return statisticCache.getVariance();
 	}
 
 	public boolean hasValues() {

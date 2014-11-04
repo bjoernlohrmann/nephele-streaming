@@ -1,66 +1,86 @@
 package eu.stratosphere.nephele.streaming.taskmanager.qosmodel;
 
+import org.apache.commons.lang3.builder.CompareToBuilder;
+import org.apache.commons.lang3.builder.EqualsBuilder;
+
+
+/**
+ * A Qos value represents a set of measurements ("samples") of some runtime
+ * aspect, e.g. a set of vertex latency measurements. A Qos value holds a timestam, the mean
+ * and optionally the variance of these measurements/samples.
+ * 
+ * @author Bjoern Lohrmann
+ * 
+ */
 public class QosValue implements Comparable<QosValue> {
 
-	private static long nextFreeId = 0;
+	private final long timestamp;
+	
+	private final double mean;
+	
+	private final double variance;
 
-	private long id;
+	private int weight;
 
-	private double value;
-
-	private long timestamp;
-
-	public QosValue(double value, long timestamp) {
-		this.value = value;
+	public QosValue(double mean, long timestamp) {
+		this(mean, 1, timestamp);
+	}
+	
+	public QosValue(double mean, int weight, long timestamp) {
+		this.mean = mean;
+		this.variance = -1;
+		this.weight = weight;
 		this.timestamp = timestamp;
-		this.id = nextFreeId++;
 	}
-
-	public double getValue() {
-		return this.value;
-	}
-
-	public void setValue(double value) {
-		this.value = value;
+	
+	public QosValue(double mean, double variance, int weight, long timestamp) {
+		this.mean = mean;
+		this.variance = variance;
+		this.weight = weight;
+		this.timestamp = timestamp;
 	}
 
 	public long getTimestamp() {
 		return this.timestamp;
 	}
-
-	public void setTimestamp(long timestamp) {
-		this.timestamp = timestamp;
+	
+	public double getMean() {
+		return this.mean;
 	}
 
-	public long getId() {
-		return this.id;
+	public double getVariance() {
+		return this.variance;
+	}
+	
+	public boolean hasVariance() {
+		return this.variance != -1;
+	}
+
+	public int getWeight() {
+		return weight;
 	}
 
 	/**
-	 * Sorts first by value and then by id.
+	 * Sorts first by mean and then by timestamp.
 	 */
 	@Override
 	public int compareTo(QosValue other) {
-		if (this.value > other.value) {
-			return 1;
-		} else if (this.value < other.value) {
-			return -1;
-		} else {
-			if (this.id > other.id) {
-				return 1;
-			} else if (this.id < other.id) {
-				return -1;
-			} else {
-				return 0;
-			}
-		}
+		return new CompareToBuilder()
+			.append(this.mean, other.mean)
+		 	.append(this.variance, other.variance)
+		 	.append(this.timestamp, other.timestamp)
+		 	.toComparison();		
 	}
 
 	@Override
 	public boolean equals(Object otherObj) {
 		if (otherObj instanceof QosValue) {
 			QosValue other = (QosValue) otherObj;
-			return other.id == this.id;
+			return new EqualsBuilder()
+				.append(this.mean, other.mean)
+				.append(this.variance, other.variance)
+				.append(this.timestamp, other.timestamp)
+				.isEquals();
 		}
 		return false;
 	}
@@ -72,7 +92,6 @@ public class QosValue implements Comparable<QosValue> {
 	 */
 	@Override
 	public int hashCode() {
-		return Long.valueOf(this.id).hashCode();
+		return Long.valueOf(this.timestamp).hashCode();
 	}
-
 }

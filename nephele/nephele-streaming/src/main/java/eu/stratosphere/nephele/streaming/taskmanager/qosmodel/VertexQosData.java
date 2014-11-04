@@ -1,8 +1,9 @@
 package eu.stratosphere.nephele.streaming.taskmanager.qosmodel;
 
-import eu.stratosphere.nephele.streaming.message.qosreport.VertexStatistics;
-
 import java.lang.reflect.Array;
+
+import eu.stratosphere.nephele.streaming.message.qosreport.VertexStatistics;
+import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.Sample;
 
 /**
  * Instances of this class hold Qos data (currently only latency) of a
@@ -21,38 +22,32 @@ public class VertexQosData {
 	 * Sparse array indexed by inputGateIndex containing the gate's record
 	 * consumption rate per second
 	 */
-	private QosStatistic[] inputGateRecordsConsumedPerSec;
+	private QosStatistic[] igRecordsConsumedPerSec;
 
 	/**
 	 * Sparse array indexed by outputGateIndex containing the gate's record
 	 * emission rate per second
 	 */
-	private QosStatistic[] outputGateRecordsEmittedPerSec;
+	private QosStatistic[] ogRecordsEmittedPerSec;
 	
 	/**
 	 * Sparse array indexed by (inputGateIndex, outputGateIndex) of the vertex.
 	 * Sparseness means that some (inputGateIndex, outputGateIndex) of the array
 	 * may be null.
 	 */
-	private QosStatistic[][] inputOutputGateLatency;
+	private QosStatistic[][] igOgVertexLatency;
 
-	private QosStatistic[][] inputOutputGateLatencyVariance;
-
-	private QosStatistic[] interArrivalTime;
-
-	private QosStatistic[] interArrivalTimeVariance;
+	private QosStatistic[] igRecordInterArrivalTime;
 	
 
 	private final static int DEFAULT_NO_OF_STATISTICS_ENTRIES = 4;
 
 	public VertexQosData(QosVertex vertex) {
 		this.vertex = vertex;
-		this.inputGateRecordsConsumedPerSec = new QosStatistic[1];
-		this.outputGateRecordsEmittedPerSec = new QosStatistic[1];
-		this.inputOutputGateLatency = new QosStatistic[1][1];
-		this.inputOutputGateLatencyVariance = new QosStatistic[1][1];
-		this.interArrivalTime = new QosStatistic[1];
-		this.interArrivalTimeVariance = new QosStatistic[1];
+		this.igRecordsConsumedPerSec = new QosStatistic[1];
+		this.ogRecordsEmittedPerSec = new QosStatistic[1];
+		this.igOgVertexLatency = new QosStatistic[1][1];
+		this.igRecordInterArrivalTime = new QosStatistic[1];
 	}
 
 	public QosVertex getVertex() {
@@ -60,43 +55,43 @@ public class VertexQosData {
 	}
 	
 	public double getLatencyInMillis(int inputGateIndex, int outputGateIndex) {
-		if (inputOutputGateLatency[inputGateIndex][outputGateIndex].hasValues()) {
-			return inputOutputGateLatency[inputGateIndex][outputGateIndex].getArithmeticMean();
+		if (igOgVertexLatency[inputGateIndex][outputGateIndex].hasValues()) {
+			return igOgVertexLatency[inputGateIndex][outputGateIndex].getMean();
 		}
 		return -1;
 	}
 
 	public double getLatencyVarianceInMillis(int inputGateIndex, int outputGateIndex) {
-		if (inputOutputGateLatencyVariance[inputGateIndex][outputGateIndex].hasValues()) {
-			return inputOutputGateLatencyVariance[inputGateIndex][outputGateIndex].getArithmeticMean();
+		if (igOgVertexLatency[inputGateIndex][outputGateIndex].hasValues()) {
+			return igOgVertexLatency[inputGateIndex][outputGateIndex].getVariance();
 		}
 		return -1;
 	}
 
 	public double getRecordsConsumedPerSec(int inputGateIndex) {
-		if (inputGateRecordsConsumedPerSec[inputGateIndex].hasValues()) {
-			return inputGateRecordsConsumedPerSec[inputGateIndex].getArithmeticMean();
+		if (igRecordsConsumedPerSec[inputGateIndex].hasValues()) {
+			return igRecordsConsumedPerSec[inputGateIndex].getMean();
 		}
 		return -1;
 	}
 
 	public double getRecordsEmittedPerSec(int outputGateIndex) {
-		if (outputGateRecordsEmittedPerSec[outputGateIndex].hasValues()) {
-			return outputGateRecordsEmittedPerSec[outputGateIndex].getArithmeticMean();
+		if (ogRecordsEmittedPerSec[outputGateIndex].hasValues()) {
+			return ogRecordsEmittedPerSec[outputGateIndex].getMean();
 		}
 		return -1;
 	}
 
 	public double getInterArrivalTimeInMillis(int inputGateIndex) {
-		if (interArrivalTime[inputGateIndex].hasValues()) {
-			return interArrivalTime[inputGateIndex].getArithmeticMean();
+		if (igRecordInterArrivalTime[inputGateIndex].hasValues()) {
+			return igRecordInterArrivalTime[inputGateIndex].getMean();
 		}
 		return -1;
 	}
 
 	public double getInterArrivalTimeVarianceInMillis(int inputGateIndex) {
-		if (interArrivalTimeVariance[inputGateIndex].hasValues()) {
-			return interArrivalTimeVariance[inputGateIndex].getArithmeticMean();
+		if (igRecordInterArrivalTime[inputGateIndex].hasValues()) {
+			return igRecordInterArrivalTime[inputGateIndex].getVariance();
 		}
 		return -1;
 	}
@@ -105,19 +100,19 @@ public class VertexQosData {
 	public void prepareForReportsOnGateCombination(int inputGateIndex,
 			int outputGateIndex) {
 
-		if (inputOutputGateLatency.length <= inputGateIndex ||
-				inputOutputGateLatency[inputGateIndex] == null) {
+		if (igOgVertexLatency.length <= inputGateIndex ||
+				igOgVertexLatency[inputGateIndex] == null) {
 			
-			inputOutputGateLatency = setInArray(QosStatistic[].class,
-					inputOutputGateLatency, 
+			igOgVertexLatency = setInArray(QosStatistic[].class,
+					igOgVertexLatency, 
 					inputGateIndex, 
 					new QosStatistic[outputGateIndex + 1]);
 		}
 
-		inputOutputGateLatency[inputGateIndex] = setInArray(
+		igOgVertexLatency[inputGateIndex] = setInArray(
 				QosStatistic.class,
-				inputOutputGateLatency[inputGateIndex], outputGateIndex,
-				new QosStatistic(DEFAULT_NO_OF_STATISTICS_ENTRIES));
+				igOgVertexLatency[inputGateIndex], outputGateIndex,
+				new QosStatistic(DEFAULT_NO_OF_STATISTICS_ENTRIES, true));
 		
 		prepareForReportsOnInputGate(inputGateIndex);
 		prepareForReportsOnOutputGate(outputGateIndex);
@@ -125,15 +120,19 @@ public class VertexQosData {
 	
 	
 	public void prepareForReportsOnInputGate(int inputGateIndex) {
-		inputGateRecordsConsumedPerSec = setInArray(QosStatistic.class,
-				inputGateRecordsConsumedPerSec, inputGateIndex,
+		igRecordsConsumedPerSec = setInArray(QosStatistic.class,
+				igRecordsConsumedPerSec, inputGateIndex,
 				new QosStatistic(DEFAULT_NO_OF_STATISTICS_ENTRIES));
-
+		
+		
+		igRecordInterArrivalTime = setInArray(QosStatistic.class,
+				igRecordInterArrivalTime, inputGateIndex,
+				new QosStatistic(DEFAULT_NO_OF_STATISTICS_ENTRIES, true));
 	} 
 
 	public void prepareForReportsOnOutputGate(int outputGateIndex) {
-		outputGateRecordsEmittedPerSec = setInArray(QosStatistic.class,
-				outputGateRecordsEmittedPerSec, outputGateIndex,
+		ogRecordsEmittedPerSec = setInArray(QosStatistic.class,
+				ogRecordsEmittedPerSec, outputGateIndex,
 				new QosStatistic(DEFAULT_NO_OF_STATISTICS_ENTRIES));
 	}
 	
@@ -171,28 +170,26 @@ public class VertexQosData {
 
 		if (inputGateIndex != -1 && outputGateIndex != -1) {
 
-			QosStatistic stat = inputOutputGateLatency[inputGateIndex][outputGateIndex];
-
-			stat.addValue(new QosValue(measurement.getVertexLatency(),
-					timestamp));
-			stat.addValue(new QosValue(measurement.getVertexLatencyVariance(),
-					timestamp));
+			Sample vertexLatency = measurement.getVertexLatencyMillis();
+			QosStatistic stat = igOgVertexLatency[inputGateIndex][outputGateIndex];
+			
+			stat.addValue(new QosValue(vertexLatency.getMean(), vertexLatency.getVariance(), vertexLatency.getNoOfSamplePoints(), timestamp));
 		}
 
 		if (inputGateIndex != -1) {
-			inputGateRecordsConsumedPerSec[inputGateIndex]
+			igRecordsConsumedPerSec[inputGateIndex]
 					.addValue(new QosValue(measurement
 							.getRecordsConsumedPerSec(), timestamp));
-			interArrivalTime[inputGateIndex]
-					.addValue(new QosValue(measurement
-							.getInterArrivalTime(), timestamp));
-			interArrivalTimeVariance[inputGateIndex]
-					.addValue(new QosValue(measurement
-							.getInterArrivalTimeVariance(), timestamp));
+
+			Sample interarrivalTime = measurement.getInterArrivalTimeMillis();
+			igRecordInterArrivalTime[inputGateIndex].addValue(new QosValue(
+					interarrivalTime.getMean(), interarrivalTime.getVariance(),
+					interarrivalTime.getNoOfSamplePoints(),
+					timestamp));
 		}
 
 		if (outputGateIndex != -1) {
-			outputGateRecordsEmittedPerSec[outputGateIndex]
+			ogRecordsEmittedPerSec[outputGateIndex]
 					.addValue(new QosValue(measurement
 							.getRecordsEmittedPerSec(), timestamp));
 
@@ -218,21 +215,21 @@ public class VertexQosData {
 				&& !isInputGateConsumptionRateNewerThan(inputGateIndex,
 						thresholdTimestamp)) {
 
-			inputGateRecordsConsumedPerSec[inputGateIndex].clear();
+			igRecordsConsumedPerSec[inputGateIndex].clear();
 		}
 
 		if (outputGateIndex != -1
 				&& !isOutputGateEmissionRateNewerThan(outputGateIndex,
 						thresholdTimestamp)) {
 
-			outputGateRecordsEmittedPerSec[outputGateIndex].clear();
+			ogRecordsEmittedPerSec[outputGateIndex].clear();
 		}
 
 		if (inputGateIndex != -1
 				&& outputGateIndex != -1
 				&& !isVertexLatencyNewerThan(inputGateIndex, outputGateIndex,
 						thresholdTimestamp)) {
-			inputOutputGateLatency[inputGateIndex][outputGateIndex].clear();
+			igOgVertexLatency[inputGateIndex][outputGateIndex].clear();
 		}
 
 	}
@@ -240,33 +237,33 @@ public class VertexQosData {
 	private boolean isVertexLatencyNewerThan(int inputGateIndex,
 			int outputGateIndex, long thresholdTimestamp) {
 
-		if (!inputOutputGateLatency[inputGateIndex][outputGateIndex].hasValues()) {
+		if (!igOgVertexLatency[inputGateIndex][outputGateIndex].hasValues()) {
 			return false;
 		}
 
-		return inputOutputGateLatency[inputGateIndex][outputGateIndex]
+		return igOgVertexLatency[inputGateIndex][outputGateIndex]
 				.getOldestValue().getTimestamp() >= thresholdTimestamp;
 	}
 	
 	private boolean isInputGateConsumptionRateNewerThan(int inputGateIndex,
 			long thresholdTimestamp) {
 
-		if (!inputGateRecordsConsumedPerSec[inputGateIndex].hasValues()) {
+		if (!igRecordsConsumedPerSec[inputGateIndex].hasValues()) {
 			return false;
 		}
 
-		return inputGateRecordsConsumedPerSec[inputGateIndex].getOldestValue()
+		return igRecordsConsumedPerSec[inputGateIndex].getOldestValue()
 				.getTimestamp() >= thresholdTimestamp;
 	}
 	
 	private boolean isOutputGateEmissionRateNewerThan(int outputGateIndex,
 			long thresholdTimestamp) {
 
-		if (!outputGateRecordsEmittedPerSec[outputGateIndex].hasValues()) {
+		if (!ogRecordsEmittedPerSec[outputGateIndex].hasValues()) {
 			return false;
 		}
 
-		return outputGateRecordsEmittedPerSec[outputGateIndex].getOldestValue()
+		return ogRecordsEmittedPerSec[outputGateIndex].getOldestValue()
 				.getTimestamp() >= thresholdTimestamp;
 	}	
 }

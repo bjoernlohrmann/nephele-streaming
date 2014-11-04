@@ -1,4 +1,4 @@
-package eu.stratosphere.nephele.streaming.taskmanager.qosreporter;
+package eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling;
 
 import java.util.concurrent.ThreadLocalRandom;
 

@@ -14,7 +14,6 @@
  **********************************************************************************************************************/
 package eu.stratosphere.nephele.streaming.taskmanager.qosmodel;
 
-import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.streaming.SequenceElement;
 
 /**
@@ -25,19 +24,19 @@ import eu.stratosphere.nephele.streaming.SequenceElement;
  */
 public class QosGraphUtil {
 
-	public static boolean match(SequenceElement<JobVertexID> sequenceElement,
+	public static boolean match(SequenceElement sequenceElement,
 			QosVertex vertex) {
 		return match(sequenceElement, vertex.getGroupVertex());
 	}
 
-	public static boolean match(SequenceElement<JobVertexID> sequenceElement,
+	public static boolean match(SequenceElement sequenceElement,
 			QosGroupVertex groupVertex) {
 		return sequenceElement.isVertex()
 				&& sequenceElement.getVertexID().equals(
 						groupVertex.getJobVertexID());
 	}
 
-	public static boolean match(SequenceElement<JobVertexID> sequenceElement,
+	public static boolean match(SequenceElement sequenceElement,
 			QosGroupEdge groupEdge) {
 
 		return sequenceElement.isEdge()
@@ -51,7 +50,7 @@ public class QosGraphUtil {
 						.getInputGateIndex();
 	}
 
-	public static boolean match(SequenceElement<JobVertexID> sequenceElement,
+	public static boolean match(SequenceElement sequenceElement,
 			QosEdge edge) {
 
 		return sequenceElement.isEdge()
@@ -68,7 +67,7 @@ public class QosGraphUtil {
 	}
 
 	public static boolean isEdgeAndEndsAtVertex(
-			SequenceElement<JobVertexID> edge, QosGroupVertex groupVertex) {
+			SequenceElement edge, QosGroupVertex groupVertex) {
 
 		return edge.isEdge()
 				&& edge.getTargetVertexID()
@@ -76,19 +75,19 @@ public class QosGraphUtil {
 	}
 
 	public static boolean isEdgeAndEndsAtVertex(
-			SequenceElement<JobVertexID> edge, QosVertex vertex) {
+			SequenceElement edge, QosVertex vertex) {
 
 		return isEdgeAndEndsAtVertex(edge, vertex.getGroupVertex());
 	}
 
 	public static boolean isEdgeAndStartsAtVertex(
-			SequenceElement<JobVertexID> edge, QosVertex vertex) {
+			SequenceElement edge, QosVertex vertex) {
 
 		return isEdgeAndStartsAtVertex(edge, vertex.getGroupVertex());
 	}
 
 	public static boolean isEdgeAndStartsAtVertex(
-			SequenceElement<JobVertexID> edge, QosGroupVertex groupVertex) {
+			SequenceElement edge, QosGroupVertex groupVertex) {
 
 		return edge.isEdge()
 				&& edge.getSourceVertexID()

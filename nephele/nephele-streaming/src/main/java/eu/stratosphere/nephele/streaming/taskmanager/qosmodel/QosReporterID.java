@@ -93,6 +93,14 @@ public abstract class QosReporterID implements IOReadableWritable {
 		public GateID getOutputGateID() {
 			return this.outputGateID;
 		}
+		
+		public boolean hasOutputGateID() {
+			return this.outputGateID != null;
+		}
+		
+		public boolean hasInputGateID() {
+			return this.inputGateID != null;
+		}
 
 		private void precomputeHash() {
 			this.precomputedHash = this.vertexID.hashCode();

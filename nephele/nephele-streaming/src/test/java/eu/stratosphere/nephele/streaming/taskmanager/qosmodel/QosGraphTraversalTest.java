@@ -85,7 +85,6 @@ public class QosGraphTraversalTest {
 	 * 
 	 * @throws Exception
 	 */
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testFixtureSequence1() throws Exception {
 		QosGraph qg = this.createQosGraph(this.fixture.jobGraph,
@@ -110,7 +109,6 @@ public class QosGraphTraversalTest {
 	 * 
 	 * @throws Exception
 	 */
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testFixtureSequence1TraverseMultiple() throws Exception {
 		QosGraph qg = this.createQosGraph(this.fixture.jobGraph,
@@ -131,7 +129,6 @@ public class QosGraphTraversalTest {
 	 * 
 	 * @throws Exception
 	 */
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testFixtureSequence1Backward() throws Exception {
 		QosGraph qg = this.createQosGraph(this.fixture.jobGraph,
@@ -152,7 +149,6 @@ public class QosGraphTraversalTest {
 	 * 
 	 * @throws Exception
 	 */
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testFixtureSequence1BackwardSkipStartTraverseMultiple()
 			throws Exception {
@@ -176,7 +172,6 @@ public class QosGraphTraversalTest {
 	 * 
 	 * @throws Exception
 	 */
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testFixtureSequence2() throws Exception {
 		QosGraph qg = this.createQosGraph(this.fixture.jobGraph,
@@ -202,7 +197,6 @@ public class QosGraphTraversalTest {
 	 * 
 	 * @throws Exception
 	 */
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testFixtureSequence2SkipStart() throws Exception {
 		QosGraph qg = this.createQosGraph(this.fixture.jobGraph,
@@ -223,7 +217,6 @@ public class QosGraphTraversalTest {
 	 * 
 	 * @throws Exception
 	 */
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testFixtureSequence2Backward() throws Exception {
 		QosGraph qg = this.createQosGraph(this.fixture.jobGraph,
@@ -246,7 +239,6 @@ public class QosGraphTraversalTest {
 	 * 
 	 * @throws Exception
 	 */
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testFixtureSequence3() throws Exception {
 		QosGraph qg = this.createQosGraph(this.fixture.jobGraph,
@@ -269,7 +261,6 @@ public class QosGraphTraversalTest {
 	 * 
 	 * @throws Exception
 	 */
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testFixtureSequence3Backward() throws Exception {
 		QosGraph qg = this.createQosGraph(this.fixture.jobGraph,
@@ -293,7 +284,6 @@ public class QosGraphTraversalTest {
 	 * 
 	 * @throws Exception
 	 */
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testFixtureSequence3SkipStart() throws Exception {
 		QosGraph qg = this.createQosGraph(this.fixture.jobGraph,
@@ -317,7 +307,6 @@ public class QosGraphTraversalTest {
 	 * 
 	 * @throws Exception
 	 */
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testFixtureSequence3TraverseOnce() throws Exception {
 		QosGraph qg = this.createQosGraph(this.fixture.jobGraph,
@@ -340,7 +329,6 @@ public class QosGraphTraversalTest {
 	 * 
 	 * @throws Exception
 	 */
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testFixtureSequence4() throws Exception {
 		QosGraph qg = this.createQosGraph(this.fixture.jobGraph,
@@ -363,7 +351,6 @@ public class QosGraphTraversalTest {
 	 * 
 	 * @throws Exception
 	 */
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testFixtureSequence4Backward() throws Exception {
 		QosGraph qg = this.createQosGraph(this.fixture.jobGraph,
@@ -389,7 +376,6 @@ public class QosGraphTraversalTest {
 	 * 
 	 * @throws Exception
 	 */
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testFixtureSequence4SkipStart() throws Exception {
 		QosGraph qg = this.createQosGraph(this.fixture.jobGraph,
@@ -458,7 +444,6 @@ public class QosGraphTraversalTest {
 	 * @throws JobGraphDefinitionException
 	 * @throws GraphConversionException
 	 */
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testSimpleGraph() throws JobGraphDefinitionException,
 			GraphConversionException {

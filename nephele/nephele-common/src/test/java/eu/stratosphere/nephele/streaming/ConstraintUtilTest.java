@@ -116,9 +116,9 @@ public class ConstraintUtilTest {
 		assertTrue(constraint.getID() != null);
 		
 		assertEquals(3, constraint.getSequence().size());
-		SequenceElement<JobVertexID> first = constraint.getSequence().get(0);
-		SequenceElement<JobVertexID> second = constraint.getSequence().get(1);
-		SequenceElement<JobVertexID> third = constraint.getSequence().get(2);
+		SequenceElement first = constraint.getSequence().get(0);
+		SequenceElement second = constraint.getSequence().get(1);
+		SequenceElement third = constraint.getSequence().get(2);
 		
 		assertTrue(first.isVertex());
 		assertFalse(second.isVertex());
@@ -169,9 +169,9 @@ public class ConstraintUtilTest {
 		assertTrue(constraint.getID() != null);
 		
 		assertEquals(3, constraint.getSequence().size());
-		SequenceElement<JobVertexID> first = constraint.getSequence().get(0);
-		SequenceElement<JobVertexID> second = constraint.getSequence().get(1);
-		SequenceElement<JobVertexID> third = constraint.getSequence().get(2);
+		SequenceElement first = constraint.getSequence().get(0);
+		SequenceElement second = constraint.getSequence().get(1);
+		SequenceElement third = constraint.getSequence().get(2);
 		
 		assertFalse(first.isVertex());
 		assertTrue(second.isVertex());
@@ -213,9 +213,9 @@ public class ConstraintUtilTest {
 		assertTrue(constraint.getID() != null);
 		
 		assertEquals(3, constraint.getSequence().size());
-		SequenceElement<JobVertexID> first = constraint.getSequence().get(0);
-		SequenceElement<JobVertexID> second = constraint.getSequence().get(1);
-		SequenceElement<JobVertexID> third = constraint.getSequence().get(2);
+		SequenceElement first = constraint.getSequence().get(0);
+		SequenceElement second = constraint.getSequence().get(1);
+		SequenceElement third = constraint.getSequence().get(2);
 		
 		assertFalse(first.isVertex());
 		assertTrue(second.isVertex());
@@ -254,11 +254,11 @@ public class ConstraintUtilTest {
 		assertTrue(constraint.getID() != null);
 
 		assertEquals(5, constraint.getSequence().size());
-		SequenceElement<JobVertexID> first = constraint.getSequence().get(0);
-		SequenceElement<JobVertexID> second = constraint.getSequence().get(1);
-		SequenceElement<JobVertexID> third = constraint.getSequence().get(2);
-		SequenceElement<JobVertexID> fourth= constraint.getSequence().get(3);
-		SequenceElement<JobVertexID> fifth = constraint.getSequence().get(4);
+		SequenceElement first = constraint.getSequence().get(0);
+		SequenceElement second = constraint.getSequence().get(1);
+		SequenceElement third = constraint.getSequence().get(2);
+		SequenceElement fourth= constraint.getSequence().get(3);
+		SequenceElement fifth = constraint.getSequence().get(4);
 
 		assertFalse(first.isVertex());
 		assertTrue(second.isVertex());
@@ -334,9 +334,9 @@ public class ConstraintUtilTest {
 		for(JobGraphLatencyConstraint constraint : constraints) {
 			assertTrue(constraint.getID() != null);
 			assertEquals(3, constraint.getSequence().size());
-			SequenceElement<JobVertexID> first = constraint.getSequence().get(0);
-			SequenceElement<JobVertexID> second = constraint.getSequence().get(1);
-			SequenceElement<JobVertexID> third = constraint.getSequence().get(2);
+			SequenceElement first = constraint.getSequence().get(0);
+			SequenceElement second = constraint.getSequence().get(1);
+			SequenceElement third = constraint.getSequence().get(2);
 			assertFalse(first.isVertex());
 			assertTrue(second.isVertex());
 			assertFalse(third.isVertex());
@@ -344,9 +344,9 @@ public class ConstraintUtilTest {
 		}
 		
 		JobGraphLatencyConstraint constraint = constraints.get(0);
-		SequenceElement<JobVertexID> first = constraint.getSequence().get(0);
-		SequenceElement<JobVertexID> second = constraint.getSequence().get(1);
-		SequenceElement<JobVertexID> third = constraint.getSequence().get(2);
+		SequenceElement first = constraint.getSequence().get(0);
+		SequenceElement second = constraint.getSequence().get(1);
+		SequenceElement third = constraint.getSequence().get(2);
 		assertEquals(1, first.getOutputGateIndex());
 		assertEquals(0, first.getInputGateIndex());
 		assertEquals(0, second.getInputGateIndex());

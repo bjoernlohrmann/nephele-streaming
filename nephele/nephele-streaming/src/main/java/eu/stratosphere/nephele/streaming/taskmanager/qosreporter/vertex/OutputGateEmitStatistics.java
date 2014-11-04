@@ -1,13 +1,13 @@
 package eu.stratosphere.nephele.streaming.taskmanager.qosreporter.vertex;
 
-public class OutputGateEmitCounter {
-	private int emitted;
+public class OutputGateEmitStatistics {
+	private long emitted;
 
 	public void emitted() {
 		emitted++;
 	}
 
-	public int getEmitted() {
+	public long getEmitted() {
 		return emitted;
 	}
 

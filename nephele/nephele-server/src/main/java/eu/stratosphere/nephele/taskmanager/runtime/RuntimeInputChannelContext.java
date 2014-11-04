@@ -73,7 +73,7 @@ final class RuntimeInputChannelContext implements InputChannelContext, ByteBuffe
 		// return pending events first
 		if (this.pendingEvents != null) {
 			// if the field is not null, it must always have a next value!
-			BufferOrEvent next = new BufferOrEvent(this.pendingEvents.next());
+			BufferOrEvent next = new BufferOrEvent(this.pendingEvents.next(), -1);
 			if (!this.pendingEvents.hasNext()) {
 				this.pendingEvents = null;
 			}
@@ -99,11 +99,11 @@ final class RuntimeInputChannelContext implements InputChannelContext, ByteBuffe
 		
 		// get the buffer, if there is one
 		if (nextEnvelope.getBuffer() != null) {
-			return new BufferOrEvent(nextEnvelope.getBuffer());
+			return new BufferOrEvent(nextEnvelope.getBuffer(), nextEnvelope.getInterarrivalTimeNanos());
 		}
 		else if (this.pendingEvents != null) {
 			// if the field is not null, it must always have a next value!
-			BufferOrEvent next = new BufferOrEvent(this.pendingEvents.next());
+			BufferOrEvent next = new BufferOrEvent(this.pendingEvents.next(), -1);
 			if (!this.pendingEvents.hasNext()) {
 				this.pendingEvents = null;
 			}
@@ -173,7 +173,8 @@ final class RuntimeInputChannelContext implements InputChannelContext, ByteBuffe
 
 				// Notify the channel about the new data. notify as much as there is (buffer plus once per event)
 				if (transferEnvelope.getBuffer() != null) {
-					this.byteBufferedInputChannel.notifyGateThatInputIsAvailable();
+					transferEnvelope.setInterarrivalTimestampNanos(this.byteBufferedInputChannel
+									.notifyGateThatInputIsAvailable());
 				}
 				if (transferEnvelope.getEventList() != null) {
 					for (int i = 0; i < transferEnvelope.getEventList().size(); i++) {

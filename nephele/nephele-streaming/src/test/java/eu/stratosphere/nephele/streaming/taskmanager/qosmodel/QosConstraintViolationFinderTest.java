@@ -40,7 +40,6 @@ import eu.stratosphere.nephele.instance.AllocatedResource;
 import eu.stratosphere.nephele.instance.InstanceManager;
 import eu.stratosphere.nephele.instance.InstanceType;
 import eu.stratosphere.nephele.jobgraph.JobGraph;
-import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.JobGraphSequence;
 import eu.stratosphere.nephele.streaming.SequenceElement;
@@ -49,6 +48,7 @@ import eu.stratosphere.nephele.streaming.message.qosreport.VertexStatistics;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosConstraintViolationFinder;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosConstraintViolationListener;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosSequenceLatencySummary;
+import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.Sample;
 
 /**
  * Tests for {@link QosConstraintViolationFinder}
@@ -197,7 +197,7 @@ public class QosConstraintViolationFinderTest {
 					new QosGraphTraversalListener() {
 						@Override
 						public void processQosVertex(QosVertex vertex,
-								SequenceElement<JobVertexID> sequenceElem) {
+								SequenceElement sequenceElem) {
 							if (vertex.getGroupVertex().getName()
 									.equals("vertex4"))
 								vertex.setQosData(new VertexQosData(vertex));
@@ -205,7 +205,7 @@ public class QosConstraintViolationFinderTest {
 
 						@Override
 						public void processQosEdge(QosEdge edge,
-								SequenceElement<JobVertexID> sequenceElem) {
+								SequenceElement sequenceElem) {
 							if (edge.getOutputGate().getVertex()
 									.getGroupVertex().getName()
 									.equals("vertex4")
@@ -248,7 +248,7 @@ public class QosConstraintViolationFinderTest {
 
 						@Override
 						public void processQosVertex(QosVertex vertex,
-								SequenceElement<JobVertexID> sequenceElem) {
+								SequenceElement sequenceElem) {
 							if (!this.removed
 									&& vertex.getGroupVertex().getName()
 											.equals("vertex3")) {
@@ -256,8 +256,7 @@ public class QosConstraintViolationFinderTest {
 								VertexQosData qosData = new VertexQosData(
 										vertex);
 								// we still have to prepare or this will end in
-								// a
-								// NullPointerException
+								// a NullPointerException
 								int inputGateIndex = sequenceElem
 										.getInputGateIndex();
 								int outputGateIndex = sequenceElem
@@ -265,18 +264,20 @@ public class QosConstraintViolationFinderTest {
 								qosData.prepareForReportsOnGateCombination(
 										inputGateIndex, outputGateIndex);
 								qosData.addVertexStatisticsMeasurement(
-										inputGateIndex,
-										outputGateIndex,
-										System.currentTimeMillis(),
-										new VertexStatistics(null, 400d, 50, 50));
+										inputGateIndex, outputGateIndex, System
+												.currentTimeMillis(),
+										new VertexStatistics(null,
+											new Sample(1000, 100, 400, 0),
+											50, 50,
+											new Sample(1000, 100, 1.0 / 50, 0)));
 								vertex.setQosData(qosData);
 								this.removed = true;
 							}
 						}
-
+						
 						@Override
 						public void processQosEdge(QosEdge edge,
-								SequenceElement<JobVertexID> sequenceElem) {
+								SequenceElement sequenceElem) {
 
 						}
 					}).traverseForward();
@@ -369,7 +370,7 @@ public class QosConstraintViolationFinderTest {
 					constraint.getSequence(), new QosGraphTraversalListener() {
 						@Override
 						public void processQosVertex(QosVertex vertex,
-								SequenceElement<JobVertexID> sequenceElem) {
+								SequenceElement sequenceElem) {
 							if (vertex.getQosData() != null)
 								return;
 							VertexQosData vertexQosData = new VertexQosData(
@@ -382,13 +383,16 @@ public class QosConstraintViolationFinderTest {
 									inputGateIndex, outputGateIndex);
 							vertexQosData.addVertexStatisticsMeasurement(
 									inputGateIndex, outputGateIndex, timestamp,
-									new VertexStatistics(null, 400d, 50, 50));
+									new VertexStatistics(null,
+											new Sample(1000, 100, 400, 0),
+											50, 50,
+											new Sample(1000, 100, 1.0 / 50, 0)));
 							vertex.setQosData(vertexQosData);
 						}
 
 						@Override
 						public void processQosEdge(QosEdge edge,
-								SequenceElement<JobVertexID> sequenceElem) {
+								SequenceElement sequenceElem) {
 							if (edge.getQosData() != null)
 								return;
 							
@@ -416,7 +420,7 @@ public class QosConstraintViolationFinderTest {
 							vertexQosData.prepareForReportsOnInputGate(edge.getInputGate().getGateIndex());
 							vertexQosData.addVertexStatisticsMeasurement(
 									edge.getInputGate().getGateIndex(), -1, timestamp,
-									new VertexStatistics(null, -1, 50, -1));
+									new VertexStatistics(null, 50, new Sample(1000, 100, 1.0 / 50, 0)));
 							targetVertex.setQosData(vertexQosData);
 							
 						}
@@ -427,7 +431,7 @@ public class QosConstraintViolationFinderTest {
 							vertexQosData.prepareForReportsOnOutputGate(edge.getOutputGate().getGateIndex());
 							vertexQosData.addVertexStatisticsMeasurement(
 									-1, edge.getOutputGate().getGateIndex(), timestamp,
-									new VertexStatistics(null, -1, -1, 50));
+									new VertexStatistics(null, 50));
 							sourceVertex.setQosData(vertexQosData);
 						}
 					});

@@ -14,7 +14,6 @@
  **********************************************************************************************************************/
 package eu.stratosphere.nephele.streaming.taskmanager.qosmodel;
 
-import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.streaming.SequenceElement;
 
 /**
@@ -38,7 +37,7 @@ public interface QosGraphTraversalListener {
 	 *            traversal.
 	 */
 	public void processQosVertex(QosVertex vertex,
-			SequenceElement<JobVertexID> sequenceElem);
+			SequenceElement sequenceElem);
 
 	/**
 	 * Callback to be implemented when depth first traversing a QosGraph along a
@@ -52,6 +51,6 @@ public interface QosGraphTraversalListener {
 	 *            traversal.
 	 */
 	public void processQosEdge(QosEdge edge,
-			SequenceElement<JobVertexID> sequenceElem);
+			SequenceElement sequenceElem);
 
 }

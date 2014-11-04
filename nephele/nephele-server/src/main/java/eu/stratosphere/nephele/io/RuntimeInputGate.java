@@ -238,7 +238,7 @@ public class RuntimeInputGate<T extends Record> extends AbstractGate<T>
 	}
 
 	@Override
-	public void notifyRecordIsAvailable(int channelIndex) {
+	public long notifyRecordIsAvailable(int channelIndex) {
 		this.availableChannels.add(Integer.valueOf(channelIndex));
 
 		RecordAvailabilityListener<T> listener = this.recordAvailabilityListener
@@ -246,6 +246,8 @@ public class RuntimeInputGate<T extends Record> extends AbstractGate<T>
 		if (listener != null) {
 			listener.reportRecordAvailability(this);
 		}
+		
+		return -1;
 	}
 
 	/**
@@ -356,8 +358,8 @@ public class RuntimeInputGate<T extends Record> extends AbstractGate<T>
 		return this.recordAvailabilityListener.get();
 	}
 
-	public void notifyDataUnitConsumed(int channelIndex) {
-		this.channelToReadFrom = -1;
+	public void notifyDataUnitConsumed(int channelIndex, long interarrivalTimeNanos, int recordsReadFromBuffer) {
+		// do nothing
 	}
 
 	@Override
