@@ -1,9 +1,5 @@
 package eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers;
 
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.IOException;
-
 import eu.stratosphere.nephele.io.IOReadableWritable;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
@@ -12,6 +8,10 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosEdge;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGroupEdge;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGroupVertex;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosVertex;
+
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
 
 public class QosConstraintSummary implements IOReadableWritable {
 
@@ -71,7 +71,7 @@ public class QosConstraintSummary implements IOReadableWritable {
 		boolean nextIsVertex = sequenceStartsWithVertex;
 		for (int i = 0; i < sequenceLength; i++) {
 			if (nextIsVertex) {
-				this.aggregatedMemberStats[i] = new double[] { 0 };
+				this.aggregatedMemberStats[i] = new double[] { 0, 0, 0, 0 };
 			} else {
 				this.aggregatedMemberStats[i] = new double[] { 0, 0, 0, 0, 0, 0 };
 			}
@@ -143,26 +143,33 @@ public class QosConstraintSummary implements IOReadableWritable {
 			throw new RuntimeException(
 					"Cannot add sequence to already finalized summary. This is a bug.");
 		}
-		
+
+		boolean nextIsVertex = constraintSummary.doesSequenceStartWithVertex();
+
 		int noOfSummarizedSequences = constraintSummary.getNoOfSequences();
 		double[][] memberStats = constraintSummary
 				.getAggregatedMemberStatistics();
 		for (int i = 0; i < memberStats.length; i++) {
 			for (int j = 0; j < memberStats[i].length; j++) {
-				if (j < 2) {
-					// apply a weighting proportional to noOfSummarizedSequences
-					// to compute average latencies
-					this.aggregatedMemberStats[i][j] += noOfSummarizedSequences
-							* memberStats[i][j];
-				} else if (j == 2 || j == 3) {
-					// record emission/consumption rates are weighted with their
-					// number of vertices
-					this.aggregatedMemberStats[i][j] += memberStats[i][j+2] * memberStats[i][j];
+				if (nextIsVertex) {
+					aggregatedMemberStats[i][j] += noOfSummarizedSequences * memberStats[i][j];
 				} else {
-					// vertex counts are just added up
-					this.aggregatedMemberStats[i][j] += memberStats[i][j];
+					if (j < 2) {
+						// apply a weighting proportional to noOfSummarizedSequences
+						// to compute average latencies
+						this.aggregatedMemberStats[i][j] += noOfSummarizedSequences
+								* memberStats[i][j];
+					} else if (j == 2 || j == 3) {
+						// record emission/consumption rates are weighted with their
+						// number of vertices
+						this.aggregatedMemberStats[i][j] += memberStats[i][j+2] * memberStats[i][j];
+					} else {
+						// vertex counts are just added up
+						this.aggregatedMemberStats[i][j] += memberStats[i][j];
+					}
 				}
 			}
+			nextIsVertex = !nextIsVertex;
 		}
 
 		// apply a weighting proportional to noOfSummarizedSequences
@@ -187,21 +194,30 @@ public class QosConstraintSummary implements IOReadableWritable {
 		if (!this.isFinalized) {
 			if (this.noOfSequences > 0) {
 				this.aggregatedTotalLatency /= this.noOfSequences;
+
+				boolean nextIsVertex = this.doesSequenceStartWithVertex();
+
 				for (int i = 0; i < getSequenceLength(); i++) {
 					for (int j = 0; j < this.aggregatedMemberStats[i].length; j++) {
-						if (j < 2) {
-							// latencies have previously been weighted
-							// with their number of sequences, now we compute the average
-							// over all sequences
+						if (nextIsVertex) {
 							this.aggregatedMemberStats[i][j] /= this.noOfSequences;
-						} else if (j == 2 || j == 3) {
-							// record emission/consumption rates have previously been weighted
-							// with their number of vertices, no we compute the avg per
-							// vertex
-							this.aggregatedMemberStats[i][j] = aggregatedMemberStats[i][j]
-									/ aggregatedMemberStats[i][j + 2];
+						} else {
+							if (j < 2) {
+								// latencies have previously been weighted
+								// with their number of sequences, now we compute the average
+								// over all sequences
+								this.aggregatedMemberStats[i][j] /= this.noOfSequences;
+							} else if (j == 2 || j == 3) {
+								// record emission/consumption rates have previously been weighted
+								// with their number of vertices, no we compute the avg per
+								// vertex
+								this.aggregatedMemberStats[i][j] = aggregatedMemberStats[i][j]
+										/ aggregatedMemberStats[i][j + 2];
+							}
 						}
 					}
+
+					nextIsVertex = !nextIsVertex;
 				}
 			} else {
 				this.aggregatedTotalLatency = 0;
@@ -223,7 +239,7 @@ public class QosConstraintSummary implements IOReadableWritable {
 	}
 	
 	private boolean doesSequenceStartWithVertex() {
-		return this.aggregatedMemberStats[0].length == 1;
+		return this.aggregatedMemberStats[0].length == 4;
 	}
 
 	public int getSequenceLength() {
@@ -237,11 +253,25 @@ public class QosConstraintSummary implements IOReadableWritable {
 	 * </p>
 	 * 
 	 * <p>
-	 * Subarrays aggregating a group vertex contain one element: The
-	 * average vertex latency of the group vertex's active {@link QosVertex}
-	 * members.
+	 * Subarrays aggregating a group vertex contain four elements:
 	 * </p>
-	 * 
+	 *
+	 * <p>
+	 * (0) = The average vertex latency of the group vertex's active {@link QosVertex} members.
+	 * </p>
+	 *
+	 * <p>
+	 * (1) = The average vertex latency variance of the group vertex's active {@link QosVertex} members.
+	 * </p>
+	 *
+	 * <p>
+	 * (2) = The average inter arrival time of the group vertex's active {@link QosVertex} members.
+	 * </p>
+	 *
+	 * <p>
+	 * (3) = The average inter arrival time variance of the group vertex's active {@link QosVertex} members.
+	 * </p>
+	 *
 	 * <p>
 	 * Subarrays aggregating a group edge contain six elements:
 	 * </p>
