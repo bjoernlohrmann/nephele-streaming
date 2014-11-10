@@ -22,8 +22,8 @@ public class InputGateInterarrivalTimeSampler {
 			long bufferInterarrivalTimeNanos, int recordsReadFromBuffer) {
 		
 		if (accBufferInterarrivalTimes.length <= channelIndex) {
-			accBufferInterarrivalTimes = StreamUtil.appendToArrayAt(
-					accBufferInterarrivalTimes, Long.class, null);
+			accBufferInterarrivalTimes = StreamUtil.setInArrayAt(
+					accBufferInterarrivalTimes, Long.class, channelIndex, null);
 		}
 
 		Long channelAccumulatedTime = accBufferInterarrivalTimes[channelIndex];

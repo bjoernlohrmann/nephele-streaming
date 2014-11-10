@@ -46,15 +46,22 @@ public class StreamUtil {
 
 	public static <T> T[] appendToArrayAt(T[]  oldArray,
 			Class<T> type,
-			T toAppend) {
-		
-		@SuppressWarnings("unchecked")
-		T[] newArray = (T[]) Array.newInstance(type, oldArray.length + 1);
-		
-		System.arraycopy(oldArray, 0, newArray, 0, oldArray.length);
-		newArray[oldArray.length] = toAppend;
-		
-		return newArray;
+			T toAppend) {	
+		return setInArrayAt(oldArray, type, oldArray.length, toAppend);
+	}
+	
+	@SuppressWarnings("unchecked")
+	public static <T> T[] setInArrayAt(T[] oldArray, Class<T> type, int index,
+			T value) {
+
+		T[] ret = oldArray;
+		if (ret.length <= index) {
+			ret = (T[]) Array.newInstance(type, index + 1);
+			System.arraycopy(oldArray, 0, ret, 0, oldArray.length);
+		}
+
+		ret[index] = value;
+		return ret;
 	}
 	
 	public static <T> AtomicReferenceArray<T[]>  createAtomicReferenceArrayOfEmptyArrays(
@@ -71,5 +78,5 @@ public class StreamUtil {
 		}
 		
 		return ret;
-	}
+	}	
 }

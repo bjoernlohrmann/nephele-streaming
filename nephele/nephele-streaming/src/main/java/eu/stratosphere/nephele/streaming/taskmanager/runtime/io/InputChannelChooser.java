@@ -93,7 +93,7 @@ public class InputChannelChooser {
 		
 		synchronized (this.incomingInputAvailabilities) {
 			long now = System.nanoTime();
-			interarrivalTime = lastArrivalTimestamp - now;
+			interarrivalTime = now - lastArrivalTimestamp;
 			lastArrivalTimestamp = now;
 
 			this.incomingInputAvailabilities.add(channelIndex);

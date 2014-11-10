@@ -108,7 +108,13 @@ public class QosLogger extends AbstractQosLogger {
 		for (SequenceElement sequenceElement : jobGraphSequence) {
 			if (sequenceElement.isVertex()) {
 				builder.append(';');
-				builder.append(sequenceElement.getName());
+				builder.append(sequenceElement.getName()+"Mean");
+				builder.append(';');
+				builder.append(sequenceElement.getName()+"Var");
+				builder.append(';');
+				builder.append(sequenceElement.getName()+"IAMean");
+				builder.append(';');
+				builder.append(sequenceElement.getName()+"IAVar");
 			} else {
 				builder.append(';');
 				builder.append("edge" + edgeIndex + "obl");

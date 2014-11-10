@@ -149,6 +149,10 @@ public abstract class AbstractByteBufferedInputChannel<T extends Record> extends
 
 		// get the next record form the buffer
 		T nextRecord = this.deserializer.readData(target, this.dataBuffer);
+		
+		if (nextRecord != null) {
+			recordsReadFromBuffer++;
+		}
 
 		// release the buffer if it is empty
 		if (this.dataBuffer.remaining() == 0) {
@@ -205,6 +209,7 @@ public abstract class AbstractByteBufferedInputChannel<T extends Record> extends
 	
 	private void releaseConsumedDataBuffer() {
 		this.amountOfDataTransmitted += this.dataBuffer.size();
+		this.dataBuffer.recycleBuffer();
 		notifyDataUnitConsumed();
 		this.dataBuffer = null;
 		this.recordsReadFromBuffer = 0;
