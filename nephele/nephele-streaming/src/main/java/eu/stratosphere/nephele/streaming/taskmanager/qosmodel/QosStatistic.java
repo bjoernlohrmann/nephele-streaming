@@ -4,7 +4,7 @@ import java.util.LinkedList;
 
 public class QosStatistic {
 
-	private final LinkedList<QosValue> sortedById;
+	private final LinkedList<QosValue> sortedByTs;
 
 	private final int statisticWindowSize;
 
@@ -25,7 +25,7 @@ public class QosStatistic {
 	}
 
 	public QosStatistic(int statisticWindowSize, boolean hasVariance) {
-		this.sortedById = new LinkedList<QosValue>();
+		this.sortedByTs = new LinkedList<QosValue>();
 		this.statisticWindowSize = statisticWindowSize;
 		this.hasVariance = hasVariance;
 		clear();
@@ -36,7 +36,7 @@ public class QosStatistic {
 		this.sumOfWeightedMeans = 0;
 		this.sumOfWeightedVariances = 0;
 		this.sumOfWeights = 0;
-		this.sortedById.clear();
+		this.sortedByTs.clear();
 	}
 
 	public void addValue(QosValue value) {
@@ -69,16 +69,16 @@ public class QosStatistic {
 	}
 
 	private QosValue insertIntoSortedByTimestamp(QosValue value) {
-		if (!this.sortedById.isEmpty()
-				&& this.sortedById.getLast().getTimestamp() >= value
+		if (!this.sortedByTs.isEmpty()
+				&& this.sortedByTs.getLast().getTimestamp() >= value
 						.getTimestamp()) {
 			throw new IllegalArgumentException(
 					"Trying to add stale Qos statistic values. This should not happen.");
 		}
-		this.sortedById.add(value);
+		this.sortedByTs.add(value);
 
 		if (this.noOfStoredValues >= this.statisticWindowSize) {
-			return this.sortedById.removeFirst();
+			return this.sortedByTs.removeFirst();
 		}
 		return null;
 	}
@@ -88,7 +88,7 @@ public class QosStatistic {
 			throw new RuntimeException(
 					"Cannot get the oldest value of empty value set");
 		}
-		return this.sortedById.getFirst();
+		return this.sortedByTs.getFirst();
 	}
 
 	public QosValue getNewestValue() {
@@ -96,7 +96,7 @@ public class QosStatistic {
 			throw new RuntimeException(
 					"Cannot get the newest value of empty value set");
 		}
-		return this.sortedById.getLast();
+		return this.sortedByTs.getLast();
 	}
 
 	public double getMean() {
@@ -122,14 +122,14 @@ public class QosStatistic {
 			mean = sumOfWeightedMeans / sumOfWeights;
 		} else {			
 			mean = 0;
-			for(QosValue value : sortedById) {
+			for(QosValue value : sortedByTs) {
 				mean += (((double)value.getWeight()) / sumOfWeights) * (value.getMean() - mean);
 			}
 		}
 		
 		if (hasVariance()) { 
 			double tgss = 0;
-			for(QosValue value : sortedById) {
+			for(QosValue value : sortedByTs) {
 				double meanDiff = value.getMean() - mean;
 				tgss += (meanDiff * meanDiff) * value.getWeight();
 			}

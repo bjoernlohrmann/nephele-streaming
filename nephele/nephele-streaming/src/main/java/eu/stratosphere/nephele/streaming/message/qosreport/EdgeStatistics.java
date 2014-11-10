@@ -138,12 +138,12 @@ public final class EdgeStatistics extends AbstractQosReportRecord {
 		return this.reporterID;
 	}
 
-	public EdgeStatistics fuseWith(EdgeStatistics channelThroughput) {
+	public EdgeStatistics fuseWith(EdgeStatistics other) {
 		return new EdgeStatistics(reporterID, 
-				(throughput + channelThroughput.throughput) / 2, 
-				(outputBufferLifetime + channelThroughput.outputBufferLifetime) / 2,
-				(recordsPerBuffer + channelThroughput.recordsPerBuffer) / 2,
-				(recordsPerSecond + channelThroughput.recordsPerSecond) / 2);
+				(throughput + other.throughput) / 2, 
+				(outputBufferLifetime + other.outputBufferLifetime) / 2,
+				(recordsPerBuffer + other.recordsPerBuffer) / 2,
+				(recordsPerSecond + other.recordsPerSecond) / 2);
 	}
 
 	/**
@@ -169,31 +169,5 @@ public final class EdgeStatistics extends AbstractQosReportRecord {
 		this.outputBufferLifetime = in.readDouble();
 		this.recordsPerBuffer = in.readDouble();
 		this.recordsPerSecond = in.readDouble();
-	}
-
-	@Override
-	public boolean equals(Object otherObj) {
-		boolean isEqual = false;
-		if (otherObj instanceof EdgeStatistics) {
-			EdgeStatistics other = (EdgeStatistics) otherObj;
-			isEqual = other.reporterID.equals(this.reporterID)
-					&& other.getThroughput() == this.getThroughput()
-					&& other.getOutputBufferLifetime() == this
-							.getOutputBufferLifetime()
-					&& other.getRecordsPerBuffer() == this
-							.getRecordsPerBuffer()
-					&& other.getRecordsPerSecond() == this
-							.getRecordsPerSecond();
-		}
-
-		return isEqual;
-	}
-
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public int hashCode() {
-		return this.reporterID.hashCode();
 	}
 }

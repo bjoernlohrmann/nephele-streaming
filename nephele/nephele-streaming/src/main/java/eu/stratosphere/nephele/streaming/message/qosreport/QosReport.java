@@ -126,8 +126,7 @@ public class QosReport extends AbstractSerializableQosMessage {
 
 		QosReporterID.Edge reporterID = edgeStats.getReporterID();
 
-		EdgeStatistics existing = this.getOrCreateEdgeStatisticsMap().get(
-				edgeStats);
+		EdgeStatistics existing = this.getOrCreateEdgeStatisticsMap().get(reporterID);
 		if (existing == null) {
 			this.getOrCreateEdgeStatisticsMap().put(reporterID, edgeStats);
 		} else {

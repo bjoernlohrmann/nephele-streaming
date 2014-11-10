@@ -19,8 +19,6 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
-import org.apache.commons.lang3.builder.HashCodeBuilder;
-
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.Sample;
 
@@ -125,30 +123,6 @@ public final class VertexStatistics extends AbstractQosReportRecord {
 		}
 		
 		return fused;
-	}
-
-	@Override
-	public boolean equals(Object otherObj) {
-		boolean isEqual = false;
-		if (otherObj instanceof VertexStatistics) {
-			VertexStatistics other = (VertexStatistics) otherObj;
-			isEqual = other.getReporterID().equals(this.getReporterID())
-					&& other.getVertexLatencyMillis() == this
-							.getVertexLatencyMillis();
-		}
-
-		return isEqual;
-	}
-
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see java.lang.Object#hashCode()
-	 */
-	@Override
-	public int hashCode() {
-		return new HashCodeBuilder().append(this.vertexLatencyMillis.getMean())
-				.append(this.reporterID).toHashCode();
 	}
 
 	/**
