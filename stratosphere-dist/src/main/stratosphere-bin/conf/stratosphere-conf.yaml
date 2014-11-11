@@ -114,10 +114,7 @@ pact.web.rootpath: ./resources/web-docs/
 #========================================================================
 
 plugins.streaming.classname: eu.stratosphere.nephele.streaming.StreamingPluginLoader
-plugins.streaming.qosreporter.tagginginterval: 7
+plugins.streaming.qosreporter.samplingprobability: 10
 plugins.streaming.qosreporter.aggregationinterval: 1000
-plugins.streaming.qosmanager.adjustmentinterval: 10000
-plugins.streaming.qosmanager.logging.buffersfile: /tmp/buffersizes.txt
+plugins.streaming.qosmanager.adjustmentinterval: 5000
 plugins.streaming.qosmanager.logging.qos_statistics_filepattern: /tmp/qos_statistics_%s
-plugins.streaming.taskmanager.io.initialTargetOutputBufferLatencyMillis: 40
-plugins.streaming.taskmanager.io.outputBufferSizeAdjustmentIntervalMillis: 2000

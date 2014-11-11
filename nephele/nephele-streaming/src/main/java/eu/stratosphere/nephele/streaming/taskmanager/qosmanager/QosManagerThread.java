@@ -16,7 +16,6 @@ import eu.stratosphere.nephele.configuration.GlobalConfiguration;
 import eu.stratosphere.nephele.instance.InstanceConnectionInfo;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.jobmanager.JobManager;
-import eu.stratosphere.nephele.plugins.PluginManager;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
 import eu.stratosphere.nephele.streaming.message.AbstractQosMessage;
 import eu.stratosphere.nephele.streaming.message.ChainUpdates;
@@ -29,6 +28,7 @@ import eu.stratosphere.nephele.streaming.taskmanager.StreamMessagingThread;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.OutputBufferLatencyManager;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.QosConstraintSummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosManagerID;
+import eu.stratosphere.nephele.streaming.util.StreamPluginConfig;
 
 /**
  * Implements a thread that serves as a Qos manager. It is started by invoking
@@ -45,15 +45,6 @@ public class QosManagerThread extends Thread {
 
 	private static final Log LOG = LogFactory.getLog(QosManagerThread.class);
 	
-	/**
-	 * Provides access to the configuration entry which defines the time interval
-	 * for adjusting target output buffer latencies.
-	 */
-	public static final String QOSMANAGER_ADJUSTMENTINTERVAL_KEY = PluginManager
-			.prefixWithPluginNamespace("streaming.qosmanager.adjustmentinterval");
-
-	public static final long DEFAULT_ADJUSTMENTINTERVAL = 5000;
-
 	public final static long WAIT_BEFORE_FIRST_ADJUSTMENT = 10 * 1000;
 
 	private JobID jobID;
@@ -118,8 +109,7 @@ public class QosManagerThread extends Thread {
 	public QosManagerThread(JobID jobID) {
 		this.jobID = jobID;
 		
-		this.adjustmentInterval = GlobalConfiguration.getLong(
-				QOSMANAGER_ADJUSTMENTINTERVAL_KEY, DEFAULT_ADJUSTMENTINTERVAL);
+		this.adjustmentInterval = StreamPluginConfig.getAdjustmentIntervalMillis();
 
 		this.timeOfNextAdjustment = QosUtils.alignToInterval(
 				System.currentTimeMillis() + WAIT_BEFORE_FIRST_ADJUSTMENT,

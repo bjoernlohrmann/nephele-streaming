@@ -2,6 +2,7 @@ package eu.stratosphere.nephele.streaming.taskmanager.qosmodel;
 
 import eu.stratosphere.nephele.streaming.message.qosreport.EdgeStatistics;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.ValueHistory;
+import eu.stratosphere.nephele.streaming.util.StreamPluginConfig;
 
 /**
  * Instances of this class hold Qos data (latency, throughput, ...) of a
@@ -24,8 +25,6 @@ public class EdgeQosData {
 
 	private QosStatistic recordsPerSecondStatistic;
 
-	private final static int DEFAULT_NO_OF_STATISTICS_ENTRIES = 4;
-
 	private boolean isInChain;
 	
 	private ValueHistory<Integer> targetOblHistory;
@@ -34,12 +33,12 @@ public class EdgeQosData {
 	public EdgeQosData(QosEdge edge) {
 		this.edge = edge;
 		this.isInChain = false;
-		this.latencyInMillisStatistic = new QosStatistic(DEFAULT_NO_OF_STATISTICS_ENTRIES);
-		this.throughputInMbitStatistic = new QosStatistic(DEFAULT_NO_OF_STATISTICS_ENTRIES);
+		this.latencyInMillisStatistic = new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize());
+		this.throughputInMbitStatistic = new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize());
 		this.outputBufferLifetimeStatistic = new QosStatistic(
-				DEFAULT_NO_OF_STATISTICS_ENTRIES);
-		this.recordsPerBufferStatistic = new QosStatistic(DEFAULT_NO_OF_STATISTICS_ENTRIES);
-		this.recordsPerSecondStatistic = new QosStatistic(DEFAULT_NO_OF_STATISTICS_ENTRIES);
+				StreamPluginConfig.computeQosStatisticWindowSize());
+		this.recordsPerBufferStatistic = new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize());
+		this.recordsPerSecondStatistic = new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize());
 		this.targetOblHistory = new ValueHistory<Integer>(2);
 	}
 

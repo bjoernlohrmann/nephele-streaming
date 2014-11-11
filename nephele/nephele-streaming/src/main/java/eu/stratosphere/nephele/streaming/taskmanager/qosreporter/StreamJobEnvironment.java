@@ -31,7 +31,9 @@ import eu.stratosphere.nephele.streaming.taskmanager.chaining.ChainManagerThread
 import eu.stratosphere.nephele.streaming.taskmanager.profiling.TaskProfilingThread;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosManagerThread;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.StreamTaskEnvironment;
+import eu.stratosphere.nephele.streaming.util.StreamPluginConfig;
 import eu.stratosphere.nephele.taskmanager.runtime.RuntimeTask;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -120,11 +122,11 @@ public class StreamJobEnvironment {
 			Environment taskEnvironment) {
 		long aggregationInterval = taskEnvironment
 				.getJobConfiguration()
-				.getLong(StreamTaskManagerPlugin.AGGREGATION_INTERVAL_KEY,
-						StreamTaskManagerPlugin.getDefaultAggregationInterval());
+				.getLong(StreamPluginConfig.AGGREGATION_INTERVAL_KEY,
+						StreamPluginConfig.getAggregationIntervalMillis());
 		int samplingProbability = taskEnvironment.getJobConfiguration().getInteger(
-				StreamTaskManagerPlugin.SAMPLING_PROBABILITY_KEY,
-				StreamTaskManagerPlugin.getDefaultSamplingProbability());
+				StreamPluginConfig.SAMPLING_PROBABILITY_KEY,
+				StreamPluginConfig.getSamplingProbabilityPercent());
 
 		this.qosReportForwarder.getConfigCenter().setAggregationInterval(
 				aggregationInterval);

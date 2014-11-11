@@ -95,8 +95,6 @@ public class ReadWriteReporter extends AbstractVertexQosReporter {
 	}
 
 	private void sendReportIfDue() {
-		
-		
 		if (vertexLatencySampler.hasSample() && canSendReport()) {
 
 			long now = System.currentTimeMillis();

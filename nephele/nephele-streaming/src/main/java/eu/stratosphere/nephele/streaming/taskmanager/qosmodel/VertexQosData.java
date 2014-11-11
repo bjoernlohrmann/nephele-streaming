@@ -4,6 +4,7 @@ import java.lang.reflect.Array;
 
 import eu.stratosphere.nephele.streaming.message.qosreport.VertexStatistics;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.Sample;
+import eu.stratosphere.nephele.streaming.util.StreamPluginConfig;
 
 /**
  * Instances of this class hold Qos data (currently only latency) of a
@@ -15,8 +16,7 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.Sample
  */
 public class VertexQosData {
 
-	private QosVertex vertex;
-	
+	private final QosVertex vertex;
 	
 	/**
 	 * Sparse array indexed by inputGateIndex containing the gate's record
@@ -38,12 +38,9 @@ public class VertexQosData {
 	private QosStatistic[][] igOgVertexLatency;
 
 	private QosStatistic[] igRecordInterArrivalTime;
-	
-
-	private final static int DEFAULT_NO_OF_STATISTICS_ENTRIES = 4;
 
 	public VertexQosData(QosVertex vertex) {
-		this.vertex = vertex;
+		this.vertex = vertex;		
 		this.igRecordsConsumedPerSec = new QosStatistic[1];
 		this.ogRecordsEmittedPerSec = new QosStatistic[1];
 		this.igOgVertexLatency = new QosStatistic[1][1];
@@ -112,7 +109,7 @@ public class VertexQosData {
 		igOgVertexLatency[inputGateIndex] = setInArray(
 				QosStatistic.class,
 				igOgVertexLatency[inputGateIndex], outputGateIndex,
-				new QosStatistic(DEFAULT_NO_OF_STATISTICS_ENTRIES, true));
+				new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize(), true));
 		
 		prepareForReportsOnInputGate(inputGateIndex);
 		prepareForReportsOnOutputGate(outputGateIndex);
@@ -122,18 +119,18 @@ public class VertexQosData {
 	public void prepareForReportsOnInputGate(int inputGateIndex) {
 		igRecordsConsumedPerSec = setInArray(QosStatistic.class,
 				igRecordsConsumedPerSec, inputGateIndex,
-				new QosStatistic(DEFAULT_NO_OF_STATISTICS_ENTRIES));
+				new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize()));
 		
 		
 		igRecordInterArrivalTime = setInArray(QosStatistic.class,
 				igRecordInterArrivalTime, inputGateIndex,
-				new QosStatistic(DEFAULT_NO_OF_STATISTICS_ENTRIES, true));
+				new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize(), true));
 	} 
 
 	public void prepareForReportsOnOutputGate(int outputGateIndex) {
 		ogRecordsEmittedPerSec = setInArray(QosStatistic.class,
 				ogRecordsEmittedPerSec, outputGateIndex,
-				new QosStatistic(DEFAULT_NO_OF_STATISTICS_ENTRIES));
+				new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize()));
 	}
 	
 	private <T> T[] setInArray(Class<T> clazz, T[] array, int index, T value) {

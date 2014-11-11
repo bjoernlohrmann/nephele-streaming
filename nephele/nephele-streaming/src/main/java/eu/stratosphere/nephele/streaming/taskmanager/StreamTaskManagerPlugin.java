@@ -15,26 +15,26 @@
 
 package eu.stratosphere.nephele.streaming.taskmanager;
 
+import java.io.IOException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import eu.stratosphere.nephele.configuration.Configuration;
-import eu.stratosphere.nephele.configuration.GlobalConfiguration;
 import eu.stratosphere.nephele.execution.RuntimeEnvironment;
 import eu.stratosphere.nephele.io.IOReadableWritable;
 import eu.stratosphere.nephele.jobgraph.JobID;
-import eu.stratosphere.nephele.plugins.PluginManager;
 import eu.stratosphere.nephele.plugins.TaskManagerPlugin;
 import eu.stratosphere.nephele.profiling.ProfilingException;
 import eu.stratosphere.nephele.streaming.message.AbstractQosMessage;
 import eu.stratosphere.nephele.streaming.message.action.DestroyInstanceQosRolesAction;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.StreamJobEnvironment;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.StreamTaskEnvironment;
+import eu.stratosphere.nephele.streaming.util.StreamPluginConfig;
 import eu.stratosphere.nephele.taskmanager.Task;
 import eu.stratosphere.nephele.taskmanager.runtime.RuntimeTask;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
-import java.io.IOException;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 /**
  * Task manager plugin that implements Qos reporting and management.
@@ -49,31 +49,6 @@ public class StreamTaskManagerPlugin implements TaskManagerPlugin {
 	 */
 	private static final Log LOG = LogFactory
 			.getLog(StreamTaskManagerPlugin.class);
-
-	/**
-	 * Provides access to the configuration entry which defines the interval in
-	 * which records shall be tagged.
-	 */
-	public static final String SAMPLING_PROBABILITY_KEY = PluginManager
-			.prefixWithPluginNamespace("streaming.qosreporter.samplingprobability");
-
-	/**
-	 * The default sampling probability in percent.
-	 */
-	public static final int DEFAULT_SAMPLING_PROBABILITY = 10;
-
-	/**
-	 * Provides access to the configuration entry which defines the interval in
-	 * which received tags shall be aggregated and sent to the job manager
-	 * plugin component.
-	 */
-	public static final String AGGREGATION_INTERVAL_KEY = PluginManager
-			.prefixWithPluginNamespace("streaming.qosreporter.aggregationinterval");
-
-	/**
-	 * The default aggregation interval.
-	 */
-	private static final long DEFAULT_AGGREGATION_INTERVAL = 1000;
 
 	/**
 	 * Stores the instance of the streaming task manager plugin.
@@ -93,10 +68,8 @@ public class StreamTaskManagerPlugin implements TaskManagerPlugin {
 	private final long defaultAggregationInterval;
 
 	public StreamTaskManagerPlugin() {
-		this.defaultSamplingProbability = GlobalConfiguration.getInteger(
-				SAMPLING_PROBABILITY_KEY, DEFAULT_SAMPLING_PROBABILITY);
-		this.defaultAggregationInterval = GlobalConfiguration.getLong(
-				AGGREGATION_INTERVAL_KEY, DEFAULT_AGGREGATION_INTERVAL);
+		this.defaultSamplingProbability = StreamPluginConfig.getSamplingProbabilityPercent();
+		this.defaultAggregationInterval = StreamPluginConfig.getAggregationIntervalMillis();
 
 		LOG.info(String
 				.format("Configured sampling probability is %d%% of all records / Aggregation interval is %d millis ",

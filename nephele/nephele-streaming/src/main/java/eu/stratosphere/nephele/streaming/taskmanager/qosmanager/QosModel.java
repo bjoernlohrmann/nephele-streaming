@@ -22,7 +22,6 @@ import java.util.List;
 
 import org.apache.log4j.Logger;
 
-import eu.stratosphere.nephele.configuration.GlobalConfiguration;
 import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
 import eu.stratosphere.nephele.io.GateID;
 import eu.stratosphere.nephele.io.channels.ChannelID;
@@ -46,6 +45,7 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGroupVertex;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosVertex;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.VertexQosData;
+import eu.stratosphere.nephele.streaming.util.StreamPluginConfig;
 
 /**
  * Wrapper class around a Qos graph used by a Qos manager. A Qos model is a
@@ -442,9 +442,7 @@ public class QosModel {
 
 		long inactivityThresholdTime = now
 				- 2
-				* GlobalConfiguration.getLong(
-						QosManagerThread.QOSMANAGER_ADJUSTMENTINTERVAL_KEY,
-						QosManagerThread.DEFAULT_ADJUSTMENTINTERVAL);
+				* StreamPluginConfig.getAdjustmentIntervalMillis();
 
 		List<QosConstraintSummary> constraintSummaries = new LinkedList<QosConstraintSummary>();
 

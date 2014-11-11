@@ -13,12 +13,12 @@ public abstract class AbstractVertexQosReporter implements VertexQosReporter {
 	
 	private final ReportTimer reportTimer;
 
-	private long receiveCounterAtLastReport;
+	private long igReceiveCounterAtLastReport;
 	private final InputGateReceiveCounter igReceiveCounter;
 	private final InputGateInterarrivalTimeSampler igInterarrivalTimeSampler;
 
-	private long emitCounterAtLastReport;
-	private final OutputGateEmitStatistics outputGateEmitCounter;
+	private long ogEmitCounterAtLastReport;
+	private final OutputGateEmitStatistics ogEmitCounter;
 
 	private final int runtimeInputGateIndex;
 
@@ -38,7 +38,7 @@ public abstract class AbstractVertexQosReporter implements VertexQosReporter {
 		this.runtimeOutputGateIndex = runtimeOutputGateIndex;
 
 		if (reporterID.hasInputGateID()) {
-			receiveCounterAtLastReport = igReceiveCounter.getRecordsReceived();
+			this.igReceiveCounterAtLastReport = igReceiveCounter.getRecordsReceived();
 			this.igReceiveCounter = igReceiveCounter;
 			this.igInterarrivalTimeSampler = new InputGateInterarrivalTimeSampler(reportForwarder.getConfigCenter().getSamplingProbability() / 100.0);
 		} else {
@@ -47,10 +47,10 @@ public abstract class AbstractVertexQosReporter implements VertexQosReporter {
 		}
 
 		if (reporterID.hasOutputGateID()) {
-			emitCounterAtLastReport = emitCounter.getEmitted();
-			this.outputGateEmitCounter = emitCounter;
+			this.ogEmitCounterAtLastReport = emitCounter.getEmitted();
+			this.ogEmitCounter = emitCounter;
 		} else {
-			this.outputGateEmitCounter = null;
+			this.ogEmitCounter = null;
 		}
 	}
 
@@ -101,19 +101,19 @@ public abstract class AbstractVertexQosReporter implements VertexQosReporter {
 	private double getRecordsConsumedPerSec(double secsPassed) {
 		double recordsConsumedPerSec = -1;
 		if (igReceiveCounter != null) {
-			recordsConsumedPerSec = (igReceiveCounter.getRecordsReceived() - receiveCounterAtLastReport)
+			recordsConsumedPerSec = (igReceiveCounter.getRecordsReceived() - igReceiveCounterAtLastReport)
 					/ secsPassed;
-			receiveCounterAtLastReport = igReceiveCounter.getRecordsReceived();
+			igReceiveCounterAtLastReport = igReceiveCounter.getRecordsReceived();
 		}
 		return recordsConsumedPerSec;
 	}
 	
 	private double getRecordsEmittedPerSec(double secsPassed) {
 		double recordEmittedPerSec = -1;
-		if (outputGateEmitCounter != null) {
-			recordEmittedPerSec = (outputGateEmitCounter.getEmitted() - emitCounterAtLastReport)
+		if (ogEmitCounter != null) {
+			recordEmittedPerSec = (ogEmitCounter.getEmitted() - ogEmitCounterAtLastReport)
 					/ secsPassed;
-			emitCounterAtLastReport = outputGateEmitCounter.getEmitted();
+			ogEmitCounterAtLastReport = ogEmitCounter.getEmitted();
 		}
 		return recordEmittedPerSec;
 	}
