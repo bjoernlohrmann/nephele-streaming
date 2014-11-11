@@ -17,8 +17,10 @@ package eu.stratosphere.nephele.executiongraph;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -38,6 +40,7 @@ import eu.stratosphere.nephele.execution.ExecutionState;
 import eu.stratosphere.nephele.execution.ExecutionStateTransition;
 import eu.stratosphere.nephele.instance.AllocatedResource;
 import eu.stratosphere.nephele.instance.AllocationID;
+import eu.stratosphere.nephele.io.DistributionPattern;
 import eu.stratosphere.nephele.io.GateID;
 import eu.stratosphere.nephele.io.IOReadableWritable;
 import eu.stratosphere.nephele.plugins.PluginID;
@@ -601,6 +604,97 @@ public final class ExecutionVertex {
 
 		return null;
 
+	}
+
+	/**
+	 * Returns all pointwise connected predecessors.
+	 */
+	public Set<ExecutionVertex> getPredecessorsOnScalingPath() {
+		HashSet<ExecutionVertex> predecessors = new HashSet<ExecutionVertex>();
+
+		for (int gateIndex = 0; gateIndex < this.inputGates.length; gateIndex++) {
+			final ExecutionGate inputGate = this.inputGates[gateIndex];
+
+			for (int edgeIndex = 0; edgeIndex < inputGate.getNumberOfEdges(); edgeIndex++) {
+				if (inputGate.getGroupEdge().getDistributionPattern() == DistributionPattern.POINTWISE) {
+					predecessors.add(inputGate.getEdge(edgeIndex).getOutputGate().getVertex());
+				}
+			}
+		}
+
+		return predecessors;
+	}
+
+	/**
+	 * Returns all pointwise connected successors.
+	 */
+	public Set<ExecutionVertex> getSuccessorsOnScalingPath() {
+		HashSet<ExecutionVertex> successors = new HashSet<ExecutionVertex>();
+
+		for (int gateIndex = 0; gateIndex < this.outputGates.length; gateIndex++) {
+			final ExecutionGate outputGate = this.outputGates[gateIndex];
+
+			for (int edgeIndex = 0; edgeIndex < outputGate.getNumberOfEdges(); edgeIndex++) {
+				if (outputGate.getGroupEdge().getDistributionPattern() == DistributionPattern.POINTWISE) {
+					successors.add(outputGate.getEdge(edgeIndex).getInputGate().getVertex());
+				}
+			}
+		}
+
+		return successors;
+	}
+
+	/**
+	 * Returns all pointwise connected vertices including this vetex.
+	 *
+	 * @return All vertices on scaling path this vertex belongs to
+	 */
+	public Set<ExecutionVertex> findAllVerticesOnScalingPath() {
+		HashSet<ExecutionVertex> vertices = new HashSet<ExecutionVertex>();
+		HashSet<ExecutionVertex> current = new HashSet<ExecutionVertex>(); // current loop
+
+		current.add(this);
+
+		while (!current.isEmpty()) {
+			HashSet<ExecutionVertex> next = new HashSet<ExecutionVertex>(); // next loop
+
+			for (ExecutionVertex vertex : current) {
+				if (!vertices.contains(vertex)) {
+					vertices.add(vertex);
+					next.addAll(vertex.getPredecessorsOnScalingPath());
+					next.addAll(vertex.getSuccessorsOnScalingPath());
+				}
+			}
+
+			current = next;
+		}
+
+		return vertices;
+	}
+
+	/**
+	 * Returns all source vertices on this scale path (used in path scale down process).
+	 */
+	public Set<ExecutionVertex> findSourceVerticesOnScalingPath() {
+		Set<ExecutionVertex> verticesOnPath = findAllVerticesOnScalingPath();
+		HashSet<ExecutionVertex> sourceVertices = new HashSet<ExecutionVertex>();
+
+		for (ExecutionVertex vertex : verticesOnPath) {
+			boolean hasInputVertexFromPath = false;
+
+			for (ExecutionVertex predecessor : vertex.getPredecessorsOnScalingPath()) {
+				if (verticesOnPath.contains(predecessor)) {
+					hasInputVertexFromPath = true;
+					break;
+				}
+			}
+
+			if (!hasInputVertexFromPath) {
+				sourceVertices.add(vertex);
+			}
+		}
+
+		return sourceVertices;
 	}
 
 	/**

@@ -729,23 +729,22 @@ public abstract class AbstractScheduler implements InstanceListener {
 					throw new RuntimeException("Subtasks in SUSPENDING state found. This is a bug.");
 				}
 
-				// switch vertices in this group from SUSPENDED to ASSIGNED
+				// Identify all vertices on (new) scaling paths
 				int offset = startGroupVertex.getCurrentElasticNumberOfRunningSubtasks();
 				for (int i = 0; i < noOfSubtasksToStart; i++) {
 				    ExecutionVertex vertexToStart = startGroupVertex.getGroupMember(offset + i);
-				    vertexToStart.compareAndUpdateExecutionState(ExecutionState.SUSPENDED, ExecutionState.ASSIGNED);
-				    verticesToBeDeployed.add(vertexToStart);
+				    verticesToBeDeployed.addAll(vertexToStart.findAllVerticesOnScalingPath());
 				}
 				
-				// now activate neighbor vertices
-				List<ExecutionVertex> nextVertices = new ArrayList<ExecutionVertex>(verticesToBeDeployed);
-				while(nextVertices.size() > 0) {
-					List<ExecutionVertex> current = nextVertices;
-					nextVertices = new ArrayList<ExecutionVertex>();
-					for(ExecutionVertex vertex : current) {
-						nextVertices.addAll(scaleUpElasticNeighbors(vertex));
+				// switch vertices from SUSPENDED to ASSIGNED
+				for (ExecutionVertex vertex : verticesToBeDeployed) {
+					if (vertex.getExecutionState() == ExecutionState.SUSPENDED) {
+						vertex.compareAndUpdateExecutionState(ExecutionState.SUSPENDED, ExecutionState.ASSIGNED);
+					} else {
+						throw new RuntimeException(
+								"Found vertex " + vertex.getName() + " in unexpected state "
+								+ vertex.getExecutionState() + " while scaling up. This is a bug.");
 					}
-					verticesToBeDeployed.addAll(nextVertices);
 				}
 
 				LOG.info("Scaling up groupVertex " + startGroupVertex.getName()
@@ -753,45 +752,6 @@ public abstract class AbstractScheduler implements InstanceListener {
 
 				deployAssignedVertices(verticesToBeDeployed);
 			}
-
-			private List<ExecutionVertex> scaleUpElasticNeighbors(ExecutionVertex vertex) {
-				List<ExecutionVertex> verticesToBeDeployed = new ArrayList<ExecutionVertex>();
-
-				// activate one input vertex on each gate
-				for(int gate = 0; gate < vertex.getNumberOfInputGates(); gate++) {
-					ExecutionGate inputGate = vertex.getInputGate(gate);
-					ExecutionVertex inputVertex = inputGate.getEdge(0).getOutputGate().getVertex();
-
-					if (inputVertex.getExecutionState() == ExecutionState.SUSPENDED) {
-						inputVertex.compareAndUpdateExecutionState(ExecutionState.SUSPENDED, ExecutionState.ASSIGNED);
-						verticesToBeDeployed.add(inputVertex);
-
-					} else if (inputVertex.getExecutionState() != ExecutionState.RUNNING
-							&& inputVertex.getExecutionState() != ExecutionState.ASSIGNED) {
-						throw new RuntimeException("Unexpected input vertex state "
-								+ inputVertex.getExecutionState() + " on vertex " + inputVertex + ".");
-					}
-				}
-
-				// activate all output vertices
-				for(int gate = 0; gate < vertex.getNumberOfOutputGates(); gate++) {
-					ExecutionGate outputGate = vertex.getOutputGate(gate);
-					ExecutionVertex outputVertex = outputGate.getEdge(0).getInputGate().getVertex();
-
-					if (outputVertex.getExecutionState() == ExecutionState.SUSPENDED) {
-						outputVertex.compareAndUpdateExecutionState(ExecutionState.SUSPENDED, ExecutionState.ASSIGNED);
-						verticesToBeDeployed.add(outputVertex);
-
-					} else if (outputVertex.getExecutionState() != ExecutionState.RUNNING
-							&& outputVertex.getExecutionState() != ExecutionState.ASSIGNED) {
-						throw new RuntimeException("Unexpected output vertex state "
-								+ outputVertex.getExecutionState() + " on vertex " + outputVertex + ".");
-					}
-				}
-
-				return verticesToBeDeployed;
-			}
-
 		};
 
 		try {
@@ -838,44 +798,25 @@ public abstract class AbstractScheduler implements InstanceListener {
                 public void run() {
                     int idxToSuspend = groupVertex.getCurrentElasticNumberOfRunningSubtasks() - 1;
                     ExecutionVertex target = groupVertex.getGroupMember(idxToSuspend);
-                    ExecutionVertex firstCandidateInPath = findFirstTaskVertexInPointWiseConnectedPath(target);
+                    Set<ExecutionVertex> sourceVertices = target.findSourceVerticesOnScalingPath();
 
-                    LOG.info("Scaling down vertex " + target.getName() + " via predecessor " + firstCandidateInPath.getName());
+					LOG.info("Scaling down vertex " + target.getName() + " via predecessor(s) " + Arrays.toString(sourceVertices.toArray()));
 
-                    TaskSuspendResult result = firstCandidateInPath.suspendTask();
-                    if (result.getReturnCode() == ReturnCode.SUCCESS) {
-                        firstCandidateInPath.compareAndUpdateExecutionState(ExecutionState.RUNNING, ExecutionState.SUSPENDING);
-                    } else {
-                        throw new RuntimeException(String.format("Failed to suspend task %s", result.getDescription()));
-                    }
-                }
+					for (ExecutionVertex sourceVertex : sourceVertices) {
+						LOG.debug("Scaling down via scale path source vertex " + sourceVertex.getName());
 
-                /**
-                 * Follow backward connections until bipartite wiring or source task found.
-                 */
-                private ExecutionVertex findFirstTaskVertexInPointWiseConnectedPath(ExecutionVertex startVertex) {
-                    ExecutionVertex current = startVertex; // current
+						if (sourceVertex.getExecutionState() != ExecutionState.RUNNING) {
+							throw new RuntimeException("Found vertex " + sourceVertex.getName() + " with unexpected state "
+									+ sourceVertex.getExecutionState() + " while scaling down. This is a bug.");
+						}
 
-                    if (current.getNumberOfInputGates() != 1)
-                        throw new RuntimeException("More than one input gate found. Not supported yet. This is a bug.");
-
-                    // only equal min/max/init subtasks allowed on connected vertices
-                    // edges = 1 => point wise, edges > 1 => bipartite
-                    while (current.getInputGate(0).getNumberOfEdges() == 1
-                            && current.getInputGate(0).getEdge(0).getOutputGate().getNumberOfEdges() == 1
-                            && !current.getInputGate(0).getEdge(0).getOutputGate().getVertex().isInputVertex()) {
-
-                        current = current.getInputGate(0).getEdge(0).getOutputGate().getVertex();
-
-                        if (current.getNumberOfInputGates() != 1)
-                            throw new RuntimeException("More than one input gate found. Not supported yet. This is a bug.");
-                        if (current.getExecutionState() != ExecutionState.RUNNING)
-                            throw new RuntimeException(
-                                    "Found vertex " + current.getName()
-                                    + " with unexpected state " + current.getExecutionState() + ". This is a bug.");
-                    }
-
-                    return current;
+						TaskSuspendResult result = sourceVertex.suspendTask();
+						if (result.getReturnCode() == ReturnCode.SUCCESS) {
+							sourceVertex.compareAndUpdateExecutionState(ExecutionState.RUNNING, ExecutionState.SUSPENDING);
+						} else {
+							throw new RuntimeException(String.format("Failed to suspend task %s", result.getDescription()));
+						}
+					}
                 }
             };
 
@@ -893,11 +834,15 @@ public abstract class AbstractScheduler implements InstanceListener {
 	private void waitForStableState(ExecutionGroupVertex groupVertex)
 			throws InterruptedException {
 
+		Set<ExecutionVertex> verticesOnScalingPath = new HashSet<ExecutionVertex>();
+		for (int i = 0; i < groupVertex.getCurrentNumberOfGroupMembers(); i++) {
+			verticesOnScalingPath.addAll(groupVertex.getGroupMember(i).findAllVerticesOnScalingPath());
+		}
+
 		boolean dirty = false;
 		do {
 			dirty = false;
-			for (int i = 0; i < groupVertex.getCurrentNumberOfGroupMembers(); i++) {
-				ExecutionVertex vertex = groupVertex.getGroupMember(i);
+			for (ExecutionVertex vertex : verticesOnScalingPath) {
 				if (vertex.getExecutionState() != ExecutionState.RUNNING
 						&& vertex.getExecutionState() != ExecutionState.SUSPENDED) {
 					dirty = true;
