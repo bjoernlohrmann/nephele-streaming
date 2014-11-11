@@ -114,18 +114,7 @@ public class QosStatistic {
 
 	private void refreshStatistic() {
 		
-		double mean;
-		
-		mean = sumOfWeightedMeans / sumOfWeights;
-		
-		if(Math.rint(sumOfWeightedMeans) == sumOfWeightedMeans) {
-			mean = sumOfWeightedMeans / sumOfWeights;
-		} else {			
-			mean = 0;
-			for(QosValue value : sortedByTs) {
-				mean += (((double)value.getWeight()) / sumOfWeights) * (value.getMean() - mean);
-			}
-		}
+		double mean = sumOfWeightedMeans / sumOfWeights;
 		
 		if (hasVariance()) { 
 			double tgss = 0;
