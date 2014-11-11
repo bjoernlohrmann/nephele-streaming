@@ -76,7 +76,9 @@ public class InputGateReporterManager {
 		}
 
 		public void update(TimestampTag tag, long now) {
-			this.accumulatedLatency += now - tag.getTimestamp();
+			// need to take max() because timestamp diffs can be below zero
+			// due to clockdrift
+			this.accumulatedLatency += Math.max(0, now - tag.getTimestamp());
 			this.tagsReceived++;
 		}
 	}
