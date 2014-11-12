@@ -403,9 +403,9 @@ public final class RuntimeTask implements Task, ExecutionObserver {
 				invokable.suspend();
 			}
 
-			// FIXME: suspension currently only works for tasks with a single
-			// input gate
-			this.environment.getInputGate(0).requestSuspend();
+			for (int gate = 0; gate < this.environment.getNumberOfInputGates(); gate++) {
+				this.environment.getInputGate(gate).requestSuspend();
+			}
 		} catch (Throwable e) {
 			LOG.error(StringUtils.stringifyException(e));
 		}
