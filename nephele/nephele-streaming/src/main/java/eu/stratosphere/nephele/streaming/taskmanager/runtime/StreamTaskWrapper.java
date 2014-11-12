@@ -66,4 +66,9 @@ public class StreamTaskWrapper extends AbstractTask {
 	public AbstractInvokable getWrappedInvokable() {
 		return wrappedInvokable;
 	}
+
+	@Override
+	public void cancel() throws Exception {
+		this.wrappedInvokable.cancel();
+	}
 }

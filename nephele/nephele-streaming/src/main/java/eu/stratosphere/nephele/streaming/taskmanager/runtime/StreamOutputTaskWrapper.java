@@ -62,4 +62,9 @@ public final class StreamOutputTaskWrapper extends AbstractOutputTask {
 	public void invoke() throws Exception {
 		this.wrappedInvokable.invoke();
 	}
+
+	@Override
+	public void cancel() throws Exception {
+		this.wrappedInvokable.cancel();
+	}
 }
