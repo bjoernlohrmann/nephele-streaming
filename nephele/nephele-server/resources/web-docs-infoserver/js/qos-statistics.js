@@ -35,11 +35,10 @@ var plotOptions = {
   grid: { hoverable: true, autoHighlight: true }
 };
 
-function initJobPanel(job, name, startTime) {
+function initJobPanel(job, name, formattedStartTime) {
   var box = $('<div id="job-' + job + '" class="panel panel-info"/>');
       box.append('<div class="panel-heading" title="' + job + '">' + '<h3 class="panel-title">'
-          + name
-          + '<span class="badge pull-right">' + startTime + '</span></h3></div>');
+          + name + '<span class="badge pull-right">' + formattedStartTime + '</span></h3></div>');
       box.append('<div class="list-group" />');
   return box;
 }
@@ -54,18 +53,29 @@ function showWaitingForDataBanner(job, currentPointCount, requiredCount) {
 }
 
 function addConstraintGroup(job, constraint, name) {
-  var name = name.replace(/->/, '<i class="fa fa-long-arrow-right"></i>');
+  var id = 'constraint-' + constraint;
+  var anchorId = id + '-anchor';
+  var title = name.replace(/->/, '<i class="fa fa-long-arrow-right"></i>');
   var box = $('<div id="constraint-' + constraint + '" class="constraint"/>');
-      box.append('<div class="list-group-item constraint-title"><h3 class="panel-title">' + name + '</h3></div>');
-      box.find('.panel-title').append('<i class="fa fa-spinner fa-spin pull-right chart-loading-icon"></i>');
+      box.append('<div id="' + anchorId + '" class="page-anchor" />');
+      box.append('<div class="list-group-item constraint-title"><h3 class="panel-title">' + title + '</h3></div>');
+
+  $('#constraint-dropdown').append('<li><a href="#' + anchorId + '">' + title + '</a></li>');
+  if ($('#plot-dropdown li').length > 0) $('#plot-dropdown').append('<li class="divider" />');
+  $('#plot-dropdown').append('<li><a href="#' + anchorId + '">' + title + '</a></li>');
+  $('#plot-dropdown').append('<li class="divider" />');
 
   $('#job-' + job + ' .list-group').append(box);
 }
 
 function addChartGroup(constraint, chart, title, leftAxisLabel, rightAxisLabel) {
-  var title = $('<div class="list-group-item">' + title + '</div>');
-      title.append('<i class="fa fa-spinner fa-spin pull-right chart-loading-icon"></i>');
-  $('#constraint-' + constraint).append(title);
+  var id = 'plot-' + constraint + '-' + chart;
+  $('#constraint-' + constraint).append('<div id="' + id + '" class="page-anchor" />');
+  $('#plot-dropdown').append('<li><a href="#' + id + '">' + title + '</a></li>');
+
+  var titleGroup = $('<div class="list-group-item">' + title + '</div>');
+      titleGroup.append('<i class="fa fa-spinner fa-spin pull-right chart-loading-icon"></i>');
+  $('#constraint-' + constraint).append(titleGroup);
 
   var box = $('<div class="list-group-item qos-chart-box" />');
   if (leftAxisLabel)
@@ -79,15 +89,15 @@ function addChartGroup(constraint, chart, title, leftAxisLabel, rightAxisLabel) 
 }
 
 function updateJobOverviewList(jobId, jobJson, currentJob) {
-  if ($('#job-overview-dropdown li[data-job="' + jobId + '"]').length == 0) {
-    $('#job-overview-dropdown').append(
+  if ($('#job-dropdown li[data-job="' + jobId + '"]').length == 0) {
+    $('#job-dropdown').append(
         '<li data-job="' + jobId + '"><a href="?job=' + jobId + '">'
-            + jobJson.name + ' (' + formattedTimeFromTimestamp(jobJson.creationTimestamp) + ')'
+            + jobJson.name + ' (' + jobJson.creationFormatted + ')'
             + '</a></li>');
   }
 
   if (jobId == currentJob)
-    $('#job-overview-dropdown li[data-job="' + jobId + '"]').addClass('active');
+    $('#job-dropdown li[data-job="' + jobId + '"]').addClass('active');
 }
 
 /** Convert raw latency json data into flot series. */
@@ -226,7 +236,10 @@ function setupPlots(jobId, json, refreshInterval) {
     addConstraintGroup(jobId, id, constraint.name);
     addChartGroup(id, 'latencies', 'Latencies', 'Latency [ms]');
     $.each(constraint.emitConsume, function(i, data) {
-      addChartGroup(id, 'emit-consume-edge-' + i, 'Emit and consume on edge ' + i, 'Records [1/s]', 'Ratio');
+      var label = 'Emit and consume on edge ' + i + ' ('
+         + constraint.emitConsumeDescriptions[i][0] + ' <i class="fa fa-long-arrow-right"></i> ' + constraint.emitConsumeDescriptions[i][1]
+         + ')';
+      addChartGroup(id, 'emit-consume-edge-' + i, label, 'Records [1/s]', 'Ratio');
     });
     $.each(constraint.cpuLoads.header, function(i, vertex) {
       addChartGroup(id, 'cpu-load-vertex-' + i, 'CPU load on vertex ' + vertex.name, 'Instances');
@@ -295,6 +308,10 @@ function setupPlots(jobId, json, refreshInterval) {
       addPlotHoverHandler(statistics[id].cpuLoads[index].plot, startTimestamp);
     });
   }
+
+  // show navigation menus
+  $('#constraint-dropdown').parent('.dropdown').removeClass('hidden');
+  $('#plot-dropdown').parent('.dropdown').removeClass('hidden');
 
   console.debug("[" + (new Date()) +"] initializing plots done.");
 
@@ -365,7 +382,7 @@ function updatePlots(statistics, json, maxEntriesCount) {
       addEmitConsumeData(statistics[id].emitConsume[i], data, maxEntriesCount);
     });
 
-    $.each(json.constraints[id].cpuLoads.header, function(i, vertex) {
+    $.each(json.constraints[id].cpuLoads.values, function(i, vertex) {
         addCpuLoadData(statistics[id].cpuLoads[i], i, json.constraints[id].cpuLoads.values, maxEntriesCount);
     });
   }
@@ -422,8 +439,7 @@ function updateJob(jobId, jobJson, refreshInterval, maxEntriesCount) {
     var minDataPointCount = getMinDataPointCount(jobJson);
 
     if ($('#job-' + jobId).length == 0) {
-      $('#jobs').append(initJobPanel(jobId, jobJson.name,
-            formattedTimeFromTimestamp(jobJson.creationTimestamp)));
+      $('#jobs').append(initJobPanel(jobId, jobJson.name, jobJson.creationFormatted));
     }
 
     if (minDataPointCount < MIN_DATA_POINTS_COUNT)
@@ -459,7 +475,7 @@ function pollStatistics(currentJob, interval, lastTimestamp) {
 
         $('.chart-loading-icon').fadeOut();
         $('#loading-banner').hide();
-        $('#job-overview-dropdown').parent('.btn-group').removeClass('hidden');
+        $('#job-dropdown').parent('.dropdown').removeClass('hidden');
       }
 
       if (nextTimestamp == Infinity)

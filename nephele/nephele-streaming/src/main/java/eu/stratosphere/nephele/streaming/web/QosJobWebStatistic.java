@@ -1,5 +1,6 @@
 package eu.stratosphere.nephele.streaming.web;
 
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -108,7 +109,8 @@ public class QosJobWebStatistic extends QosStatisticsServlet.JobStatistic {
 	public JSONObject getJobMetadata() throws JSONException {
 		JSONObject meta = new JSONObject();
 		meta.put("name", this.jobName);
-		meta.put("creationTimestamp", this.jobCreationTimestamp);		
+		meta.put("creationTimestamp", this.jobCreationTimestamp);
+		meta.put("creationFormatted", new Date(this.jobCreationTimestamp));
 		return meta;
 	}
 

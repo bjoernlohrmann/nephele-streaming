@@ -67,14 +67,16 @@ public class CpuLoadInMemoryLogger extends AbstractCpuLoadLogger {
 	}
 
 	public JSONObject toJson(JSONObject json) throws JSONException {
-		return toJson(json, this.history.getEntries());
+		return toJson(json, this.history.getEntries(), true);
 	}
 
 	public JSONObject toJson(JSONObject json, long minTimestamp) throws JSONException {
-		return toJson(json, this.history.getLastEntries(minTimestamp));
+		return toJson(json, this.history.getLastEntries(minTimestamp), false);
 	}
 
-	private JSONObject toJson(JSONObject result, HistoryEntry<JSONObject> entries[]) throws JSONException {
+	private JSONObject toJson(JSONObject result, HistoryEntry<JSONObject> entries[]
+			, boolean withLabels) throws JSONException {
+
 		JSONArray values = new JSONArray();
 
 		for (HistoryEntry<JSONObject> entry : entries) {
@@ -82,7 +84,9 @@ public class CpuLoadInMemoryLogger extends AbstractCpuLoadLogger {
 		}
 
 		JSONObject cpuLoads = new JSONObject();
-		cpuLoads.put("header", this.header);
+		if (withLabels) {
+			cpuLoads.put("header", this.header);
+		}
 		cpuLoads.put("values", values);
 		result.put("cpuLoads", cpuLoads);
 

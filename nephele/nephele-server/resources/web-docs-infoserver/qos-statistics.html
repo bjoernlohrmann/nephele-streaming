@@ -40,8 +40,35 @@
       </div><!-- /.navbar-header -->
    
       <div class="collapse navbar-collapse">
-        <!-- Logging dropdown -->
         <ul class="nav navbar-nav navbar-right">
+          <!-- Job dropdown -->
+          <li class="dropdown user-dropdown hidden">
+            <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+              Jobs <span class="caret"></span>
+            </a>
+            <ul class="dropdown-menu" role="menu" id="job-dropdown">
+            </ul>
+          </li>
+
+          <!-- Constraint dropdown -->
+          <li class="dropdown user-dropdown hidden">
+            <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+              Constraints <span class="caret"></span>
+            </a>
+            <ul class="dropdown-menu" role="menu" id="constraint-dropdown">
+            </ul>
+          </li>
+
+          <!-- Plot dropdown -->
+          <li class="dropdown user-dropdown hidden">
+            <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+              Plots <span class="caret"></span>
+            </a>
+            <ul class="dropdown-menu" role="menu" id="plot-dropdown">
+            </ul>
+          </li>
+
+          <!-- Logging dropdown -->
           <li class="dropdown user-dropdown">
             <a href="#" class="dropdown-toggle" data-toggle="dropdown">
               <i class="fa fa-archive"></i> Log Files <span class="caret"></span>
@@ -71,15 +98,6 @@
           <h1>
             QoS Statistics
             <small id="job-title">Detailed job statistics</small>
-
-            <div class="btn-group pull-right hidden">
-              <button type="button" class="btn btn-primary btn-lg dropdown-toggle" data-toggle="dropdown">
-                All Jobs
-                <span class="caret"></span>
-              </button>
-              <ul class="dropdown-menu" role="menu" id="job-overview-dropdown">
-              </ul>
-            </div>
           </h1>
         </div>
 

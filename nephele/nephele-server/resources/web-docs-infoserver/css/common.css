@@ -38,6 +38,11 @@ body {
     }
 }
 
+.page-anchor {
+    position: absolute;
+    margin-top: -60px;
+}
+
 /* navbar logo */
 nav .navbar-brand-img {
   padding: 5px 0px 5px 15px;

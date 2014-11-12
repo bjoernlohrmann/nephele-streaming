@@ -24,11 +24,13 @@ public class QosInMemoryLogger extends AbstractQosLogger {
 	private final ValueHistory<QosConstraintSummary> history;
 	private final JSONArray latencyTypes;
 	private final JSONArray latencyLabels;
+	private final JSONArray emitConsumeDescriptions;
 
 	public QosInMemoryLogger(ExecutionGraph execGraph, JobGraphLatencyConstraint constraint, long loggingInterval) {
 		super(loggingInterval);
 		this.latencyTypes = getLatencyTypesHeader(constraint.getSequence());
 		this.latencyLabels = getLatencyLabelsHeader(constraint.getSequence());
+		this.emitConsumeDescriptions = getEmitConsumeEdgeDescriptions(execGraph, constraint.getSequence());
 		int noOfHistoryEntries = GlobalConfiguration.getInteger(LOG_ENTRIES_KEY, DEFAULT_ENTRIES_COUNT);
 		this.history = new ValueHistory<QosConstraintSummary>(noOfHistoryEntries);
 	}
@@ -52,6 +54,21 @@ public class QosInMemoryLogger extends AbstractQosLogger {
 		return header;
 	}
 
+	private JSONArray getEmitConsumeEdgeDescriptions(ExecutionGraph execGraph, JobGraphSequence jobGraphSequence) {
+		JSONArray descriptions = new JSONArray();
+
+		for (SequenceElement<JobVertexID> sequenceElement : jobGraphSequence) {
+			if (sequenceElement.isEdge()) {
+				JSONArray description = new JSONArray();
+				description.put(execGraph.getExecutionGroupVertex(sequenceElement.getSourceVertexID()).getName());
+				description.put(execGraph.getExecutionGroupVertex(sequenceElement.getTargetVertexID()).getName());
+				descriptions.put(description);
+			}
+		}
+
+		return descriptions;
+	}
+
 	private JSONArray getLatencyTypesHeader(JobGraphSequence jobGraphSequence) {
 		JSONArray header = new JSONArray();
 
@@ -72,14 +89,16 @@ public class QosInMemoryLogger extends AbstractQosLogger {
 	}
 
 	public JSONObject toJson(JSONObject json) throws JSONException {
-		return toJson(json, this.history.getEntries());
+		return toJson(json, this.history.getEntries(), true);
 	}
 
 	public JSONObject toJson(JSONObject json, long minTimestamp) throws JSONException {
-		return toJson(json, this.history.getLastEntries(minTimestamp));
+		return toJson(json, this.history.getLastEntries(minTimestamp), false);
 	}
 
-	private JSONObject toJson(JSONObject result, HistoryEntry<QosConstraintSummary> entries[]) throws JSONException {
+	private JSONObject toJson(JSONObject result, HistoryEntry<QosConstraintSummary> entries[],
+			boolean withLabels) throws JSONException {
+
 		JSONArray latencyEntries = new JSONArray();
 		JSONArray emitConsume = new JSONArray();
 
@@ -130,12 +149,18 @@ public class QosInMemoryLogger extends AbstractQosLogger {
 		}
 
 		JSONObject latency = new JSONObject();
-		latency.put("types", this.latencyTypes);
-		latency.put("labels", this.latencyLabels);
+		if (withLabels) {
+			latency.put("types", this.latencyTypes);
+			latency.put("labels", this.latencyLabels);
+		}
 		latency.put("rows", latencyEntries);
 		result.put("latencies", latency);
 
 		result.put("emitConsume", emitConsume);
+		if (withLabels) {
+			result.put("emitConsumeDescriptions", this.emitConsumeDescriptions);
+		}
+
 		return result;
 	}
 }
