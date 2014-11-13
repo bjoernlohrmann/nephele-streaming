@@ -29,7 +29,7 @@ import eu.stratosphere.nephele.streaming.util.StreamPluginConfig;
  * 
  * @author Bjoern Lohrmann
  */
-public class QosLogger {
+public class QosLogger extends AbstractQosLogger {
 
 	private BufferedWriter writer;
 

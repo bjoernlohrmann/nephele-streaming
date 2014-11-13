@@ -44,8 +44,6 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 			LatencyConstraintCpuLoadSummary summarizedCpuUtilizations,
 			Map<JobVertexID, Integer> scalingActions)
 			throws UnexpectedVertexExecutionStateException {
-
-		int[] taskDop = constraintSummary.getTaskDop();
 		
 		for (SequenceElement seqElem : constraint.getSequence()) {
 			if (seqElem.isEdge()) {
@@ -59,10 +57,9 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 
 				QosGroupEdgeSummary edgeSummary = constraintSummary.getGroupEdgeSummary(seqElem.getIndexInSequence());
 				double recordSendRate = edgeSummary.getMeanEmissionRate()
-						* getNoOfRunningTasks(senderGroupVertex);
-				double recordConsumptionRate = edgeSummary
-						.getMeanConsumptionRate()
-						* getNoOfRunningTasks(consumerGroupVertex);
+						* edgeSummary.getActiveEmitterVertices();
+				double recordConsumptionRate = edgeSummary.getMeanConsumptionRate()
+						* edgeSummary.getActiveConsumerVertices();
 				
 				GroupVertexCpuLoadSummary cpuLoadSummary = summarizedCpuUtilizations
 						.get(seqElem.getTargetVertexID());
@@ -99,8 +96,6 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 					addScaleDownAction(seqElem, edgeSummary,
 							cpuLoadSummary.getAvgCpuUtilization() / 100.0, scalingActions);
 				}
-
-				edgeIndex++;
 			}
 		}
 		LOG.debug(scalingActions.toString());

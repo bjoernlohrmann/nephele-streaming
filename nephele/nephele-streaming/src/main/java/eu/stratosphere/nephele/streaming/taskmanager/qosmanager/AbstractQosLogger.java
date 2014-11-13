@@ -18,8 +18,6 @@ import java.io.IOException;
 
 import org.codehaus.jettison.json.JSONException;
 
-import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.QosConstraintSummary;
-
 public abstract class AbstractQosLogger {
 	protected long loggingInterval;
 

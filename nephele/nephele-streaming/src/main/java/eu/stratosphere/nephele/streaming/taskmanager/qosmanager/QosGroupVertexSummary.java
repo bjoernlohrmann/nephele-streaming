@@ -7,11 +7,11 @@ import java.util.List;
 
 public class QosGroupVertexSummary implements QosGroupElementSummary {
 
-	private int activeVertices;
+	private int activeVertices = 0;
 
-	private double meanVertexLatency;
+	private double meanVertexLatency = 0;
 
-	private double meanVertexLatencyVariance;
+	private double meanVertexLatencyVariance = 0;
 
 	public double getMeanVertexLatency() {
 		return meanVertexLatency;
@@ -61,8 +61,10 @@ public class QosGroupVertexSummary implements QosGroupElementSummary {
 					* toMerge.meanVertexLatencyVariance;
 		}
 
-		meanVertexLatency /= activeVertices;
-		meanVertexLatencyVariance /= meanVertexLatencyVariance;
+		if (activeVertices > 0) {
+			meanVertexLatency /= activeVertices;
+			meanVertexLatencyVariance /= meanVertexLatencyVariance;
+		}
 	}
 
 	@Override

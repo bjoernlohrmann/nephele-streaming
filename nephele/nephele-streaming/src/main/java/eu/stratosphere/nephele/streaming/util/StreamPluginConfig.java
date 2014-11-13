@@ -30,13 +30,22 @@ public class StreamPluginConfig {
 	public static final int DEFAULT_SAMPLING_PROBABILITY = 10;
 
 	/**
-	 * Name of the configuration entry which defines the QoS constraint log file
+	 * Name of the configuration entry which defines the QoS statistics log file
 	 * location.
 	 */
-	public static final String LOGFILE_PATTERN_KEY = PluginManager
+	public static final String QOS_STAT_LOGFILE_PATTERN_KEY = PluginManager
 			.prefixWithPluginNamespace("streaming.qosmanager.logging.qos_statistics_filepattern");
 
-	public static final String DEFAULT_LOGFILE_PATTERN = "/tmp/qos_statistics_%s";
+	public static final String DEFAULT_QOS_STAT_LOGFILE_PATTERN = "/tmp/qos_statistics_%s";
+
+	/**
+	 * Name of the configuration entry which defines the CPU statistics log file
+	 * location.
+	 */
+	private static final String CPU_STAT_LOGFILE_PATTERN_KEY = PluginManager
+			.prefixWithPluginNamespace("streaming.qosmanager.logging.cpu_statistics_filepattern");
+
+	private static final String DEFAULT_CPU_STAT_LOGFILE_PATTERN = "/tmp/cpu_statistics_%s";
 
 	/**
 	 * Name of the configuration entry which defines the time interval for QoS
@@ -46,6 +55,15 @@ public class StreamPluginConfig {
 			.prefixWithPluginNamespace("streaming.qosmanager.adjustmentinterval");
 
 	public static final long DEFAULT_ADJUSTMENTINTERVAL = 5000;
+
+	public static final String IN_MEMORY_LOG_ENTRIES_KEY = PluginManager
+			.prefixWithPluginNamespace("streaming.qosmanager.logging.in_memory_entries");
+
+	/**
+	 * Keep history of last 15min by default: 15 60 /
+	 * (DEFAULT_ADJUSTMENTINTERVAL / 1000)) = 180
+	 */
+	public static final int DEFAULT_IN_MEMORY_LOG_ENTRIES = 180;
 
 	public static long getAggregationIntervalMillis() {
 		return GlobalConfiguration.getLong(AGGREGATION_INTERVAL_KEY,
@@ -62,13 +80,24 @@ public class StreamPluginConfig {
 				DEFAULT_SAMPLING_PROBABILITY);
 	}
 
+	public static int getNoOfInMemoryLogEntries() {
+		return GlobalConfiguration.getInteger(IN_MEMORY_LOG_ENTRIES_KEY,
+				DEFAULT_IN_MEMORY_LOG_ENTRIES);
+	}
+
 	public static String getQosStatisticsLogfilePattern() {
-		return GlobalConfiguration.getString(LOGFILE_PATTERN_KEY,
-				DEFAULT_LOGFILE_PATTERN);
+		return GlobalConfiguration.getString(QOS_STAT_LOGFILE_PATTERN_KEY,
+				DEFAULT_QOS_STAT_LOGFILE_PATTERN);
+	}
+
+	public static String getCpuStatisticsLogfilePattern() {
+		return GlobalConfiguration.getString(CPU_STAT_LOGFILE_PATTERN_KEY,
+				DEFAULT_CPU_STAT_LOGFILE_PATTERN);
 	}
 
 	public static int computeQosStatisticWindowSize() {
 		return (int) Math.ceil(((double) getAdjustmentIntervalMillis())
 				/ getAggregationIntervalMillis());
 	}
+
 }

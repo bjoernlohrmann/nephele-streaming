@@ -122,7 +122,7 @@ public class JobGraphSequence extends LinkedList<SequenceElement>
 		if (includeExternalStartEndVertex && getFirst().isEdge())
 			vertices.add(getFirst().getSourceVertexID());
 
-		for (SequenceElement<JobVertexID> element : this) {
+		for (SequenceElement element : this) {
 			if (element.isVertex())
 				vertices.add(element.getVertexID());
 		}
@@ -133,9 +133,9 @@ public class JobGraphSequence extends LinkedList<SequenceElement>
 		return vertices;
 	}
 
-	public SequenceElement<JobVertexID> getFirstVertex() {
-		for (Iterator<SequenceElement<JobVertexID>> it = iterator(); it.hasNext();) {
-			SequenceElement<JobVertexID> current = it.next();
+	public SequenceElement getFirstVertex() {
+		for (Iterator<SequenceElement> it = iterator(); it.hasNext();) {
+			SequenceElement current = it.next();
 			if (current.isVertex())
 				return current;
 		}
@@ -143,9 +143,9 @@ public class JobGraphSequence extends LinkedList<SequenceElement>
 		return null;
 	}
 
-	public SequenceElement<JobVertexID> getLastVertex() {
-		for (Iterator<SequenceElement<JobVertexID>> it = descendingIterator(); it.hasNext();) {
-			SequenceElement<JobVertexID> current = it.next();
+	public SequenceElement getLastVertex() {
+		for (Iterator<SequenceElement> it = descendingIterator(); it.hasNext();) {
+			SequenceElement current = it.next();
 			if (current.isVertex())
 				return current;
 		}

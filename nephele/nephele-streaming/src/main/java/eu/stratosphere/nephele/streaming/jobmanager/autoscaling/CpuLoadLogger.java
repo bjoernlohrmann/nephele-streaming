@@ -5,24 +5,18 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Map;
 
-import eu.stratosphere.nephele.configuration.GlobalConfiguration;
 import eu.stratosphere.nephele.executiongraph.ExecutionGraph;
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
-import eu.stratosphere.nephele.plugins.PluginManager;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
+import eu.stratosphere.nephele.streaming.util.StreamPluginConfig;
 
 public class CpuLoadLogger extends AbstractCpuLoadLogger {
-	private static final String LOGFILE_PATTERN_KEY = PluginManager
-			.prefixWithPluginNamespace("streaming.qosmanager.logging.cpu_load_statistics_filepattern");
-
-	private static final String DEFAULT_LOGFILE_PATTERN = "/tmp/cpu_load_statistics_%s";
-
 	private BufferedWriter writer;
 
 	public CpuLoadLogger(ExecutionGraph execGraph, JobGraphLatencyConstraint constraint, long loggingInterval) throws IOException {
 		super(execGraph, constraint, loggingInterval);
 		
-		String logFile = GlobalConfiguration.getString(LOGFILE_PATTERN_KEY, DEFAULT_LOGFILE_PATTERN);
+		String logFile = StreamPluginConfig.getCpuStatisticsLogfilePattern();
 		if (logFile.contains("%s")) {
 			logFile = String.format(logFile, constraint.getID().toString());
 		}

@@ -6,29 +6,23 @@ import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 
-import eu.stratosphere.nephele.configuration.GlobalConfiguration;
 import eu.stratosphere.nephele.executiongraph.ExecutionGraph;
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
-import eu.stratosphere.nephele.plugins.PluginManager;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.HistoryEntry;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.ValueHistory;
+import eu.stratosphere.nephele.streaming.util.StreamPluginConfig;
 
 public class CpuLoadInMemoryLogger extends AbstractCpuLoadLogger {
 	private final ValueHistory<JSONObject> history;
 	private final JSONArray header;
-
-	private static final String LOG_ENTRIES_KEY = PluginManager.prefixWithPluginNamespace("streaming.qosmanager.logging.in_memory_entries");
-
-	private static final int DEFAULT_ENTRY_COUNT = 15 * 60 / 10; // = 15min @ 10s logging interval
 
 	public CpuLoadInMemoryLogger(ExecutionGraph execGraph, JobGraphLatencyConstraint constraint, long loggingInterval) throws JSONException {
 		super(execGraph, constraint, loggingInterval);
 
 		this.header = getHeader(execGraph);
 
-		int noOfHistoryEntries = GlobalConfiguration.getInteger(LOG_ENTRIES_KEY, DEFAULT_ENTRY_COUNT);
-		this.history = new ValueHistory<JSONObject>(noOfHistoryEntries);
+		this.history = new ValueHistory<JSONObject>(StreamPluginConfig.getNoOfInMemoryLogEntries());
 	}
 
 	private JSONArray getHeader(ExecutionGraph execGraph) throws JSONException {

@@ -25,7 +25,7 @@ public class LatencyConstraintCpuLoadSummaryAggregator {
 
 		LatencyConstraintCpuLoadSummary summary = new LatencyConstraintCpuLoadSummary();
 
-		for (SequenceElement<JobVertexID> seqElem : qosConstraint.getSequence()) {
+		for (SequenceElement seqElem : qosConstraint.getSequence()) {
 			if (seqElem.isEdge()) {
 
 				JobVertexID sourceVertexID = seqElem.getSourceVertexID();

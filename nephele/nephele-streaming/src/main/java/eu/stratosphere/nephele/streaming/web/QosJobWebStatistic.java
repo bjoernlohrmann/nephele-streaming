@@ -17,8 +17,8 @@ import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
 import eu.stratosphere.nephele.streaming.jobmanager.autoscaling.CpuLoadInMemoryLogger;
 import eu.stratosphere.nephele.streaming.jobmanager.autoscaling.LatencyConstraintCpuLoadSummary;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosConstraintSummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosInMemoryLogger;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.QosConstraintSummary;
 
 public class QosJobWebStatistic extends QosStatisticsServlet.JobStatistic {
 	

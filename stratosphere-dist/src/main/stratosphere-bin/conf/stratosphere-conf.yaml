@@ -118,3 +118,5 @@ plugins.streaming.qosreporter.samplingprobability: 10
 plugins.streaming.qosreporter.aggregationinterval: 1000
 plugins.streaming.qosmanager.adjustmentinterval: 5000
 plugins.streaming.qosmanager.logging.qos_statistics_filepattern: /tmp/qos_statistics_%s
+plugins.streaming.qosmanager.logging.cpu_statistics_filepattern: /tmp/cpu_statistics_%s
+plugins.streaming.qosmanager.logging.in_memory_entries: 180
