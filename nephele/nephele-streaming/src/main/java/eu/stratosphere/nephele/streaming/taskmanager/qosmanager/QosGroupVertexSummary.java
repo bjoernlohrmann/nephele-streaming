@@ -63,7 +63,7 @@ public class QosGroupVertexSummary implements QosGroupElementSummary {
 
 		if (activeVertices > 0) {
 			meanVertexLatency /= activeVertices;
-			meanVertexLatencyVariance /= meanVertexLatencyVariance;
+			meanVertexLatencyVariance /= activeVertices;
 		}
 	}
 
