@@ -23,25 +23,26 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.Sample;
 
 /**
- * This class stores information about the latency as well as record consumption
- * and emission rate of a vertex (task).
+ * This class stores information about the latency (interread time), record
+ * interarrival time as well as record consumption and emission rate of a vertex
+ * (task).
  * 
  * @author warneke, Bjoern Lohrmann
  */
 public final class VertexStatistics extends AbstractQosReportRecord {
 
 	private QosReporterID.Vertex reporterID;
-	private Sample vertexLatencyMillis;
+	private Sample igInterReadTimeMillis;
 	private double recordsConsumedPerSec;
 	private double recordsEmittedPerSec;
 	private Sample recordInterArrivalTimeMillis;
 
 	public VertexStatistics(QosReporterID.Vertex reporterID,
-			Sample vertexLatencyMillis, double recordsConsumedPerSec,
+			Sample igInterReadTimeMillis, double recordsConsumedPerSec,
 			double recordsEmittedPerSec, Sample recordInterArrivalTimeMillis) {
 
 		this.reporterID = reporterID;
-		this.vertexLatencyMillis = vertexLatencyMillis;
+		this.igInterReadTimeMillis = igInterReadTimeMillis;
 		this.recordsConsumedPerSec = recordsConsumedPerSec;
 		this.recordsEmittedPerSec = recordsEmittedPerSec;
 		this.recordInterArrivalTimeMillis = recordInterArrivalTimeMillis;
@@ -53,8 +54,9 @@ public final class VertexStatistics extends AbstractQosReportRecord {
 	}
 
 	public VertexStatistics(QosReporterID.Vertex reporterID,
-			double recordsConsumedPerSec, Sample recordInterArrivalTimeMillis) {
-		this(reporterID, null, recordsConsumedPerSec, -1,
+			Sample readReadTimeMillis, double recordsConsumedPerSec,
+			Sample recordInterArrivalTimeMillis) {
+		this(reporterID, readReadTimeMillis, recordsConsumedPerSec, -1,
 				recordInterArrivalTimeMillis);
 	}
 
@@ -69,12 +71,13 @@ public final class VertexStatistics extends AbstractQosReportRecord {
 	}
 
 	/**
-	 * Returns the task latency in milliseconds.
+	 * Returns the time between a successful read on the reporter's input gate
+	 * and the next attempt to read from any input gate.
 	 * 
-	 * @return the task latency in milliseconds
+	 * @return a sample with mean and variance
 	 */
-	public Sample getVertexLatencyMillis() {
-		return this.vertexLatencyMillis;
+	public Sample getInputGateInterReadTimeMillis() {
+		return this.igInterReadTimeMillis;
 	}
 
 	public double getRecordsConsumedPerSec() {
@@ -85,11 +88,6 @@ public final class VertexStatistics extends AbstractQosReportRecord {
 		return recordsEmittedPerSec;
 	}
 
-	/**
-	 * Returns the task latency in milliseconds.
-	 * 
-	 * @return the task latency in milliseconds
-	 */
 	public Sample getInterArrivalTimeMillis() {
 		return recordInterArrivalTimeMillis;
 	}
@@ -98,15 +96,18 @@ public final class VertexStatistics extends AbstractQosReportRecord {
 
 		boolean hasInputGate = reporterID.getInputGateID() != null;
 		boolean hasOutputGate = reporterID.getOutputGateID() != null;
-		
-		
+
 		VertexStatistics fused = new VertexStatistics(reporterID,
-				vertexLatencyMillis, recordsConsumedPerSec,
+				igInterReadTimeMillis, recordsConsumedPerSec,
 				recordsEmittedPerSec, recordInterArrivalTimeMillis);
 
 		if (hasInputGate) {
 			fused.recordInterArrivalTimeMillis = recordInterArrivalTimeMillis
 					.fuseWithDisjunctSample(other.getInterArrivalTimeMillis());
+
+			fused.igInterReadTimeMillis = igInterReadTimeMillis
+					.fuseWithDisjunctSample(other
+							.getInputGateInterReadTimeMillis());
 
 			fused.recordsConsumedPerSec = (recordsConsumedPerSec + other
 					.getRecordsConsumedPerSec()) / 2;
@@ -117,11 +118,6 @@ public final class VertexStatistics extends AbstractQosReportRecord {
 					.getRecordsEmittedPerSec()) / 2;
 		}
 
-		if (hasInputGate && hasOutputGate) {
-			fused.vertexLatencyMillis = vertexLatencyMillis
-					.fuseWithDisjunctSample(other.getVertexLatencyMillis());
-		}
-		
 		return fused;
 	}
 
@@ -137,15 +133,12 @@ public final class VertexStatistics extends AbstractQosReportRecord {
 
 		if (hasInputGate) {
 			recordInterArrivalTimeMillis.write(out);
+			igInterReadTimeMillis.write(out);
 			out.writeDouble(this.getRecordsConsumedPerSec());
 		}
 
 		if (hasOutputGate) {
 			out.writeDouble(this.getRecordsEmittedPerSec());
-		}
-
-		if (hasInputGate && hasOutputGate) {
-			vertexLatencyMillis.write(out);
 		}
 	}
 
@@ -163,16 +156,13 @@ public final class VertexStatistics extends AbstractQosReportRecord {
 		if (hasInputGate) {
 			recordInterArrivalTimeMillis = new Sample();
 			recordInterArrivalTimeMillis.read(in);
+			igInterReadTimeMillis = new Sample();
+			igInterReadTimeMillis.read(in);
 			this.recordsConsumedPerSec = in.readDouble();
 		}
 
 		if (hasOutputGate) {
 			this.recordsEmittedPerSec = in.readDouble();
-		}
-
-		if (hasInputGate && hasOutputGate) {
-			vertexLatencyMillis = new Sample();
-			vertexLatencyMillis.read(in);
 		}
 	}
 }

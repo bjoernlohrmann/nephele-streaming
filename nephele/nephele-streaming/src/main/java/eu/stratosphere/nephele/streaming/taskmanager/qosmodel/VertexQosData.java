@@ -31,11 +31,12 @@ public class VertexQosData {
 	private QosStatistic[] ogRecordsEmittedPerSec;
 	
 	/**
-	 * Sparse array indexed by (inputGateIndex, outputGateIndex) of the vertex.
-	 * Sparseness means that some (inputGateIndex, outputGateIndex) of the array
-	 * may be null.
+	 * Sparse array indexed by inputGateIndex. Contains the mean time between a
+	 * read() from an input gate and the next *attempt* to read from any input
+	 * gate. For vertices within a constraint this is equivalent to vertex
+	 * latency.
 	 */
-	private QosStatistic[][] igOgVertexLatency;
+	private QosStatistic[] igInterReadTime;
 
 	private QosStatistic[] igRecordInterArrivalTime;
 
@@ -43,7 +44,7 @@ public class VertexQosData {
 		this.vertex = vertex;		
 		this.igRecordsConsumedPerSec = new QosStatistic[1];
 		this.ogRecordsEmittedPerSec = new QosStatistic[1];
-		this.igOgVertexLatency = new QosStatistic[1][1];
+		this.igInterReadTime = new QosStatistic[1];
 		this.igRecordInterArrivalTime = new QosStatistic[1];
 	}
 
@@ -51,16 +52,16 @@ public class VertexQosData {
 		return this.vertex;
 	}
 	
-	public double getLatencyInMillis(int inputGateIndex, int outputGateIndex) {
-		if (igOgVertexLatency[inputGateIndex][outputGateIndex].hasValues()) {
-			return igOgVertexLatency[inputGateIndex][outputGateIndex].getMean();
+	public double getLatencyInMillis(int inputGateIndex) {
+		if (igInterReadTime[inputGateIndex].hasValues()) {
+			return igInterReadTime[inputGateIndex].getMean();
 		}
 		return -1;
 	}
-
-	public double getLatencyVarianceInMillis(int inputGateIndex, int outputGateIndex) {
-		if (igOgVertexLatency[inputGateIndex][outputGateIndex].hasValues()) {
-			return igOgVertexLatency[inputGateIndex][outputGateIndex].getVariance();
+	
+	public double getLatencyVarianceInMillis(int inputGateIndex) {
+		if (igInterReadTime[inputGateIndex].hasValues()) {
+			return igInterReadTime[inputGateIndex].getVariance();
 		}
 		return -1;
 	}
@@ -96,20 +97,6 @@ public class VertexQosData {
 
 	public void prepareForReportsOnGateCombination(int inputGateIndex,
 			int outputGateIndex) {
-
-		if (igOgVertexLatency.length <= inputGateIndex ||
-				igOgVertexLatency[inputGateIndex] == null) {
-			
-			igOgVertexLatency = setInArray(QosStatistic[].class,
-					igOgVertexLatency, 
-					inputGateIndex, 
-					new QosStatistic[outputGateIndex + 1]);
-		}
-
-		igOgVertexLatency[inputGateIndex] = setInArray(
-				QosStatistic.class,
-				igOgVertexLatency[inputGateIndex], outputGateIndex,
-				new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize(), true));
 		
 		prepareForReportsOnInputGate(inputGateIndex);
 		prepareForReportsOnOutputGate(outputGateIndex);
@@ -117,10 +104,14 @@ public class VertexQosData {
 	
 	
 	public void prepareForReportsOnInputGate(int inputGateIndex) {
+		igInterReadTime = setInArray(QosStatistic.class,
+				igInterReadTime, inputGateIndex,
+				new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize(), true));
+
+		
 		igRecordsConsumedPerSec = setInArray(QosStatistic.class,
 				igRecordsConsumedPerSec, inputGateIndex,
 				new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize()));
-		
 		
 		igRecordInterArrivalTime = setInArray(QosStatistic.class,
 				igRecordInterArrivalTime, inputGateIndex,
@@ -165,15 +156,12 @@ public class VertexQosData {
 	public void addVertexStatisticsMeasurement(int inputGateIndex, int outputGateIndex,
 			long timestamp, VertexStatistics measurement) {
 
-		if (inputGateIndex != -1 && outputGateIndex != -1) {
-
-			Sample vertexLatency = measurement.getVertexLatencyMillis();
-			QosStatistic stat = igOgVertexLatency[inputGateIndex][outputGateIndex];
-			
-			stat.addValue(new QosValue(vertexLatency.getMean(), vertexLatency.getVariance(), vertexLatency.getNoOfSamplePoints(), timestamp));
-		}
-
 		if (inputGateIndex != -1) {
+			Sample vertexLatency = measurement.getInputGateInterReadTimeMillis();
+			igInterReadTime[inputGateIndex].addValue(new QosValue(vertexLatency
+					.getMean(), vertexLatency.getVariance(), vertexLatency
+					.getNoOfSamplePoints(), timestamp));
+			
 			igRecordsConsumedPerSec[inputGateIndex]
 					.addValue(new QosValue(measurement
 							.getRecordsConsumedPerSec(), timestamp));
@@ -204,42 +192,24 @@ public class VertexQosData {
 
 		return false;
 	}
-	
+
 	public void dropOlderData(int inputGateIndex, int outputGateIndex,
 			long thresholdTimestamp) {
 
 		if (inputGateIndex != -1
 				&& !isInputGateConsumptionRateNewerThan(inputGateIndex,
 						thresholdTimestamp)) {
-
+			
 			igRecordsConsumedPerSec[inputGateIndex].clear();
+			igInterReadTime[inputGateIndex].clear();
 		}
 
 		if (outputGateIndex != -1
 				&& !isOutputGateEmissionRateNewerThan(outputGateIndex,
 						thresholdTimestamp)) {
-
+			
 			ogRecordsEmittedPerSec[outputGateIndex].clear();
 		}
-
-		if (inputGateIndex != -1
-				&& outputGateIndex != -1
-				&& !isVertexLatencyNewerThan(inputGateIndex, outputGateIndex,
-						thresholdTimestamp)) {
-			igOgVertexLatency[inputGateIndex][outputGateIndex].clear();
-		}
-
-	}
-		
-	private boolean isVertexLatencyNewerThan(int inputGateIndex,
-			int outputGateIndex, long thresholdTimestamp) {
-
-		if (!igOgVertexLatency[inputGateIndex][outputGateIndex].hasValues()) {
-			return false;
-		}
-
-		return igOgVertexLatency[inputGateIndex][outputGateIndex]
-				.getOldestValue().getTimestamp() >= thresholdTimestamp;
 	}
 	
 	private boolean isInputGateConsumptionRateNewerThan(int inputGateIndex,

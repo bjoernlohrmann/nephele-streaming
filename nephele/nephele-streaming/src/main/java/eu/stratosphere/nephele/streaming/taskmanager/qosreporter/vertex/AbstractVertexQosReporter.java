@@ -15,7 +15,7 @@ public abstract class AbstractVertexQosReporter implements VertexQosReporter {
 
 	private long igReceiveCounterAtLastReport;
 	private final InputGateReceiveCounter igReceiveCounter;
-	private final InputGateInterarrivalTimeSampler igInterarrivalTimeSampler;
+	private final InputGateInterArrivalTimeSampler igInterarrivalTimeSampler;
 
 	private long ogEmitCounterAtLastReport;
 	private final OutputGateEmitStatistics ogEmitCounter;
@@ -40,7 +40,7 @@ public abstract class AbstractVertexQosReporter implements VertexQosReporter {
 		if (reporterID.hasInputGateID()) {
 			this.igReceiveCounterAtLastReport = igReceiveCounter.getRecordsReceived();
 			this.igReceiveCounter = igReceiveCounter;
-			this.igInterarrivalTimeSampler = new InputGateInterarrivalTimeSampler(reportForwarder.getConfigCenter().getSamplingProbability() / 100.0);
+			this.igInterarrivalTimeSampler = new InputGateInterArrivalTimeSampler(reportForwarder.getConfigCenter().getSamplingProbability() / 100.0);
 		} else {
 			this.igReceiveCounter = null;
 			this.igInterarrivalTimeSampler = null;
@@ -73,7 +73,7 @@ public abstract class AbstractVertexQosReporter implements VertexQosReporter {
 	}
 	
 	public void sendReport(long now, 
-			Sample vertexLatencyMillis) {
+			Sample igInterReadTimeMillis) {
 		
 		double secsPassed = (now - reportTimer.getTimeOfLastReport()) / 1000.0;
 		
@@ -81,12 +81,13 @@ public abstract class AbstractVertexQosReporter implements VertexQosReporter {
 		
 		if (reporterID.hasInputGateID() && reporterID.hasOutputGateID()) {
 			toSend = new VertexStatistics(reporterID,
-					vertexLatencyMillis,
+					igInterReadTimeMillis,
 					getRecordsConsumedPerSec(secsPassed),
 					getRecordsEmittedPerSec(secsPassed),
 					igInterarrivalTimeSampler.drawSampleAndReset(now).rescale(0.001));
 		} else if (reporterID.hasInputGateID()) {
 			toSend = new VertexStatistics(reporterID,
+					igInterReadTimeMillis,
 					getRecordsConsumedPerSec(secsPassed),
 					igInterarrivalTimeSampler.drawSampleAndReset(now).rescale(0.001));
 		} else {

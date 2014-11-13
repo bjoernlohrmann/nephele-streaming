@@ -4,7 +4,7 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.Bernou
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.Sample;
 import eu.stratosphere.nephele.streaming.util.StreamUtil;
 
-public class InputGateInterarrivalTimeSampler {
+public class InputGateInterArrivalTimeSampler {
 	
 	/**
 	 * Samples records interarrival times in microseconds. These are computed
@@ -14,7 +14,7 @@ public class InputGateInterarrivalTimeSampler {
 	
 	private Long[] accBufferInterarrivalTimes = new Long[0];
 
-	public InputGateInterarrivalTimeSampler(double samplingProbability) {
+	public InputGateInterArrivalTimeSampler(double samplingProbability) {
 		this.interarrivalTimeSampler = new BernoulliSampler(samplingProbability);
 	}
 

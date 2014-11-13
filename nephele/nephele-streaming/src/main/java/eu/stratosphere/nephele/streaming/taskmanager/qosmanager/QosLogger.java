@@ -21,7 +21,6 @@ import java.io.IOException;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.JobGraphSequence;
 import eu.stratosphere.nephele.streaming.SequenceElement;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.QosConstraintSummary;
 import eu.stratosphere.nephele.streaming.util.StreamPluginConfig;
 
 /**
@@ -52,7 +51,7 @@ public class QosLogger {
 		StringBuilder builder = new StringBuilder();
 		builder.append(this.getLogTimestamp() / 1000);
 		builder.append(';');
-		builder.append(summary.getNoOfSequences());
+		builder.append(summary.getViolationReport().getNoOfSequences());
 		builder.append(';');
 
 		this.appendSummaryLine(builder, summary);
@@ -63,21 +62,37 @@ public class QosLogger {
 	}
 
 	private void appendSummaryLine(StringBuilder builder, QosConstraintSummary summary) {
-		builder.append(this.formatDouble(summary.getAvgSequenceLatency()));
+		builder.append(this.formatDouble(summary.getViolationReport().getMeanSequenceLatency()));
 		builder.append(';');
-		builder.append(this.formatDouble(summary.getMinSequenceLatency()));
+		builder.append(this.formatDouble(summary.getViolationReport().getMinSequenceLatency()));
 		builder.append(';');
-		builder.append(this.formatDouble(summary.getMaxSequenceLatency()));
+		builder.append(this.formatDouble(summary.getViolationReport().getMaxSequenceLatency()));
 		
-		double[][] memberStats = summary.getAggregatedMemberStatistics();
-
-		for (int i = 0; i < memberStats.length; i++) {
-			for (int j = 0; j < memberStats[i].length; j++) {
-				if (j < 4) {
-					builder.append(';');
-					builder.append(this.formatDouble(memberStats[i][j]));
-				}
-			}
+		boolean nextIsVertex = summary.doesSequenceStartWithVertex();
+		
+		for (int i = 0; i < summary.getSequenceLength(); i++) {
+			if(nextIsVertex) {
+				QosGroupVertexSummary vs = summary.getGroupVertexSummary(i);
+				builder.append(';');
+				builder.append(this.formatDouble(vs.getMeanVertexLatency()));
+				builder.append(';');
+				builder.append(this.formatDouble(vs.getMeanVertexLatencyVariance()));				
+			} else {
+				QosGroupEdgeSummary ve = summary.getGroupEdgeSummary(i);
+				builder.append(';');
+				builder.append(this.formatDouble(ve.getOutputBufferLatencyMean()));
+				builder.append(';');
+				builder.append(this.formatDouble(ve.getTransportLatencyMean()));
+				builder.append(';');
+				builder.append(this.formatDouble(ve.getMeanEmissionRate()));
+				builder.append(';');
+				builder.append(this.formatDouble(ve.getMeanConsumptionRate()));
+				builder.append(';');
+				builder.append(this.formatDouble(ve.getMeanConsumerVertexInterarrivalTime()));
+				builder.append(';');
+				builder.append(this.formatDouble(ve.getMeanConsumerVertexInterarrivalTimeVariance()));
+			}			
+			nextIsVertex = !nextIsVertex;
 		}
 	}
 
@@ -102,10 +117,6 @@ public class QosLogger {
 				builder.append(sequenceElement.getName()+"Mean");
 				builder.append(';');
 				builder.append(sequenceElement.getName()+"Var");
-				builder.append(';');
-				builder.append(sequenceElement.getName()+"IAMean");
-				builder.append(';');
-				builder.append(sequenceElement.getName()+"IAVar");
 			} else {
 				builder.append(';');
 				builder.append("edge" + edgeIndex + "obl");
@@ -115,6 +126,11 @@ public class QosLogger {
 				builder.append("edge" + edgeIndex + "Emit");
 				builder.append(';');
 				builder.append("edge" + edgeIndex + "Consume");
+				builder.append(';');
+				builder.append("edge" + edgeIndex +"IAMean");
+				builder.append(';');
+				builder.append("edge" + edgeIndex +"IAVar");
+
 				edgeIndex++;
 			}
 		}

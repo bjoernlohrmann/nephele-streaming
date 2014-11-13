@@ -21,7 +21,6 @@ import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.JobGraphSequence;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
 import eu.stratosphere.nephele.streaming.SequenceElement;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.QosConstraintSummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.EdgeQosData;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosEdge;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraph;
@@ -59,7 +58,7 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 
 	private QosConstraintViolationListener constraintViolationListener;
 
-	private QosConstraintSummary constraintSummary;
+	private QosConstraintViolationReport violationReport;
 	
 	private long inactivityThresholdTime;
 
@@ -70,7 +69,7 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 
 		this.qosGraph = qosGraph;
 		this.constraint = qosGraph.getConstraintByID(constraintID);
-		this.constraintSummary = new QosConstraintSummary(this.constraint);
+		this.violationReport = new QosConstraintViolationReport(this.constraint);
 		this.constraintViolationListener = constraintViolationListener;
 		this.inactivityThresholdTime = inactivityThresholdTime;
 
@@ -87,7 +86,7 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 				new QosGraphMember[this.sequenceLength]);
 	}
 
-	public QosConstraintSummary scanSequencesForQosConstraintViolations() {
+	public QosConstraintViolationReport scanSequencesForQosConstraintViolations() {
 
 		JobGraphSequence sequence = this.constraint.getSequence();
 		QosGroupVertex startGroupVertex;
@@ -104,7 +103,7 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 			this.graphTraversal.traverseForwardConditional();
 		}
 		
-		return this.constraintSummary;
+		return this.violationReport;
 	}
 
 	/*
@@ -197,7 +196,7 @@ public class QosConstraintViolationFinder implements QosGraphTraversalListener,
 	private void handleFullSequence() {
 		sequenceSummary.update(this.currentSequenceMembers);
 		
-		constraintSummary.addQosSequenceLatencySummary(sequenceSummary);
+		violationReport.addQosSequenceLatencySummary(sequenceSummary);
 
 		double constraintViolatedByMillis = this.sequenceSummary.getSequenceLatency()
 				- this.constraint.getLatencyConstraintInMillis();

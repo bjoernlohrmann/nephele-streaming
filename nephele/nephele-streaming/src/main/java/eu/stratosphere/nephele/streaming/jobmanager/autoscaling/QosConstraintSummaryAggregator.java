@@ -1,12 +1,15 @@
 package eu.stratosphere.nephele.streaming.jobmanager.autoscaling;
 
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Set;
 
 import eu.stratosphere.nephele.executiongraph.ExecutionGraph;
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.QosConstraintSummary;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosConstraintSummary;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosConstraintViolationReport;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosManagerID;
 
 public class QosConstraintSummaryAggregator {
@@ -42,12 +45,12 @@ public class QosConstraintSummaryAggregator {
 	}
 	
 	public QosConstraintSummary computeAggregation() {
-		QosConstraintSummary aggregation = new QosConstraintSummary(constraint);
+		QosConstraintViolationReport vioRep = new QosConstraintViolationReport(constraint);
+		QosConstraintSummary aggregation = new QosConstraintSummary(constraint, vioRep);
 
-		for (QosConstraintSummary summary : summaries.values()) {
-			aggregation.mergeOtherSummary(summary);
-		}
-
+		List<QosConstraintSummary> completeSummaries = getCompleteSummaries();
+		aggregation.merge(completeSummaries);
+		
 		int taskDop[] = new int[this.groupVertecies.length];
 		int vertexIndex = 0;
 		for (JobVertexID id : groupVertecies) {
@@ -55,7 +58,17 @@ public class QosConstraintSummaryAggregator {
 			vertexIndex++;
 		}
 		aggregation.setTaskDop(taskDop);
-
+		
 		return aggregation;
+	}
+
+	private List<QosConstraintSummary> getCompleteSummaries() {
+		List<QosConstraintSummary> ret = new LinkedList<QosConstraintSummary>();
+		for (QosConstraintSummary summary : summaries.values()) {
+			if (summary.hasData()) {
+				ret.add(summary);
+			}
+		}
+		return ret;
 	}
 }

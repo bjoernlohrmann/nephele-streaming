@@ -7,7 +7,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 import eu.stratosphere.nephele.jobgraph.JobID;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.QosConstraintSummary;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosConstraintSummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosManagerID;
 
 public class QosManagerConstraintSummaries extends AbstractSerializableQosMessage {

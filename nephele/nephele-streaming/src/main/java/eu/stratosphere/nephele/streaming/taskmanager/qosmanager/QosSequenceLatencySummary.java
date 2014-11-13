@@ -11,8 +11,6 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphMember;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosVertex;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.VertexQosData;
 
-import java.util.List;
-
 public class QosSequenceLatencySummary {
 	
 	private final int[][] inputOutputGateCombinations;
@@ -35,7 +33,7 @@ public class QosSequenceLatencySummary {
 			this.inputOutputGateCombinations[index] = new int[2];
 			if (sequenceElement.isVertex()) {
 				this.noOfVertices++;
-				this.memberLatencies[index] = new double[4];
+				this.memberLatencies[index] = new double[2];
 				this.inputOutputGateCombinations[index][0] = sequenceElement
 						.getInputGateIndex();
 				this.inputOutputGateCombinations[index][1] = sequenceElement
@@ -62,22 +60,16 @@ public class QosSequenceLatencySummary {
 				VertexQosData vertexQos = ((QosVertex) member).getQosData();
 
 				int inputGateIndex = this.inputOutputGateCombinations[index][0];
-				int outputGateIndex = this.inputOutputGateCombinations[index][1];
 
-				this.memberLatencies[index][0] = vertexQos.getLatencyInMillis(inputGateIndex, outputGateIndex);
-				this.memberLatencies[index][1] = vertexQos.getLatencyVarianceInMillis(inputGateIndex, outputGateIndex);
-				this.memberLatencies[index][2] = vertexQos.getInterArrivalTimeInMillis(inputGateIndex);
-				this.memberLatencies[index][3] = vertexQos.getInterArrivalTimeVarianceInMillis(inputGateIndex);
+				this.memberLatencies[index][0] = vertexQos.getLatencyInMillis(inputGateIndex);
+				this.memberLatencies[index][1] = vertexQos.getLatencyVarianceInMillis(inputGateIndex);
 				sequenceLatency += this.memberLatencies[index][0];
 			} else {
 				EdgeQosData edgeQos = ((QosEdge) member).getQosData();
-				double channelLatency = edgeQos.getChannelLatencyInMillis();
-				double outputBufferLatency = Math.min(channelLatency, edgeQos.getOutputBufferLifetimeInMillis() / 2);
-				
-				this.memberLatencies[index][0] = outputBufferLatency;
-				this.memberLatencies[index][1] = channelLatency - outputBufferLatency;
-				sequenceLatency += channelLatency;
-				outputBufferLatencySum += outputBufferLatency;
+				this.memberLatencies[index][0] = edgeQos.estimateOutputBufferLatencyInMillis();
+				this.memberLatencies[index][1] = edgeQos.estimateTransportLatencyInMillis();
+				sequenceLatency += edgeQos.getChannelLatencyInMillis();
+				outputBufferLatencySum += this.memberLatencies[index][0];
 				this.isMemberQosDataFresh = this.isMemberQosDataFresh && hasFreshValues((QosEdge) member);
 			}
 

@@ -420,7 +420,7 @@ public class QosConstraintViolationFinderTest {
 							vertexQosData.prepareForReportsOnInputGate(edge.getInputGate().getGateIndex());
 							vertexQosData.addVertexStatisticsMeasurement(
 									edge.getInputGate().getGateIndex(), -1, timestamp,
-									new VertexStatistics(null, 50, new Sample(1000, 100, 1.0 / 50, 0)));
+									new VertexStatistics(null, new Sample(1000, 100, 1.0 / 50, 0), 50, new Sample(1000, 100, 1.0 / 50, 0)));
 							targetVertex.setQosData(vertexQosData);
 							
 						}

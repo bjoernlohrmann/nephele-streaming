@@ -45,6 +45,28 @@ public class EdgeQosData {
 	public QosEdge getEdge() {
 		return this.edge;
 	}
+	
+	public double estimateOutputBufferLatencyInMillis() {
+		double channelLatency = getChannelLatencyInMillis();
+		double oblt = getOutputBufferLifetimeInMillis();
+
+		if (channelLatency == -1 || oblt == -1) {
+			return -1;
+		}
+
+		return Math.min(channelLatency, oblt / 2);
+	}
+
+	public double estimateTransportLatencyInMillis() {
+		double channelLatency = getChannelLatencyInMillis();
+		double oblt = getOutputBufferLifetimeInMillis();
+
+		if (channelLatency == -1 || oblt == -1) {
+			return -1;
+		}
+
+		return Math.max(0, channelLatency - (oblt / 2));
+	}
 
 	public double getChannelLatencyInMillis() {
 		if (this.latencyInMillisStatistic.hasValues()) {

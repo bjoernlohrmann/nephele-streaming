@@ -27,18 +27,11 @@ public class ReadReadVertexQosReporterGroup implements VertexQosReporter {
 	private final InputGateReceiveCounter igReceiveCounter;
 	private long igReceiveCounterAtLastReport;
 	
-	private final InputGateInterarrivalTimeSampler igInterarrivalTimeSampler;
+	private final InputGateInterArrivalTimeSampler igInterArrivalTimeSampler;
+	
+	private final InputGateInterReadTimeSampler igInterReadTimeSampler;
 
 	private final int inputGateIndex;
-
-	/**
-	 * Samples the elapsed time between a read on the input gate identified
-	 * {@link #inputGateIndex} and the next read on any other input gate.
-	 * Elapsed time is sampled in microseconds.
-	 */
-	private final BernoulliSampler vertexLatencySampler;
-
-	private long lastSampleReadTime;
 
 	public ReadReadVertexQosReporterGroup(
 			QosReportForwarderThread reportForwarder, int inputGateIndex,
@@ -46,19 +39,17 @@ public class ReadReadVertexQosReporterGroup implements VertexQosReporter {
 
 		this.inputGateIndex = inputGateIndex;
 
-		this.vertexLatencySampler = new BernoulliSampler(reportForwarder
+		this.igInterReadTimeSampler = new InputGateInterReadTimeSampler(reportForwarder
 				.getConfigCenter().getSamplingProbability() / 100.0);
 		
+		this.igInterArrivalTimeSampler = new InputGateInterArrivalTimeSampler(reportForwarder
+				.getConfigCenter().getSamplingProbability() / 100.0);
+
 		this.igReceiveCounter = igReceiveCounter;
-		this.igReceiveCounterAtLastReport = igReceiveCounter.getRecordsReceived();
-		
-		this.igInterarrivalTimeSampler = new InputGateInterarrivalTimeSampler(reportForwarder
-				.getConfigCenter().getSamplingProbability() / 100.0);
+		this.igReceiveCounterAtLastReport = igReceiveCounter.getRecordsReceived();		
 		
 		this.reportTimer = new ReportTimer(reportForwarder.getConfigCenter()
 				.getAggregationInterval());
-		
-		this.lastSampleReadTime = -1;
 	}
 
 	public void addReporter(ReadReadReporter reporter) {
@@ -67,14 +58,14 @@ public class ReadReadVertexQosReporterGroup implements VertexQosReporter {
 
 	protected void sendReportIfDue() {
 		if (reportTimer.reportIsDue() 
-				&& vertexLatencySampler.hasSample()
-				&& igInterarrivalTimeSampler.hasSample()) {
+				&& igInterReadTimeSampler.hasSample()
+				&& igInterArrivalTimeSampler.hasSample()) {
 
 			long now = System.currentTimeMillis();
 			
 			// draw sample and rescale from micros to millis
-			Sample vertexLatency = vertexLatencySampler.drawSampleAndReset(now).rescale(0.001);
-			Sample interarrivalTime = igInterarrivalTimeSampler.drawSampleAndReset(now).rescale(0.001);
+			Sample vertexLatency = igInterReadTimeSampler.drawSampleAndReset(now).rescale(0.001);
+			Sample interarrivalTime = igInterArrivalTimeSampler.drawSampleAndReset(now).rescale(0.001);
 			
 			double recordsConsumedPerSec = getRecordsConsumedPerSec((now - reportTimer.getTimeOfLastReport()) / 1000.0);
 			
@@ -99,27 +90,21 @@ public class ReadReadVertexQosReporterGroup implements VertexQosReporter {
 	@Override
 	public void recordReceived(int runtimeInputGateIndex) {
 		if (runtimeInputGateIndex == this.inputGateIndex) {
-			if (vertexLatencySampler.shouldTakeSamplePoint()) {
-				lastSampleReadTime = System.nanoTime();
-			}
+			igInterReadTimeSampler.recordReceivedOnIg();
 			sendReportIfDue();
 		}
 	}
 
 	@Override
 	public void tryingToReadRecord(int runtimeInputGateIndex) {
-		if (lastSampleReadTime != -1) {
-			// if lastSampleReadTime is set then we should sample
-			vertexLatencySampler.addSamplePoint((System.nanoTime() - lastSampleReadTime) / 1000);
-			lastSampleReadTime = -1;
-		}
+		igInterReadTimeSampler.tryingToReadRecordFromAnyIg();
 	}
 	
 	@Override
 	public void inputBufferConsumed(int inputGateIndex, int channelIndex,
 			long bufferInterarrivalTimeNanos, int recordsReadFromBuffer) {
 		
-		igInterarrivalTimeSampler.inputBufferConsumed(channelIndex, bufferInterarrivalTimeNanos, recordsReadFromBuffer);
+		igInterArrivalTimeSampler.inputBufferConsumed(channelIndex, bufferInterarrivalTimeNanos, recordsReadFromBuffer);
 	}
 
 	@Override
