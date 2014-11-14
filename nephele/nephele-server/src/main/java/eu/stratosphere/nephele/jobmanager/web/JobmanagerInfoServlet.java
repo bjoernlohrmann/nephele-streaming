@@ -130,22 +130,24 @@ public class JobmanagerInfoServlet extends HttpServlet {
 			wrt.write("],");
 
 			wrt.write("\"elasticScaleParameters\": {");
-			JobVertexID groupVertexId = new JobVertexID();
-			first = true;
-			for (ManagementGroupVertex groupVertex : jobManagementGraph.getGroupVerticesInTopologicalOrder()) {
-				groupVertexId.setID(groupVertex.getID());
-				ExecutionGroupVertex executionGroupVertex = jobmanager.getExecutionGroupVertex(jobEvent.getJobID(), groupVertexId);
-				if (executionGroupVertex.hasElasticNumberOfRunningSubtasks()) {
-					if (first)
-						first = false;
-					else
-						wrt.write(",");
+			if (jobEvent.getJobStatus() == JobStatus.RUNNING) {
+				JobVertexID groupVertexId = new JobVertexID();
+				first = true;
+				for (ManagementGroupVertex groupVertex : jobManagementGraph.getGroupVerticesInTopologicalOrder()) {
+					groupVertexId.setID(groupVertex.getID());
+					ExecutionGroupVertex executionGroupVertex = jobmanager.getExecutionGroupVertex(jobEvent.getJobID(), groupVertexId);
+					if (executionGroupVertex.hasElasticNumberOfRunningSubtasks()) {
+						if (first)
+							first = false;
+						else
+							wrt.write(",");
 
-					wrt.write("\"" + groupVertexId + "\": { ");
-					wrt.write("\"min\": " + executionGroupVertex.getMinElasticNumberOfRunningSubtasks() + ",");
-					wrt.write("\"current\": " + executionGroupVertex.getCurrentElasticNumberOfRunningSubtasks() + ",");
-					wrt.write("\"max\": " + executionGroupVertex.getMaxElasticNumberOfRunningSubtasks());
-					wrt.write("}");
+						wrt.write("\"" + groupVertexId + "\": { ");
+						wrt.write("\"min\": " + executionGroupVertex.getMinElasticNumberOfRunningSubtasks() + ",");
+						wrt.write("\"current\": " + executionGroupVertex.getCurrentElasticNumberOfRunningSubtasks() + ",");
+						wrt.write("\"max\": " + executionGroupVertex.getMaxElasticNumberOfRunningSubtasks());
+						wrt.write("}");
+					}
 				}
 			}
 			wrt.write("}");
