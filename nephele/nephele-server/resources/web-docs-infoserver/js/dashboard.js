@@ -169,6 +169,8 @@ function drawDependencies() {
 function fillTable(table, json) {
 	$(table).html("");
 
+    json.sort(function(a, b) { return b.time - a.time });
+
 	$.each(json, function(i, job) {
 		$("#rJpH").hide();
 		var countGroups = 0;
