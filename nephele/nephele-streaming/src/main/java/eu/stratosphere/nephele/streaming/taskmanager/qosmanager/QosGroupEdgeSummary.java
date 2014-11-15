@@ -188,7 +188,7 @@ public class QosGroupEdgeSummary implements QosGroupElementSummary {
 
 	@Override
 	public boolean hasData() {
-		return activeEdges > 0 && activeConsumerVertices > 0
+		return (activeEdges == -1 || activeEdges > 0) && activeConsumerVertices > 0
 				&& activeEmitterVertices > 0;
 	}
 

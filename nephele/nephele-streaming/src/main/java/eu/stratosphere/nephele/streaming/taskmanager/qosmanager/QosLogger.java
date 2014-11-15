@@ -72,11 +72,11 @@ public class QosLogger extends AbstractQosLogger {
 		
 		for (int i = 0; i < summary.getSequenceLength(); i++) {
 			if(nextIsVertex) {
-				QosGroupVertexSummary vs = summary.getGroupVertexSummary(i);
-				builder.append(';');
-				builder.append(this.formatDouble(vs.getMeanVertexLatency()));
-				builder.append(';');
-				builder.append(this.formatDouble(vs.getMeanVertexLatencyVariance()));				
+//				QosGroupVertexSummary vs = summary.getGroupVertexSummary(i);
+//				builder.append(';');
+//				builder.append(this.formatDouble(vs.getMeanVertexLatency()));
+//				builder.append(';');
+//				builder.append(this.formatDouble(vs.getMeanVertexLatencyVariance()));				
 			} else {
 				QosGroupEdgeSummary ve = summary.getGroupEdgeSummary(i);
 				builder.append(';');
@@ -91,6 +91,10 @@ public class QosLogger extends AbstractQosLogger {
 				builder.append(this.formatDouble(ve.getMeanConsumerVertexInterarrivalTime()));
 				builder.append(';');
 				builder.append(this.formatDouble(ve.getMeanConsumerVertexInterarrivalTimeVariance()));
+				builder.append(';');
+				builder.append(this.formatDouble(ve.getMeanConsumerVertexLatency()));
+				builder.append(';');
+				builder.append(this.formatDouble(ve.getMeanConsumerVertexLatencyVariance()));
 			}			
 			nextIsVertex = !nextIsVertex;
 		}
@@ -113,10 +117,10 @@ public class QosLogger extends AbstractQosLogger {
 
 		for (SequenceElement sequenceElement : jobGraphSequence) {
 			if (sequenceElement.isVertex()) {
-				builder.append(';');
-				builder.append(sequenceElement.getName()+"Mean");
-				builder.append(';');
-				builder.append(sequenceElement.getName()+"Var");
+//				builder.append(';');
+//				builder.append(sequenceElement.getName()+"Mean");
+//				builder.append(';');
+//				builder.append(sequenceElement.getName()+"Var");
 			} else {
 				builder.append(';');
 				builder.append("edge" + edgeIndex + "obl");
@@ -130,7 +134,11 @@ public class QosLogger extends AbstractQosLogger {
 				builder.append("edge" + edgeIndex +"IAMean");
 				builder.append(';');
 				builder.append("edge" + edgeIndex +"IAVar");
-
+				builder.append(';');
+				builder.append("edge" + edgeIndex +"IRMean");
+				builder.append(';');
+				builder.append("edge" + edgeIndex +"IRVar");
+				
 				edgeIndex++;
 			}
 		}

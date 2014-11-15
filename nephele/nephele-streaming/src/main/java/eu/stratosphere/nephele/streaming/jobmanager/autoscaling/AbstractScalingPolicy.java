@@ -43,11 +43,15 @@ public abstract class AbstractScalingPolicy {
 		Map<JobVertexID, Integer> scalingActions = new HashMap<JobVertexID, Integer>();
 
 		for (QosConstraintSummary constraintSummary : constraintSummaries) {
-			collectScalingActionsForConstraint(
-					qosConstraints.get(constraintSummary.getLatencyConstraintID()),
-					constraintSummary, taskCpuLoads,
-					cpuLoadsSummaryAggreators.get(constraintSummary.getLatencyConstraintID()),
-					scalingActions);
+			if (constraintSummary.hasData()) {
+
+				collectScalingActionsForConstraint(
+						qosConstraints.get(constraintSummary
+								.getLatencyConstraintID()), constraintSummary,
+						taskCpuLoads,
+						cpuLoadsSummaryAggreators.get(constraintSummary
+								.getLatencyConstraintID()), scalingActions);
+			}
 		}
 
 		return scalingActions;

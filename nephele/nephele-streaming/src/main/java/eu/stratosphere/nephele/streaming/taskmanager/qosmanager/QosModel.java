@@ -665,4 +665,12 @@ public class QosModel {
 			LatencyConstraintID constraintID) {
 		return this.qosGraph.getConstraintByID(constraintID);
 	}
+	
+	public Collection<JobGraphLatencyConstraint> getJobGraphLatencyConstraints() {
+		return this.qosGraph.getConstraints();
+	}
+
+	public State getState() {
+		return this.state;
+	}
 }

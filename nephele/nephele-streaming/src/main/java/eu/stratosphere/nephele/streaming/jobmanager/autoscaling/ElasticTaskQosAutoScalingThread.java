@@ -8,7 +8,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -62,6 +66,12 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 	private final HashMap<JobVertexID, Integer> vertexTopologicalScores = new HashMap<JobVertexID, Integer>();
 
 	private AbstractScalingPolicy scalingPolicy;
+	
+	private ExecutorService threadPool = Executors.newSingleThreadExecutor();
+	
+	private Future<?> ongoingScalingActions = null;
+
+	private int cooldownPeriods = 6;
 
 	public ElasticTaskQosAutoScalingThread(ExecutionGraph execGraph,
 			HashMap<LatencyConstraintID, QosGraph> qosGraphs,
@@ -152,6 +162,7 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 		}
 	}
 
+		
 	@Override
 	public void run() {
 		try {
@@ -169,13 +180,22 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 					List<QosConstraintSummary> constraintSummaries = aggregateConstraintSummaries();
 					logConstraintSummaries(constraintSummaries);
 
-					Map<LatencyConstraintID, LatencyConstraintCpuLoadSummary> cpuLoadSummaries =
-							summarizeCpuUtilizations(taskCpuLoads);
+					Map<LatencyConstraintID, LatencyConstraintCpuLoadSummary> cpuLoadSummaries = summarizeCpuUtilizations(taskCpuLoads);
 					logCpuLoadSummaries(cpuLoadSummaries);
 
-					Map<JobVertexID, Integer> scalingActions = scalingPolicy.getScalingActions(
-							constraintSummaries, taskCpuLoads, cpuLoadSummaries);
-					applyScalingActions(scalingActions);
+					if (cooldownPeriods > 0) {
+						cooldownPeriods--;
+					} else if (ongoingScalingActions != null) {
+						if (ongoingScalingActions.isDone()) {
+							ongoingScalingActions = null;
+							cooldownPeriods = 3;
+						}
+					} else {
+						Map<JobVertexID, Integer> scalingActions = scalingPolicy
+								.getScalingActions(constraintSummaries,
+										taskCpuLoads, cpuLoadSummaries);
+						ongoingScalingActions = triggerScalingActions(scalingActions);
+					}
 
 					timeOfLastScaling = System.currentTimeMillis();
 					timeOfNextScaling = timeOfLastScaling
@@ -195,11 +215,10 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 		LOG.info("Qos Auto Scaling Thread stopped.");
 	}
 
-	private void applyScalingActions(Map<JobVertexID, Integer> scalingActions)
-			throws Exception {
+	private Future<?> triggerScalingActions(final Map<JobVertexID, Integer> scalingActions) {
 
 		// apply scaling actions in topological order
-		JobVertexID[] topoSortedVertexIds = scalingActions.keySet().toArray(
+		final JobVertexID[] topoSortedVertexIds = scalingActions.keySet().toArray(
 				new JobVertexID[0]);
 
 		Arrays.sort(topoSortedVertexIds, new Comparator<JobVertexID>() {
@@ -211,17 +230,35 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 			}
 		});
 
-		JobManager jm = JobManager.getInstance();
+		final JobManager jm = JobManager.getInstance();
 
-		for (JobVertexID vertexId : topoSortedVertexIds) {
-			int scalingAction = scalingActions.get(vertexId);
-			if (scalingAction > 0) {
-				jm.scaleUpElasticTask(jobID, vertexId, scalingAction);
-			} else {
-				jm.scaleDownElasticTask(jobID, vertexId, scalingAction);
+		Runnable scaler = new Runnable() {
+			@Override
+			public void run() {
+				try {
+					for (JobVertexID vertexId : topoSortedVertexIds) {
+						int scalingAction = scalingActions.get(vertexId);
+						if (scalingAction > 0) {
+							jm.scaleUpElasticTask(jobID, vertexId,
+									scalingAction);
+						}
+					}
+
+					for (JobVertexID vertexId : topoSortedVertexIds) {
+						int scalingAction = scalingActions.get(vertexId);
+						if (scalingAction < 0) {
+							jm.scaleDownElasticTask(jobID, vertexId,
+									scalingAction);
+
+						}
+					}
+				} catch (Exception e) {
+					LOG.error("Error during scaling action", e);
+				}
 			}
-		}
-
+		};
+		
+		return threadPool.submit(scaler);
 	}
 
 	private List<QosConstraintSummary> aggregateConstraintSummaries() {
@@ -309,6 +346,16 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 		scalingPolicy = null;
 
 		QosStatisticsServlet.removeJob(this.jobID);
+		
+		if (ongoingScalingActions != null) {
+			threadPool.shutdown();
+			try {
+				threadPool.awaitTermination(1, TimeUnit.SECONDS);
+			} catch (InterruptedException e) {
+				threadPool.shutdownNow();
+			}
+			threadPool = null;
+		}
 	}
 
 	private boolean scalingIsDue(long now) {

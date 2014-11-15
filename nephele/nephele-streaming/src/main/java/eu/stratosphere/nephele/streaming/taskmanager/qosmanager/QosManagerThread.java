@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -16,6 +17,7 @@ import eu.stratosphere.nephele.configuration.GlobalConfiguration;
 import eu.stratosphere.nephele.instance.InstanceConnectionInfo;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.jobmanager.JobManager;
+import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
 import eu.stratosphere.nephele.streaming.message.AbstractQosMessage;
 import eu.stratosphere.nephele.streaming.message.ChainUpdates;
@@ -73,17 +75,13 @@ public class QosManagerThread extends Thread {
 		int noOfVertexAnnounces = 0;
 		int noOfEdgeAnnounces = 0;
 		
-		public void logAndReset() {
-			logAndReset(0);
-		}
-		
-		public void logAndReset(long adjustmentOverhead) {
-			LOG.debug(String.format("total messages: %d (edge: %d lats and %d stats | vertex: %d | edgeReporters: %d | vertexReporters: %d) || enqueued: %d || buffersizeAdjustmentOverhead: %d",
+		public void logAndReset(QosModel.State state) {
+			LOG.debug(String.format("total messages: %d (edge: %d lats and %d stats | vertex: %d | edgeReporters: %d | vertexReporters: %d) || enqueued: %d || QosModel: %s",
 							noOfMessages, noOfEdgeLatencies,
 							noOfEdgeStatistics, noOfVertexLatencies,
 							noOfEdgeAnnounces, noOfVertexAnnounces,
 							streamingDataQueue.size(),
-							adjustmentOverhead));
+							state.toString()));
 
 			noOfMessages = 0;
 			noOfEdgeLatencies = 0;
@@ -145,15 +143,13 @@ public class QosManagerThread extends Thread {
 		try {
 			while (!interrupted()) {
 				AbstractQosMessage streamingData = this.streamingDataQueue
-						.poll(adjustmentInterval, TimeUnit.MILLISECONDS);
+						.poll(50, TimeUnit.MILLISECONDS);
 
-				if (streamingData == null) {
-					stats.logAndReset();
-					continue;
+				if (streamingData != null) {
+					stats.noOfMessages++;
+					processStreamingData(stats, streamingData);
 				}
 				
-				stats.noOfMessages++;
-				processStreamingData(stats, streamingData);
 				adjustIfNecessary(stats);
 			}
 
@@ -172,27 +168,46 @@ public class QosManagerThread extends Thread {
 			throws InterruptedException {
 
 		long beginAdjustTime = System.currentTimeMillis();
-		if (this.qosModel.isReady() && isAdjustmentNecessary(beginAdjustTime)) {
+		if (!isAdjustmentNecessary(beginAdjustTime)) {
+			return;
+		}
 
+		List<QosConstraintSummary> constraintSummaries = null;
+		
+		if (this.qosModel.isReady()) {
 			QosConstraintViolationListener listener = this.oblManager
 					.getQosConstraintViolationListener();
 
-			List<QosConstraintSummary> constraintSummaries = this.qosModel
-					.findQosConstraintViolationsAndSummarize(listener);
+			constraintSummaries = this.qosModel.findQosConstraintViolationsAndSummarize(listener);
 
 			this.oblManager.applyAndSendBufferAdjustments(beginAdjustTime);
 
-			sendConstraintSummariesToJm(constraintSummaries, beginAdjustTime);
-			if (JobManager.getInstance() == null) {
-				logConstraintSummaries(constraintSummaries);
-			}
-
-			long now = System.currentTimeMillis();
-			stats.logAndReset(now - beginAdjustTime);
-			this.refreshTimeOfNextAdjustment(now);
 		}
+		
+		if(constraintSummaries == null) {
+			constraintSummaries = createEmptyConstraintSummaries();
+		}
+		
+		sendConstraintSummariesToJm(constraintSummaries, beginAdjustTime);
+		if (JobManager.getInstance() == null) {
+			logConstraintSummaries(constraintSummaries);
+		}
+
+		long now = System.currentTimeMillis();
+		stats.logAndReset(qosModel.getState());
+		this.refreshTimeOfNextAdjustment(now);
 	}
 	
+	private List<QosConstraintSummary> createEmptyConstraintSummaries() {
+		List<QosConstraintSummary> emptySummaries = new LinkedList<QosConstraintSummary>();
+		
+		for(JobGraphLatencyConstraint constraint : qosModel.getJobGraphLatencyConstraints()) {		
+			emptySummaries.add(new QosConstraintSummary(constraint, new QosConstraintViolationReport(constraint)));
+		}
+		
+		return emptySummaries;
+	}
+
 	private boolean isAdjustmentNecessary(long now) {
 		return now >= this.timeOfNextAdjustment;
 	}
@@ -230,6 +245,8 @@ public class QosManagerThread extends Thread {
 					this.jmConnectionInfo,
 					new QosManagerConstraintSummaries(jobID, qosManagerID, timestamp, constraintSummaries));
 			
+		} else {
+			LOG.warn("Cannot send constraint summaries because QosManagerID is unknown");
 		}
 	}
 

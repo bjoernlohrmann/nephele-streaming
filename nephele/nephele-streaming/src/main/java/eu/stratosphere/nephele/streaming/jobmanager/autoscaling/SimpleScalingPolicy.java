@@ -1,5 +1,6 @@
 package eu.stratosphere.nephele.streaming.jobmanager.autoscaling;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -13,11 +14,12 @@ import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
 import eu.stratosphere.nephele.streaming.SequenceElement;
-import eu.stratosphere.nephele.streaming.message.CpuLoadClassifier;
-import eu.stratosphere.nephele.streaming.message.CpuLoadClassifier.CpuLoad;
+import eu.stratosphere.nephele.streaming.jobmanager.autoscaling.optimization.GG1Server;
+import eu.stratosphere.nephele.streaming.jobmanager.autoscaling.optimization.Rebalancer;
 import eu.stratosphere.nephele.streaming.message.TaskCpuLoadChange;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosConstraintSummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosGroupEdgeSummary;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosGroupVertexSummary;
 
 /**
  * Scaling policy that scales individual group vertices based on their CPU load
@@ -45,136 +47,81 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 			Map<JobVertexID, Integer> scalingActions)
 			throws UnexpectedVertexExecutionStateException {
 		
-		for (SequenceElement seqElem : constraint.getSequence()) {
-			if (seqElem.isEdge()) {
-
-				ExecutionGroupVertex consumerGroupVertex = getExecutionGraph()
-						.getExecutionGroupVertex(seqElem.getTargetVertexID());
-
-				if (!consumerGroupVertex.hasElasticNumberOfRunningSubtasks()) {
-					continue;
-				}
-
-				QosGroupEdgeSummary edgeSummary = constraintSummary.getGroupEdgeSummary(seqElem.getIndexInSequence());
-				double recordSendRate = edgeSummary.getMeanEmissionRate()
-						* edgeSummary.getActiveEmitterVertices();
-				double recordConsumptionRate = edgeSummary.getMeanConsumptionRate()
-						* edgeSummary.getActiveConsumerVertices();
-				
-				GroupVertexCpuLoadSummary cpuLoadSummary = summarizedCpuUtilizations
-						.get(seqElem.getTargetVertexID());
-				
-				LOG.debug(String.format("sendRate: %.1f | consumeRate: %.1f | avgCpuUtil: %.1f | hi:%d med:%d lo:%d\n",
-						recordSendRate, recordConsumptionRate, cpuLoadSummary.getAvgCpuUtilization(),
-						cpuLoadSummary.getHighs(), cpuLoadSummary.getMediums(), cpuLoadSummary.getLows()));
-
-				if (recordSendRate == 0 || recordConsumptionRate == 0) {
-					continue;
-				}
-				
-				double sendConsumeRatio = recordSendRate / recordConsumptionRate;
-				
-				if (cpuLoadSummary.getAvgCpuLoad() == CpuLoad.HIGH
-						&& cpuLoadSummary.getLows() < 2
-						&& sendConsumeRatio >= CpuLoadClassifier.HIGH_THRESHOLD_PERCENT / 100.0) {
-
-					// in general, scale up if the consumer task's avg cpu
-					// utilization is high, with one exception:
-					// don't do anything, if the sender has already
-					// significantly reduced its sending rate but the
-					// consumer task is busy working off already queued data. In
-					// this case it is better
-					// not to scale out and just wait until the queued data has
-					// been processed.
-
-					addScaleUpAction(seqElem, edgeSummary, scalingActions);
-
-				} else if (cpuLoadSummary.getAvgCpuLoad() == CpuLoad.LOW
-						&& cpuLoadSummary.getHighs() < 2
-						&& sendConsumeRatio >= CpuLoadClassifier.HIGH_THRESHOLD_PERCENT / 100.0) {
-
-					addScaleDownAction(seqElem, edgeSummary,
-							cpuLoadSummary.getAvgCpuUtilization() / 100.0, scalingActions);
-				}
+		
+		if(constraintSummary.getViolationReport().getMeanSequenceLatency() > constraint.getLatencyConstraintInMillis()) {
+			// constraint is violated on average
+			if(hasBottleneck(constraintSummary)) {
+				resolveBottleneck(constraint, constraintSummary, scalingActions);
+			} else {
+				rebalance(constraint, constraintSummary, scalingActions);
 			}
+		} else {
+			rebalance(constraint, constraintSummary, scalingActions);
 		}
+		
 		LOG.debug(scalingActions.toString());
 	}
 
-	private void addScaleUpAction(SequenceElement edge,
-			QosGroupEdgeSummary edgeSummary,
+	private void rebalance(JobGraphLatencyConstraint constraint,
+			QosConstraintSummary constraintSummary,
 			Map<JobVertexID, Integer> scalingActions) {
-
-		// midpoint between medium and high cpu load thresholds
-		double targetCpuUtil = (CpuLoadClassifier.MEDIUM_THRESHOLD_PERCENT + CpuLoadClassifier.HIGH_THRESHOLD_PERCENT) / 200.0;
-
-		int noOfSenderTasks = getExecutionGraph()
-				.getExecutionGroupVertex(edge.getSourceVertexID())
-				.getNumberOfRunningSubstasks();
-
-		// compute new number of consumer tasks so that future cpu utilization
-		// will be close to targetCpuUtil (assuming perfect load balancing,
-		// constant send rate and constant consumer capacity :-P ).
-		int newNoOfConsumerTasks = (int) Math
-				.ceil((edgeSummary.getMeanEmissionRate() * noOfSenderTasks)
-						/ (edgeSummary.getMeanConsumptionRate() * targetCpuUtil));
-
-		LOG.debug(String.format("SCALE-UP: newConsumers (before ulimits): %d\n", newNoOfConsumerTasks));
 		
-		// apply user defined limits
-		ExecutionGroupVertex consumer = getExecutionGraph()
-				.getExecutionGroupVertex(edge.getTargetVertexID());
-		newNoOfConsumerTasks = applyElasticityLimits(consumer,
-				newNoOfConsumerTasks);
+		
+		ArrayList<GG1Server> gg1Servers = new ArrayList<GG1Server>();
+		
+		int elasticVertices = 0;
 
-		// merge with possibly existing scaling action from another constraint
-		int scalingAction = newNoOfConsumerTasks
-				- consumer.getNumberOfRunningSubstasks();
-		if (scalingAction != 0) {
-			if (scalingActions.containsKey(consumer.getJobVertexID())) {
-				scalingAction = Math.max(scalingAction,
-						scalingActions.get(consumer.getJobVertexID()));
+		// Computes available time for queuing by subtracting all unavoidable
+		// latencies (processing time, queue wait before
+		// of non-elastic vertices) from the constraint time. 
+		double availableQueueTime = constraint.getLatencyConstraintInMillis();
+		for (SequenceElement seqElem : constraint.getSequence()) {
+			if (seqElem.isEdge()) {
+				ExecutionGroupVertex consumerGroupVertex = getExecutionGraph()
+						.getExecutionGroupVertex(seqElem.getTargetVertexID());
+
+				QosGroupEdgeSummary edgeSummary = constraintSummary.getGroupEdgeSummary(seqElem.getIndexInSequence());
+				
+				if (!consumerGroupVertex.hasElasticNumberOfRunningSubtasks()) {
+					availableQueueTime -= edgeSummary.getTransportLatencyMean();
+					continue;
+				}
+				
+				elasticVertices++;
+				
+				gg1Servers.add(new GG1Server(consumerGroupVertex
+						.getJobVertexID(), consumerGroupVertex
+						.getMinElasticNumberOfRunningSubtasks(),
+						consumerGroupVertex.getMaxElasticNumberOfRunningSubtasks(),
+						edgeSummary));
+				
+			} else {
+				QosGroupVertexSummary vertexSummary = constraintSummary.getGroupVertexSummary(seqElem.getIndexInSequence());
+				availableQueueTime -= vertexSummary.getMeanVertexLatency();
 			}
-			scalingActions.put(consumer.getJobVertexID(), scalingAction);
+		}
+		
+		// So availableQueueTime is now the max time available for output buffer latency and queue waiting
+		// before elastic tasks. Output buffer latency will "magically" adapts itself, however we
+		// reserve 75% of the remaining availableQueueTime for it.
+		availableQueueTime *= 0.25 * 0.8;
+		
+		Rebalancer reb = new Rebalancer(gg1Servers, availableQueueTime);
+		
+		if (availableQueueTime > 0 && reb.computeRebalancedParallelism()) {
+			LOG.debug("RestoreConstraint: " + reb.getScalingActions());
+			scalingActions.putAll(reb.getScalingActions());
+		} else {
+			LOG.warn(String.format("Could not find a suitable scale-out for the current situation (available queue time: %.3fms)", availableQueueTime));
 		}
 	}
 
-	private void addScaleDownAction(SequenceElement edge,
-			QosGroupEdgeSummary edgeSummary, double consumerCpuUtil,
-			Map<JobVertexID, Integer> scalingActions) {
+	private void resolveBottleneck(JobGraphLatencyConstraint constraint, QosConstraintSummary constraintSummary, Map<JobVertexID, Integer> scalingActions) {
+		// TODO Auto-generated method stub
+	}
 
-		// midpoint between medium and high cpu load thresholds
-		double targetCpuUtil = (CpuLoadClassifier.MEDIUM_THRESHOLD_PERCENT + CpuLoadClassifier.HIGH_THRESHOLD_PERCENT) / 200.0;
-
-		ExecutionGroupVertex consumer = getExecutionGraph()
-				.getExecutionGroupVertex(edge.getTargetVertexID());
-
-		int noOfConsumerTasks = consumer.getNumberOfRunningSubstasks();
-
-		double avgConsumeRate = edgeSummary.getMeanConsumptionRate();
-
-		double loadFactor = (consumerCpuUtil * noOfConsumerTasks)
-				/ avgConsumeRate;
-
-		int newNoOfConsumerTasks = (int) Math.ceil(loadFactor * avgConsumeRate
-				/ targetCpuUtil);
-
-		LOG.debug(String.format("SCALE-DOWN: newConsumers (before ulimits): %d\n", newNoOfConsumerTasks));
-		
-		// apply user defined limits
-		newNoOfConsumerTasks = applyElasticityLimits(consumer,
-				newNoOfConsumerTasks);
-
-		// merge with possibly existing scaling action from another constraint
-		int scalingAction = newNoOfConsumerTasks
-				- consumer.getNumberOfRunningSubstasks();
-		if (scalingAction != 0) {
-			if (scalingActions.containsKey(consumer.getJobVertexID())) {
-				scalingAction = Math.min(scalingAction,
-						scalingActions.get(consumer.getJobVertexID()));
-			}
-
-			scalingActions.put(consumer.getJobVertexID(), scalingAction);
-		}
+	private boolean hasBottleneck(QosConstraintSummary constraintSummary) {
+		// TODO Auto-generated method stub
+		return false;
 	}
 }
