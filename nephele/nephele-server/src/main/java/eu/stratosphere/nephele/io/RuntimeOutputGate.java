@@ -361,6 +361,14 @@ public class RuntimeOutputGate<T extends Record> extends AbstractGate<T> impleme
 	public synchronized void setOutputChannelSuspended(int index, boolean isSuspended) {
 
 		if (isSuspended != this.getOutputChannel(index).isSuspended()) {
+			if(!isSuspended) {
+				// initialize autoflush interval
+				int randomAutoflushInterval = this.getOutputChannel(
+						(int) (activeOutputChannels * Math.random()))
+						.getAutoflushInterval();
+				this.getOutputChannel(index).setAutoflushInterval(
+						randomAutoflushInterval);
+			}
 			this.getOutputChannel(index).setSuspended(isSuspended);
 			
 			switch(this.getGateState()) {

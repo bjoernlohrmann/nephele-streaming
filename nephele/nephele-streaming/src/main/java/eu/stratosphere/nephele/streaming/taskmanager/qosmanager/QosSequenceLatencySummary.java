@@ -18,7 +18,8 @@ public class QosSequenceLatencySummary {
 	private int noOfEdges;
 	private int noOfVertices;
 	private double sequenceLatency;
-	private double outputBufferLatencySum;
+	private double vertexLatencySum;
+	private double transportLatencySum;
 	private boolean isMemberQosDataFresh;
 
 	public QosSequenceLatencySummary(JobGraphSequence jobGraphSequence) {
@@ -51,7 +52,8 @@ public class QosSequenceLatencySummary {
 	
 	public void update(List<QosGraphMember> sequenceMembers) {
 		this.sequenceLatency = 0;
-		this.outputBufferLatencySum = 0;
+		this.vertexLatencySum = 0;
+		this.transportLatencySum = 0;
 		this.isMemberQosDataFresh = true;
 		
 		int index = 0;
@@ -64,12 +66,13 @@ public class QosSequenceLatencySummary {
 				this.memberLatencies[index][0] = vertexQos.getLatencyInMillis(inputGateIndex);
 				this.memberLatencies[index][1] = vertexQos.getLatencyVarianceInMillis(inputGateIndex);
 				sequenceLatency += this.memberLatencies[index][0];
+				vertexLatencySum += this.memberLatencies[index][0];
 			} else {
 				EdgeQosData edgeQos = ((QosEdge) member).getQosData();
 				this.memberLatencies[index][0] = edgeQos.estimateOutputBufferLatencyInMillis();
 				this.memberLatencies[index][1] = edgeQos.estimateTransportLatencyInMillis();
 				sequenceLatency += edgeQos.getChannelLatencyInMillis();
-				outputBufferLatencySum += this.memberLatencies[index][0];
+				transportLatencySum += this.memberLatencies[index][1];
 				this.isMemberQosDataFresh = this.isMemberQosDataFresh && hasFreshValues((QosEdge) member);
 			}
 
@@ -93,8 +96,12 @@ public class QosSequenceLatencySummary {
 		return sequenceLatency;
 	}
 
-	public double getOutputBufferLatencySum() {
-		return outputBufferLatencySum;
+	public double getVertexLatencySum() {
+		return vertexLatencySum;
+	}
+	
+	public double getTransportLatencySum() {
+		return transportLatencySum;
 	}
 	
 	public boolean isMemberQosDataFresh() {
@@ -107,9 +114,5 @@ public class QosSequenceLatencySummary {
 
 	public int getNoOfVertices() {
 		return noOfVertices;
-	}
-	
-	public double getNonOutputBufferLatency() {
-		return this.sequenceLatency - this.outputBufferLatencySum;
-	}
+	}	
 }

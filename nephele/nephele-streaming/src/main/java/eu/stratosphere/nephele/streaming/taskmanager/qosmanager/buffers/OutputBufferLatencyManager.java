@@ -91,11 +91,13 @@ public class OutputBufferLatencyManager {
 			QosSequenceLatencySummary qosSummary,
 			HashMap<QosEdge, Integer> edgesToAdjust) {
 
-		int uniformTargetObl = computeUniformTargetObl(
-				constraint, qosSummary);
+		double availLatPerChannel = computeAvailableChannelLatency(
+				constraint, qosSummary) / countUnchainedEdges(sequenceMembers);
 
+		int i=-1;
 		for (QosGraphMember member : sequenceMembers) {
-
+			i++;
+			
 			if (member.isVertex()) {
 				continue;
 			}
@@ -106,12 +108,34 @@ public class OutputBufferLatencyManager {
 			if (qosData.isInChain()) {
 				continue;
 			}
+			
+			double edgeTransportLatency = qosSummary.getMemberLatencies()[i][1];
+			int targetObl;
+			
+			if(edgeTransportLatency > 0.2 * availLatPerChannel) {
+				// queue wait is larger than 20% of available latency
+				// per channel.  in this case stick to the 80:20 rule,
+				// build in another 10% margin of safety, and
+				// trust in the autoscaler to adjust parallelism
+				// so that queue wait drops.
+				targetObl = (int) (availLatPerChannel * 0.8 * 0.9);
+			} else {
+				// queue wait is lower than 20%. in this case use
+				// the resulting "free" available channel latency
+				// for output buffering. And as always build in
+				// another 10% margin of safety.
+
+				targetObl = (int) (0.9 * (availLatPerChannel - edgeTransportLatency));
+			}
 
 			// do nothing if change is very small
 			ValueHistory<Integer> targetOblHistory = qosData.getTargetOblHistory();
-			if(targetOblHistory.hasEntries()) {
+			if (targetOblHistory.hasEntries()) {
 				int oldTargetObl = targetOblHistory.getLastEntry().getValue();
-				if (Math.abs(oldTargetObl - uniformTargetObl) / oldTargetObl < 0.05) {
+				
+				if (oldTargetObl == targetObl
+						|| (oldTargetObl != 0 && (Math.abs(oldTargetObl
+								- targetObl) / oldTargetObl) < 0.05)) {
 					continue;
 				}
 			}
@@ -119,34 +143,40 @@ public class OutputBufferLatencyManager {
 			// do nothing target output buffer latency on this edge is already being adjusted to
 			// a smaller value
 			if (!edgesToAdjust.containsKey(edge)
-					|| edgesToAdjust.get(edge) > uniformTargetObl) {
-				edgesToAdjust.put(qosData.getEdge(), uniformTargetObl);
+					|| edgesToAdjust.get(edge) > targetObl) {
+				edgesToAdjust.put(qosData.getEdge(), targetObl);
 			}
 		}
 	}
 
-	private int computeUniformTargetObl(
-			JobGraphLatencyConstraint constraint, QosSequenceLatencySummary qosSummary) {
-		
-		int toReturn;
-
-		if (constraint.getLatencyConstraintInMillis() > qosSummary.getNonOutputBufferLatency()) {
-			// regular case (nonOutputBufferLatency < constraint): we have a
-			// chance of meeting the constraint
-			// by telling the TM to adjust output buffer sizes
-			
-			toReturn = (int) (constraint.getLatencyConstraintInMillis() - qosSummary
-					.getNonOutputBufferLatency()) / qosSummary.getNoOfEdges();
-		} else {
-			// overload case (nonOutputBufferLatency >= constraint): we
-			// don't have a chance of meeting the constraint by
-			// adjusting output buffer sizes. in this case
-			// choose a sensible default
-			
-			toReturn = (int) constraint.getLatencyConstraintInMillis() / qosSummary.getNoOfEdges();
+	private int countUnchainedEdges(List<QosGraphMember> sequenceMembers) {
+		int unchainedCount = 0;
+		for (QosGraphMember member : sequenceMembers) {
+			if (member.isEdge() && !((QosEdge) member).getQosData().isInChain()) {
+				unchainedCount++;
+			}
 		}
-		
-		return Math.max(1, toReturn);
+		return unchainedCount;
+	}
+
+	private double computeAvailableChannelLatency(JobGraphLatencyConstraint constraint,
+			QosSequenceLatencySummary qosSummary) {
+
+		double toReturn;
+
+		if (constraint.getLatencyConstraintInMillis() > qosSummary.getVertexLatencySum()) {
+			// regular case we have a chance of meeting the constraint by
+			// adjusting output buffer sizes here and trusting
+			// in the autoscaler to adjust transport latency
+			toReturn = constraint.getLatencyConstraintInMillis() - qosSummary.getVertexLatencySum();
+
+		} else {
+			// overload case (vertexLatencySum >= constraint): we
+			// don't have a chance of meeting the constraint at all
+			toReturn = 0;
+		}
+
+		return toReturn;
 	}
 
 	private void setTargetOutputBufferLatency(QosEdge edge, int targetObl)

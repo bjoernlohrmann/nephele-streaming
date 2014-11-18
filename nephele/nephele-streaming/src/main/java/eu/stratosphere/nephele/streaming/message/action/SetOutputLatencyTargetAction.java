@@ -88,9 +88,9 @@ public final class SetOutputLatencyTargetAction extends
 					"Argument sourceChannelID must not be null");
 		}
 
-		if (outputBufferLatencyTarget <= 0) {
+		if (outputBufferLatencyTarget < 0) {
 			throw new IllegalArgumentException(
-					"Argument outputBufferLatencyTarget must be greather than zero");
+					"Argument outputBufferLatencyTarget must be >= 0");
 		}
 
 		this.vertexID = vertexID;

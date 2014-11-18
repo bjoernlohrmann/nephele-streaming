@@ -66,7 +66,7 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 
 	private long lastFlushDeadlineMissNanos = 0;
 	
-	private int autoflushIntervalMillis = 20;
+	private int autoflushIntervalMillis = 9;
 
 	private static final Log LOG = LogFactory.getLog(AbstractByteBufferedOutputChannel.class);
 
@@ -313,6 +313,10 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 	
 	public void setAutoflushInterval(int newAutoflushIntervalMillis) {
 		this.autoflushIntervalMillis = newAutoflushIntervalMillis;
+	}
+	
+	public int getAutoflushInterval() {
+		return this.autoflushIntervalMillis;
 	}
 
 	public void limitBufferSize(int newOutputBufferSize) {

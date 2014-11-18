@@ -118,4 +118,9 @@ public abstract class AbstractOutputChannel<T extends Record> extends AbstractCh
 	}
 
 	public abstract void processPendingEvents() throws IOException, InterruptedException;
+
+	
+	public abstract void setAutoflushInterval(int newAutoflushIntervalMillis);
+	
+	public abstract int getAutoflushInterval();
 }
