@@ -1426,8 +1426,8 @@ public class JobManager implements DeploymentManager, ExtendedManagementProtocol
 		this.scheduler.scaleUpElasticTask(jobID, jobVertexID, noOfSubtasksToStart);
 	}
 
-	public void scaleDownElasticTask(JobID jobID, JobVertexID jobVertexID, final int noOfSubtasksToStart) throws Exception {
-		this.scheduler.scaleDownElasticTask(jobID, jobVertexID, noOfSubtasksToStart);
+	public void scaleDownElasticTask(JobID jobID, JobVertexID jobVertexID, final int noOfSubtasksToSuspend) throws Exception {
+		this.scheduler.scaleDownElasticTask(jobID, jobVertexID, noOfSubtasksToSuspend);
 	}
 
 	public ExecutionGroupVertex getExecutionGroupVertex(JobID jobID, JobVertexID jobVertexID) {

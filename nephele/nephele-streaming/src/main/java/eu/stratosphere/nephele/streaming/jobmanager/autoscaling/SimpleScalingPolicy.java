@@ -58,7 +58,7 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 				rebalance(constraint, constraintSummary, scalingActions, false);
 			}
 		} else {
-			rebalance(constraint, constraintSummary, scalingActions, false);
+			rebalance(constraint, constraintSummary, scalingActions, true);
 		}
 		
 		LOG.debug(String.format("%d %s", QosUtils.alignToInterval(

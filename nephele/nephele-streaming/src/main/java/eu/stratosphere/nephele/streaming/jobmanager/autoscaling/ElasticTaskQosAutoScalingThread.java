@@ -251,7 +251,7 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 						int scalingAction = scalingActions.get(vertexId);
 						if (scalingAction < 0) {
 							jm.scaleDownElasticTask(jobID, vertexId,
-									scalingAction);
+									- scalingAction);
 
 						}
 					}
