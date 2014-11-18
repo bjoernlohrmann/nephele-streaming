@@ -1,6 +1,7 @@
 package eu.stratosphere.nephele.streaming.jobmanager.autoscaling.optimization;
 
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 
 import java.util.ArrayList;
 import java.util.Map;
@@ -34,12 +35,11 @@ public class RebalancerTest {
 		assertTrue(result.size() == servers.size());
 		for (GG1Server server : servers) {
 			JobVertexID id = server.getGroupVertexID();
-			assertTrue(server.getLowerBoundParallelism() <= result.get(id)
-					&& result.get(id) <= server.getUpperBoundParallelism());
+			assertTrue(server.getLowerBoundParallelism() <= result.get(id));
+			assertTrue(result.get(id) <= server.getUpperBoundParallelism());
 			assertTrue(server.getMeanUtilization(result.get(id)) < 1);
 		}
 	}
-	
 
 	@Test
 	public void testRebalanceWith10Edges() {
@@ -82,5 +82,27 @@ public class RebalancerTest {
 		
 		servers.add(new GG1Server(new JobVertexID(), 1, 100, GG1ServerTest.getEdge2()));
 		return servers;
+	}
+	
+	@Test
+	public void testImpossibleRebalance() {
+		ArrayList<GG1Server> servers = new ArrayList<GG1Server>();
+		servers.add(new GG1Server(new JobVertexID(), 1, 210, GG1ServerTest.getEdge1()));
+		servers.add(new GG1Server(new JobVertexID(), 1, 100, GG1ServerTest.getEdge2()));
+		
+		Rebalancer reb = new Rebalancer(servers, 4);
+		assertFalse(reb.computeRebalancedParallelism());
+		assertSolutionIsCompleteAndValid(servers, reb);
+		
+		int resultCost = reb.getRebalancedParallelismCost();
+		assertTrue(resultCost == 210+100);
+		
+		Map<JobVertexID, Integer> result = reb.getRebalancedParallelism();
+		assertTrue(result.size() == servers.size());
+		for (GG1Server server : servers) {
+			JobVertexID id = server.getGroupVertexID();
+			assertTrue(server.getLowerBoundParallelism() <= result.get(id));
+			assertTrue(result.get(id) <= server.getUpperBoundParallelism());
+		}
 	}
 }

@@ -20,6 +20,8 @@ import eu.stratosphere.nephele.streaming.message.TaskCpuLoadChange;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosConstraintSummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosGroupEdgeSummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosGroupVertexSummary;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosUtils;
+import eu.stratosphere.nephele.streaming.util.StreamPluginConfig;
 
 /**
  * Scaling policy that scales individual group vertices based on their CPU load
@@ -53,28 +55,30 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 			if(hasBottleneck(constraintSummary)) {
 				resolveBottleneck(constraint, constraintSummary, scalingActions);
 			} else {
-				rebalance(constraint, constraintSummary, scalingActions);
+				rebalance(constraint, constraintSummary, scalingActions, false);
 			}
 		} else {
-			rebalance(constraint, constraintSummary, scalingActions);
+			rebalance(constraint, constraintSummary, scalingActions, false);
 		}
 		
-		LOG.debug(scalingActions.toString());
+		LOG.debug(String.format("%d %s", QosUtils.alignToInterval(
+				System.currentTimeMillis(),
+				StreamPluginConfig.getAdjustmentIntervalMillis()) / 1000,
+				scalingActions.toString()));
 	}
 
 	private void rebalance(JobGraphLatencyConstraint constraint,
 			QosConstraintSummary constraintSummary,
-			Map<JobVertexID, Integer> scalingActions) {
-		
+			Map<JobVertexID, Integer> scalingActions,
+			boolean allowScaleDown) {
 		
 		ArrayList<GG1Server> gg1Servers = new ArrayList<GG1Server>();
 		
-		int elasticVertices = 0;
-
-		// Computes available time for queuing by subtracting all unavoidable
+		// Computes available time for queueing by subtracting all unavoidable
 		// latencies (processing time, queue wait before
 		// of non-elastic vertices) from the constraint time. 
 		double availableQueueTime = constraint.getLatencyConstraintInMillis();
+		
 		for (SequenceElement seqElem : constraint.getSequence()) {
 			if (seqElem.isEdge()) {
 				ExecutionGroupVertex consumerGroupVertex = getExecutionGraph()
@@ -82,37 +86,57 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 
 				QosGroupEdgeSummary edgeSummary = constraintSummary.getGroupEdgeSummary(seqElem.getIndexInSequence());
 				
-				if (!consumerGroupVertex.hasElasticNumberOfRunningSubtasks()) {
+				if (consumerGroupVertex.hasElasticNumberOfRunningSubtasks()) {
+					
+					int minParallelism = consumerGroupVertex
+							.getMinElasticNumberOfRunningSubtasks();
+					
+					if (!allowScaleDown) {
+						minParallelism = edgeSummary.getActiveConsumerVertices();
+					}
+					
+					gg1Servers.add(new GG1Server(consumerGroupVertex
+							.getJobVertexID(), minParallelism,
+							consumerGroupVertex.getMaxElasticNumberOfRunningSubtasks(),
+							edgeSummary));
+				} else {
+					availableQueueTime -= edgeSummary.getOutputBufferLatencyMean();
 					availableQueueTime -= edgeSummary.getTransportLatencyMean();
-					continue;
 				}
-				
-				elasticVertices++;
-				
-				gg1Servers.add(new GG1Server(consumerGroupVertex
-						.getJobVertexID(), consumerGroupVertex
-						.getMinElasticNumberOfRunningSubtasks(),
-						consumerGroupVertex.getMaxElasticNumberOfRunningSubtasks(),
-						edgeSummary));
-				
 			} else {
 				QosGroupVertexSummary vertexSummary = constraintSummary.getGroupVertexSummary(seqElem.getIndexInSequence());
 				availableQueueTime -= vertexSummary.getMeanVertexLatency();
 			}
 		}
 		
-		// So availableQueueTime is now the max time available for output buffer latency and queue waiting
-		// before elastic tasks. Output buffer latency will "magically" adapts itself, however we
-		// reserve 75% of the remaining availableQueueTime for it.
-		availableQueueTime *= 0.25 * 0.8;
+		// So availableQueueTime right now is the time available for output
+		// buffer latency AND queue waiting before elastic tasks. According
+		// to the 80:20 rule, output buffer latency will adapt itself
+		// to be 80% of that, so we can take the remaining 20% for queueing
+		// (minus another 10% margin of safety).
+		availableQueueTime *= 0.2 * 0.9;
 		
 		Rebalancer reb = new Rebalancer(gg1Servers, availableQueueTime);
+		boolean rebalanceSuccess = false;
 		
-		if (availableQueueTime > 0 && reb.computeRebalancedParallelism()) {
-			LOG.debug("RestoreConstraint: " + reb.getScalingActions());
-			scalingActions.putAll(reb.getScalingActions());
-		} else {
-			LOG.warn(String.format("Could not find a suitable scale-out for the current situation (available queue time: %.3fms)", availableQueueTime));
+		if (availableQueueTime > 0) {
+			rebalanceSuccess = reb.computeRebalancedParallelism();
+			Map<JobVertexID, Integer> rebActions = reb.getScalingActions();
+			Map<JobVertexID, Integer> rebParallelism = reb.getRebalancedParallelism();
+			
+			StringBuilder strBuild = new StringBuilder();
+			for(JobVertexID id : rebActions.keySet()) {
+				strBuild.append(rebParallelism.get(id));
+				strBuild.append(String.format("(%d)", rebActions.get(id)));
+			}
+			
+			LOG.debug("Rebalance: " + strBuild.toString());
+			scalingActions.putAll(rebActions);
+		}
+		
+		if (!rebalanceSuccess) {
+			LOG.warn(String.format("Could not find a suitable scale-out for the current situation (available queue time: %.3fms)",
+							availableQueueTime));
 		}
 	}
 

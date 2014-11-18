@@ -67,28 +67,28 @@ public class Rebalancer {
 	public boolean computeRebalancedParallelism() {
 		int[] lowestCostP = null;
 		int lowestCost = Integer.MAX_VALUE;
+		boolean lowestCostPFound = false;
 
 		for (int i = 0; i < 10; i++) {
 			int[] newP = getRandomHighCostParallelism();
 
 			if (newP == null) {
-				// there is no solution to the problem.
+				lowestCostP = new int[gg1Servers.size()];
+				fillMaximum(lowestCostP);
+				lowestCost = computeCost(lowestCostP);
 				break;
 			}
 
 			int newPCost = minimizeCost(newP);
 			if (newPCost < lowestCost) {
+				lowestCostPFound = true;
 				lowestCostP = newP;
 				lowestCost = newPCost;
 			}
 		}
 
-		if (lowestCostP == null) {
-			return false;
-		} else {
-			setRebalancedParallelismWithCost(lowestCostP, lowestCost);
-			return true;
-		}
+		setRebalancedParallelismWithCost(lowestCostP, lowestCost);
+		return lowestCostPFound;
 	}
 
 	private void setRebalancedParallelismWithCost(int[] lowestCostP, int lowestCost) {
@@ -97,7 +97,12 @@ public class Rebalancer {
 		
 		for (int i = 0; i < lowestCostP.length; i++) {
 			rebalancedParallelism.put(gg1Servers.get(i).getGroupVertexID(), lowestCostP[i]);
-			scalingActions.put(gg1Servers.get(i).getGroupVertexID(), lowestCostP[i] - gg1Servers.get(i).getCurrentParallelism());
+			
+			int action = lowestCostP[i]
+					- gg1Servers.get(i).getCurrentParallelism();
+			if (action != 0) {
+				scalingActions.put(gg1Servers.get(i).getGroupVertexID(), action);
+			}
 		}
 		
 		rebalancedParallelismCost = lowestCost;

@@ -194,7 +194,10 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 						Map<JobVertexID, Integer> scalingActions = scalingPolicy
 								.getScalingActions(constraintSummaries,
 										taskCpuLoads, cpuLoadSummaries);
-						ongoingScalingActions = triggerScalingActions(scalingActions);
+						
+						if (!scalingActions.isEmpty()) {
+							ongoingScalingActions = triggerScalingActions(scalingActions);
+						}
 					}
 
 					timeOfLastScaling = System.currentTimeMillis();
