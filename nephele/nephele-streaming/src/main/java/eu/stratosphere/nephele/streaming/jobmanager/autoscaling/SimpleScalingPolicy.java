@@ -15,6 +15,7 @@ import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
 import eu.stratosphere.nephele.streaming.SequenceElement;
 import eu.stratosphere.nephele.streaming.jobmanager.autoscaling.optimization.GG1Server;
+import eu.stratosphere.nephele.streaming.jobmanager.autoscaling.optimization.GG1ServerKingman;
 import eu.stratosphere.nephele.streaming.jobmanager.autoscaling.optimization.Rebalancer;
 import eu.stratosphere.nephele.streaming.message.TaskCpuLoadChange;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosConstraintSummary;
@@ -95,7 +96,7 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 						minParallelism = edgeSummary.getActiveConsumerVertices();
 					}
 					
-					gg1Servers.add(new GG1Server(consumerGroupVertex
+					gg1Servers.add(new GG1ServerKingman(consumerGroupVertex
 							.getJobVertexID(), minParallelism,
 							consumerGroupVertex.getMaxElasticNumberOfRunningSubtasks(),
 							edgeSummary));
@@ -113,8 +114,8 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 		// buffer latency AND queue waiting before elastic tasks. According
 		// to the 80:20 rule, output buffer latency will adapt itself
 		// to be 80% of that, so we can take the remaining 20% for queueing
-		// (minus another 10% margin of safety).
-		availableQueueTime *= 0.2 * 0.9;
+		// (minus another 5% margin of safety).
+		availableQueueTime *= 0.2 * 0.95;
 		
 		Rebalancer reb = new Rebalancer(gg1Servers, availableQueueTime);
 		boolean rebalanceSuccess = false;

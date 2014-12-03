@@ -3,6 +3,7 @@ package eu.stratosphere.nephele.streaming.jobmanager.autoscaling.optimization;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.TreeSet;
 
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
 
@@ -12,48 +13,36 @@ public class Rebalancer {
 
 	private final double maxTotalQueueWait;
 
-	private Map<JobVertexID, Integer> rebalancedParallelism;
+	private final Map<JobVertexID, Integer> rebalancedParallelism = new HashMap<JobVertexID, Integer>();
 
+	private final HashMap<JobVertexID, Integer> scalingActions = new HashMap<JobVertexID, Integer>();
+	
 	private int rebalancedParallelismCost;
 
-	private HashMap<JobVertexID, Integer> scalingActions;
+	private class Gradient implements Comparable<Gradient> {
+		final int serverIndex;
+		double queueWait;
+		double gradient; // = queueWait(currParallelism+1) -
+							// queueWait(currParallelism)
 
-	public Rebalancer(ArrayList<GG1Server> gg1Servers, double maxTotalQueueWaitMillis) {
-		this.gg1Servers = gg1Servers;
-		this.maxTotalQueueWait = maxTotalQueueWaitMillis/1000;
-	}
-
-	private int minimizeCost(int[] newP) {
-
-		double currPQueueWait = computeQueueWait(newP);
-
-		while (true) {
-			int smallestGradientIndex = -1;
-			double smallestGradient = Double.MAX_VALUE;
-
-			for (int i = 0; i < newP.length; i++) {
-				GG1Server server = gg1Servers.get(i);
-
-				if (server.getLowerBoundParallelism() < newP[i]) {
-					double gradient = server.getKLBQueueWait(newP[i] - 1)
-							- server.getKLBQueueWait(newP[i]);
-					if (gradient < smallestGradient) {
-						smallestGradientIndex = i;
-						smallestGradient = gradient;
-					}
-				}
-			}
-
-			if (smallestGradientIndex != -1
-					&& currPQueueWait + smallestGradient <= maxTotalQueueWait) {
-				newP[smallestGradientIndex]--;
-				currPQueueWait += smallestGradient;
-			} else {
-				break;
-			}
+		public Gradient(int serverIndex) {
+			this.serverIndex = serverIndex;
 		}
 
-		return computeCost(newP);
+		@Override
+		public int compareTo(Gradient other) {
+			return Double.compare(gradient, other.gradient);
+		}
+
+		public boolean exists() {
+			return !Double.isInfinite(gradient);
+		}
+	}
+
+	public Rebalancer(ArrayList<GG1Server> gg1Servers,
+			double maxTotalQueueWaitMillis) {
+		this.gg1Servers = gg1Servers;
+		this.maxTotalQueueWait = maxTotalQueueWaitMillis / 1000;
 	}
 
 	private int computeCost(int[] newP) {
@@ -65,110 +54,127 @@ public class Rebalancer {
 	}
 
 	public boolean computeRebalancedParallelism() {
-		int[] lowestCostP = null;
-		int lowestCost = Integer.MAX_VALUE;
-		boolean lowestCostPFound = false;
+		int[] p = fillMaximum(new int[gg1Servers.size()]);
+		double pQueueWait = computeQueueWait(p);
 
-		for (int i = 0; i < 10; i++) {
-			int[] newP = getRandomHighCostParallelism();
+		// ensure feasibility
+		if (pQueueWait > maxTotalQueueWait) {
+			setRebalancedParallelismWithCost(p, computeCost(p));
+			return false;
+		}
 
-			if (newP == null) {
-				lowestCostP = new int[gg1Servers.size()];
-				fillMaximum(lowestCostP);
-				lowestCost = computeCost(lowestCostP);
-				break;
+		fillEffectiveMinimum(p);
+		pQueueWait = computeQueueWait(p);
+
+		TreeSet<Gradient> queueWaitGradients = initQueueWaitGradients(p);
+
+		while (pQueueWait > maxTotalQueueWait) {
+			Gradient lowestGrad = queueWaitGradients.pollFirst();
+			GG1Server lowestGradServer = gg1Servers.get(lowestGrad.serverIndex);
+
+			int newP = lowestGradServer
+					.computeParallelismForQueueWaitThreshold(maxTotalQueueWait
+							- pQueueWait + lowestGrad.queueWait);
+
+			if (queueWaitGradients.size() > 0) {
+				Gradient secLowestGrad = queueWaitGradients.first();
+				newP = Math
+						.min(lowestGradServer
+								.computeParallelismForGradientThreshold(secLowestGrad.gradient),
+								newP);
 			}
 
-			int newPCost = minimizeCost(newP);
-			if (newPCost < lowestCost) {
-				lowestCostPFound = true;
-				lowestCostP = newP;
-				lowestCost = newPCost;
+			if (p[lowestGrad.serverIndex] > newP) {
+				throw new RuntimeException("Stuff doesn't work.");
+			}
+
+			double newPQueueWait = lowestGradServer.getQueueWait(newP);
+			p[lowestGrad.serverIndex] = newP;
+			pQueueWait = pQueueWait - lowestGrad.queueWait + newPQueueWait;
+			lowestGrad.queueWait = newPQueueWait;
+			lowestGrad.gradient = lowestGradServer
+					.computeQueueWaitGradient(newP);
+
+			if (lowestGrad.exists()) {
+				queueWaitGradients.add(lowestGrad);
 			}
 		}
 
-		setRebalancedParallelismWithCost(lowestCostP, lowestCost);
-		return lowestCostPFound;
+		setRebalancedParallelismWithCost(p, computeCost(p));
+		return true;
 	}
 
-	private void setRebalancedParallelismWithCost(int[] lowestCostP, int lowestCost) {
-		rebalancedParallelism = new HashMap<JobVertexID, Integer>();
-		scalingActions = new HashMap<JobVertexID, Integer>();
-		
+	private TreeSet<Gradient> initQueueWaitGradients(int[] newP) {
+		TreeSet<Gradient> set = new TreeSet<Gradient>();
+
+		for (int i = 0; i < newP.length; i++) {
+			Gradient g = new Gradient(i);
+			g.queueWait = gg1Servers.get(i).getQueueWait(newP[i]);
+			g.gradient = gg1Servers.get(i).computeQueueWaitGradient(newP[i]);
+
+			if (g.exists()) {
+				set.add(g);
+			}
+
+		}
+		return set;
+	}
+
+	private void setRebalancedParallelismWithCost(int[] lowestCostP,
+			int lowestCost) {
+
 		for (int i = 0; i < lowestCostP.length; i++) {
-			rebalancedParallelism.put(gg1Servers.get(i).getGroupVertexID(), lowestCostP[i]);
-			
+			rebalancedParallelism.put(gg1Servers.get(i).getGroupVertexID(),
+					lowestCostP[i]);
+
 			int action = lowestCostP[i]
 					- gg1Servers.get(i).getCurrentParallelism();
 			if (action != 0) {
-				scalingActions.put(gg1Servers.get(i).getGroupVertexID(), action);
+				scalingActions
+						.put(gg1Servers.get(i).getGroupVertexID(), action);
 			}
 		}
-		
+
 		rebalancedParallelismCost = lowestCost;
 	}
 
 	private double computeQueueWait(int[] newP) {
 		double totalQueueWait = 0;
 		for (int i = 0; i < newP.length; i++) {
-			totalQueueWait += gg1Servers.get(i).getKLBQueueWait(newP[i]);
+			totalQueueWait += gg1Servers.get(i).getQueueWait(newP[i]);
 		}
 
 		return totalQueueWait;
 	}
 
-	/**
-	 * Returns a new set of randomized parallism parameters with queueWait <
-	 * maxTotalQueueWait.
-	 * 
-	 * @return new set of randomized parallism parameters, or null if none
-	 *         exist.
-	 */
-	private int[] getRandomHighCostParallelism() {
-		int[] newP = new int[gg1Servers.size()];
-
-		int attempts = 0;
-		while (attempts < 10) {
-			fillRandom(newP);
-
-			if (computeQueueWait(newP) < maxTotalQueueWait) {
-				return newP;
-			}
-
-			attempts++;
-		}
-
-		fillMaximum(newP);
-		if (computeQueueWait(newP) < maxTotalQueueWait) {
-			return newP;
-		}
-
-		return null;
-	}
-
-	private void fillMaximum(int[] newP) {
+	private int[] fillMaximum(int[] newP) {
 		for (int i = 0; i < gg1Servers.size(); i++) {
 			newP[i] = gg1Servers.get(i).getUpperBoundParallelism();
 		}
+		return newP;
 	}
 
-	private void fillRandom(int[] newP) {
+	private int[] fillEffectiveMinimum(int[] newP) {
 		for (int i = 0; i < gg1Servers.size(); i++) {
-			int currP = gg1Servers.get(i).getCurrentParallelism();
-			int maxP = gg1Servers.get(i).getUpperBoundParallelism();
-			newP[i] = (int) Math.ceil(currP + (maxP - currP) * Math.random());
+			newP[i] = gg1Servers.get(i).getLowerBoundParallelism();
 		}
+
+		return newP;
 	}
 
 	public Map<JobVertexID, Integer> getRebalancedParallelism() {
 		return rebalancedParallelism;
 	}
-	
+
 	public Map<JobVertexID, Integer> getScalingActions() {
 		return scalingActions;
 	}
 
 	public int getRebalancedParallelismCost() {
 		return rebalancedParallelismCost;
+	}
+
+	public double getMaxTotalQueueWait() {
+		return maxTotalQueueWait;
 	}
 }

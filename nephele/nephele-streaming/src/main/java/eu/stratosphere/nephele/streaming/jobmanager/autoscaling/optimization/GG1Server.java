@@ -3,27 +3,25 @@ package eu.stratosphere.nephele.streaming.jobmanager.autoscaling.optimization;
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosGroupEdgeSummary;
 
-public class GG1Server {
+public abstract class GG1Server {
 
 	private final JobVertexID groupVertexID;
 
-	private final double lambdaTotal;
+	protected final double lambdaTotal;
 
-	private final int p;
+	protected final int p;
 
-	private final double varA;
+	protected final double cA;
 
-	private final double S;
+	protected final double S;
 
-	private final double varS;
+	protected final double cS;
 
-	private final double cS;
+	protected final double fittingFactor;
 
-	private final double fittingFactor;
+	protected final int lowerBoundParallelism;
 
-	private final int lowerBoundParallelism;
-
-	private final int upperBoundParallelism;
+	protected final int upperBoundParallelism;
 
 	public GG1Server(JobVertexID groupVertexID, int minSubtasks,
 			int maxSubtasks, QosGroupEdgeSummary edgeSummary) {
@@ -33,16 +31,18 @@ public class GG1Server {
 		lambdaTotal = edgeSummary.getMeanEmissionRate()
 				* edgeSummary.getActiveEmitterVertices();
 		p = edgeSummary.getActiveConsumerVertices();
-		varA = edgeSummary.getMeanConsumerVertexInterarrivalTimeVariance() / (1000*1000);
 		S = edgeSummary.getMeanConsumerVertexLatency() / 1000;
-		varS = edgeSummary.getMeanConsumerVertexLatencyVariance() / (1000*1000);
 
 		// derived values
-		cS = Math.sqrt(varS) / S;
-		fittingFactor = edgeSummary.getTransportLatencyMean() / 1000
-				/ getKLBQueueWaitUnadjusted(p);
-		lowerBoundParallelism = Math.max((int) Math.ceil(lambdaTotal * S),
-				minSubtasks);
+		double varS = edgeSummary.getMeanConsumerVertexLatencyVariance() / (1000*1000);
+		double varA = edgeSummary.getMeanConsumerVertexInterarrivalTimeVariance() / (1000*1000);
+		cS = Math.sqrt(varS) / S; 
+		cA = Math.sqrt(varA) * lambdaTotal / p;
+		
+		fittingFactor = (edgeSummary.getTransportLatencyMean() / 1000)
+				/ getQueueWaitUnfitted(p);
+		lowerBoundParallelism = Math.min(Math.max((int) Math.ceil(lambdaTotal * S),
+				minSubtasks), maxSubtasks);
 		upperBoundParallelism = maxSubtasks;
 	}
 
@@ -50,48 +50,34 @@ public class GG1Server {
 		return groupVertexID;
 	}
 
-	private double getKingmanQueueWait(int newP, double rho, double newA,
-			double cA) {
-		double left = rho * S / (1 - rho);
-		double right = ((cA * cA) + (cS * cS)) / 2;
-
-		return left * right;
-	}
-
-	private double getKLBCorrectionFactor(int newP, double rho, double newA,
-			double cA) {
-		double exponent;
-
-		if (cA > 1) {
-			exponent = (-1) * (1 - rho) * (cA * cA - 1)
-					/ (cA * cA + 4 * cS * cS);
-		} else {
-			exponent = (-2 * (1 - rho) * (1 - cA * cA) * (1 - cA * cA))
-					/ (3 * rho * (cA * cA + cS * cS));
-		}
-
-		return Math.exp(exponent);
-	}
-
-	private double getKLBQueueWaitUnadjusted(int newP) {
+	protected abstract double getQueueWaitUnfitted(int newP, double rho);
+	
+	private double getQueueWaitUnfitted(int newP) {
 		double rho = getMeanUtilization(newP);
-		double newA = newP / lambdaTotal;
-		double cA = Math.sqrt(varA) / newA;
 
 		if (rho < 1) {
-			return getKingmanQueueWait(newP, rho, newA, cA)
-					* getKLBCorrectionFactor(newP, rho, newA, cA);
+			return getQueueWaitUnfitted(newP, rho);
 		} else {
-			return Double.NaN;
+			return Double.POSITIVE_INFINITY;
 		}
 	}
-
-	public double getKLBQueueWait(int newP) {
-		return getKLBQueueWaitUnadjusted(newP) * fittingFactor;
+	
+	public double getQueueWait(int newP) {
+		return getQueueWaitUnfitted(newP) * fittingFactor;
 	}
 
 	public int getLowerBoundParallelism() {
 		return lowerBoundParallelism;
+	}
+		
+	public double computeQueueWaitGradient(int newP) {
+		if (newP >= getUpperBoundParallelism()) {
+			return Double.POSITIVE_INFINITY;
+		} else if (newP < getLowerBoundParallelism()) {
+			return Double.NEGATIVE_INFINITY;
+		} else {
+			return getQueueWait(newP + 1) - getQueueWait(newP);
+		}
 	}
 
 	public int getUpperBoundParallelism() {
@@ -104,5 +90,88 @@ public class GG1Server {
 	
 	public double getMeanUtilization(int newP) {
 		return S * lambdaTotal / newP;
+	}
+
+	
+	/**
+	 * Returns a degree of parallelism so that its queue wait gradient
+	 * {@link #computeQueueWaitGradient(int)} is greater or equal to the given
+	 * threshold.
+	 * 
+	 * @param gradientThreshold
+	 *            A negative floating point value indication the minimum desired
+	 *            queue wait gradient.
+	 * 
+	 * @return A value between {@link #effectiveLowerBoundParallelism} and
+	 *         {@link #upperBoundParallelism} (both inclusive).
+	 * 
+	 */
+	public int computeParallelismForGradientThreshold(double gradientThreshold) {		
+		double a = fittingFactor * lambdaTotal * S * S * (cA * cA + cS * cS) / 2;
+		double b = lambdaTotal * S;
+		double c = gradientThreshold;
+
+		// we are looking for a new parallelism x so that the queueWaitGradient
+		// is >= c, or in other words, we are looking for an x s.t.
+		// a/(x+1-b) - a/(x-b) >= c
+		//
+		// these are the p,q from pq-formula for solving the quadratic equation
+		// a/(x+1-b) - a/(x-b) == c
+		double p = 1 - 2 * b;
+		double q = (a + c * (b * b - b)) / c;
+
+		// since the pq formula gives us two solutions for x, we always take the larger 
+		// one (the smaller one is invalid)
+		double x = -(p / 2) + Math.sqrt(p*p - 4*q)/2;
+
+		if (Double.isNaN(x)) {
+			throw new RuntimeException(
+					"Could not compute parallelism for a queue wait gradient threshold. This is a bug.");
+		}
+		
+		int ret = (int) Math.min(upperBoundParallelism,
+				Math.max(lowerBoundParallelism, Math.floor(x + 1)));
+		
+		int upDiff = 0;
+		while (computeQueueWaitGradient(ret + upDiff) < gradientThreshold) {
+			upDiff++;
+		}
+
+		int downDiff = 0;
+		while (computeQueueWaitGradient(ret - downDiff - 1) >= gradientThreshold) {
+			downDiff++;
+		}
+		
+		return ret + upDiff - downDiff;
+	}
+	
+	/**
+	 * Returns a degree of parallelism so that the queue wait time
+	 * {@link #getQueueWait(int)} is lower or equal to the given
+	 * threshold. If no valid value can be found, the upper bound on parallelism
+	 * is returned.
+	 * 
+	 * @param queueWaitThreshold
+	 * @return A value from between {@link #effectiveLowerBoundParallelism} and
+	 *         {@link #upperBoundParallelism} (both inclusive).
+	 * 
+	 */
+	public int computeParallelismForQueueWaitThreshold(double queueWaitThreshold) {
+		// determine feasibility
+		if (getQueueWait(upperBoundParallelism) > queueWaitThreshold) {
+			return upperBoundParallelism;
+		}
+		
+		double a = fittingFactor * lambdaTotal * S * S * (cA * cA + cS * cS) / 2;
+		double b = lambdaTotal * S;
+		
+		// we are looking for a parallelism x so that the queue wait time is
+		// <= w, or in other words, we for a parallelism x so that
+		// a/(x-b) <= queueWaitThreshold
+		
+		double x = (a / queueWaitThreshold) + b;
+		
+		return (int) Math.min(upperBoundParallelism,
+				Math.max(lowerBoundParallelism, Math.floor(x + 1)));
 	}
 }
