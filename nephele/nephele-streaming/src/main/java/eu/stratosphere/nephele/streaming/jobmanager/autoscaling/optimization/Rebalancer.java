@@ -19,6 +19,8 @@ public class Rebalancer {
 	
 	private int rebalancedParallelismCost;
 
+	private double rebalancedQueueWait;
+
 	private class Gradient implements Comparable<Gradient> {
 		final int serverIndex;
 		double queueWait;
@@ -59,7 +61,7 @@ public class Rebalancer {
 
 		// ensure feasibility
 		if (pQueueWait > maxTotalQueueWait) {
-			setRebalancedParallelismWithCost(p, computeCost(p));
+			setRebalancedParallelism(p);
 			return false;
 		}
 
@@ -100,7 +102,7 @@ public class Rebalancer {
 			}
 		}
 
-		setRebalancedParallelismWithCost(p, computeCost(p));
+		setRebalancedParallelism(p);
 		return true;
 	}
 
@@ -120,14 +122,13 @@ public class Rebalancer {
 		return set;
 	}
 
-	private void setRebalancedParallelismWithCost(int[] lowestCostP,
-			int lowestCost) {
+	private void setRebalancedParallelism(int[] newP) {
 
-		for (int i = 0; i < lowestCostP.length; i++) {
+		for (int i = 0; i < newP.length; i++) {
 			rebalancedParallelism.put(gg1Servers.get(i).getGroupVertexID(),
-					lowestCostP[i]);
+					newP[i]);
 
-			int action = lowestCostP[i]
+			int action = newP[i]
 					- gg1Servers.get(i).getCurrentParallelism();
 			if (action != 0) {
 				scalingActions
@@ -135,7 +136,8 @@ public class Rebalancer {
 			}
 		}
 
-		rebalancedParallelismCost = lowestCost;
+		rebalancedParallelismCost = computeCost(newP);
+		rebalancedQueueWait = computeQueueWait(newP);
 	}
 
 	private double computeQueueWait(int[] newP) {
@@ -176,5 +178,9 @@ public class Rebalancer {
 
 	public double getMaxTotalQueueWait() {
 		return maxTotalQueueWait;
+	}
+
+	public double getRebalancedQueueWait() {
+		return rebalancedQueueWait;
 	}
 }

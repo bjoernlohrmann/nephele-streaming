@@ -34,7 +34,7 @@ public class QosSequenceLatencySummary {
 			this.inputOutputGateCombinations[index] = new int[2];
 			if (sequenceElement.isVertex()) {
 				this.noOfVertices++;
-				this.memberLatencies[index] = new double[2];
+				this.memberLatencies[index] = new double[1];
 				this.inputOutputGateCombinations[index][0] = sequenceElement
 						.getInputGateIndex();
 				this.inputOutputGateCombinations[index][1] = sequenceElement
@@ -64,7 +64,6 @@ public class QosSequenceLatencySummary {
 				int inputGateIndex = this.inputOutputGateCombinations[index][0];
 
 				this.memberLatencies[index][0] = vertexQos.getLatencyInMillis(inputGateIndex);
-				this.memberLatencies[index][1] = vertexQos.getLatencyVarianceInMillis(inputGateIndex);
 				sequenceLatency += this.memberLatencies[index][0];
 				vertexLatencySum += this.memberLatencies[index][0];
 			} else {

@@ -32,12 +32,8 @@ public abstract class GG1Server {
 				* edgeSummary.getActiveEmitterVertices();
 		p = edgeSummary.getActiveConsumerVertices();
 		S = edgeSummary.getMeanConsumerVertexLatency() / 1000;
-
-		// derived values
-		double varS = edgeSummary.getMeanConsumerVertexLatencyVariance() / (1000*1000);
-		double varA = edgeSummary.getMeanConsumerVertexInterarrivalTimeVariance() / (1000*1000);
-		cS = Math.sqrt(varS) / S; 
-		cA = Math.sqrt(varA) * lambdaTotal / p;
+		cS = edgeSummary.getMeanConsumerVertexLatencyCV();
+		cA = edgeSummary.getMeanConsumerVertexInterarrivalTimeCV();
 		
 		fittingFactor = (edgeSummary.getTransportLatencyMean() / 1000)
 				/ getQueueWaitUnfitted(p);

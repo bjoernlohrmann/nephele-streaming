@@ -73,14 +73,14 @@ public class QosGroupEdgeSummary implements QosGroupElementSummary {
 	private double meanConsumerVertexLatency;
 
 	/**
-	 * See {@link #meanConsumerVertexLatency}. This is the mean of the vertex
-	 * latency variances.
+	 * See {@link #meanConsumerVertexLatency}. This is the mean coefficient of variation of
+	 * vertex latencies.
 	 */
-	private double meanConsumerVertexLatencyVariance;
+	private double meanConsumerVertexLatencyCV;
 
 	private double meanConsumerVertexInterarrivalTime;
 
-	private double meanConsumerVertexInterarrivalTimeVariance;
+	private double meanConsumerVertexInterarrivalTimeCV;
 
 	public QosGroupEdgeSummary() {
 	}
@@ -149,13 +149,13 @@ public class QosGroupEdgeSummary implements QosGroupElementSummary {
 		this.meanConsumerVertexLatency = meanConsumerVertexLatency;
 	}
 
-	public double getMeanConsumerVertexLatencyVariance() {
-		return meanConsumerVertexLatencyVariance;
+	public double getMeanConsumerVertexLatencyCV() {
+		return meanConsumerVertexLatencyCV;
 	}
 
-	public void setMeanConsumerVertexLatencyVariance(
-			double meanConsumerVertexLatencyVariance) {
-		this.meanConsumerVertexLatencyVariance = meanConsumerVertexLatencyVariance;
+	public void setMeanConsumerVertexLatencyCV(
+			double meanConsumerVertexLatencyCV) {
+		this.meanConsumerVertexLatencyCV = meanConsumerVertexLatencyCV;
 	}
 
 	public double getMeanConsumerVertexInterarrivalTime() {
@@ -167,13 +167,13 @@ public class QosGroupEdgeSummary implements QosGroupElementSummary {
 		this.meanConsumerVertexInterarrivalTime = meanConsumerVertexInterarrivalTime;
 	}
 
-	public double getMeanConsumerVertexInterarrivalTimeVariance() {
-		return meanConsumerVertexInterarrivalTimeVariance;
+	public double getMeanConsumerVertexInterarrivalTimeCV() {
+		return meanConsumerVertexInterarrivalTimeCV;
 	}
 
-	public void setMeanConsumerVertexInterarrivalTimeVariance(
-			double meanConsumerVertexInterarrivalTimeVariance) {
-		this.meanConsumerVertexInterarrivalTimeVariance = meanConsumerVertexInterarrivalTimeVariance;
+	public void setMeanConsumerVertexInterarrivalTimeCV(
+			double meanConsumerVertexInterarrivalTimeCV) {
+		this.meanConsumerVertexInterarrivalTimeCV = meanConsumerVertexInterarrivalTimeCV;
 	}
 
 	@Override
@@ -218,14 +218,14 @@ public class QosGroupEdgeSummary implements QosGroupElementSummary {
 			meanConsumerVertexLatency += toMerge.activeConsumerVertices
 					* toMerge.meanConsumerVertexLatency;
 
-			meanConsumerVertexLatencyVariance += toMerge.activeConsumerVertices
-					* toMerge.meanConsumerVertexLatencyVariance;
+			meanConsumerVertexLatencyCV += toMerge.activeConsumerVertices
+					* toMerge.meanConsumerVertexLatencyCV;
 
 			meanConsumerVertexInterarrivalTime += toMerge.activeConsumerVertices
 					* toMerge.meanConsumerVertexInterarrivalTime;
 
-			meanConsumerVertexInterarrivalTimeVariance += toMerge.activeConsumerVertices
-					* toMerge.meanConsumerVertexInterarrivalTimeVariance;
+			meanConsumerVertexInterarrivalTimeCV += toMerge.activeConsumerVertices
+					* toMerge.meanConsumerVertexInterarrivalTimeCV;
 		}
 
 		if (hasData()) {
@@ -236,9 +236,9 @@ public class QosGroupEdgeSummary implements QosGroupElementSummary {
 
 			meanConsumptionRate /= activeConsumerVertices;
 			meanConsumerVertexLatency /= activeConsumerVertices;
-			meanConsumerVertexLatencyVariance /= activeConsumerVertices;
+			meanConsumerVertexLatencyCV /= activeConsumerVertices;
 			meanConsumerVertexInterarrivalTime /= activeConsumerVertices;
-			meanConsumerVertexInterarrivalTimeVariance /= activeConsumerVertices;
+			meanConsumerVertexInterarrivalTimeCV /= activeConsumerVertices;
 		}
 	}
 
@@ -254,9 +254,9 @@ public class QosGroupEdgeSummary implements QosGroupElementSummary {
 		out.writeInt(activeConsumerVertices);
 		out.writeDouble(meanConsumptionRate);
 		out.writeDouble(meanConsumerVertexLatency);
-		out.writeDouble(meanConsumerVertexLatencyVariance);
+		out.writeDouble(meanConsumerVertexLatencyCV);
 		out.writeDouble(meanConsumerVertexInterarrivalTime);
-		out.writeDouble(meanConsumerVertexInterarrivalTimeVariance);
+		out.writeDouble(meanConsumerVertexInterarrivalTimeCV);
 
 	}
 
@@ -272,8 +272,8 @@ public class QosGroupEdgeSummary implements QosGroupElementSummary {
 		activeConsumerVertices = in.readInt();
 		meanConsumptionRate = in.readDouble();
 		meanConsumerVertexLatency = in.readDouble();
-		meanConsumerVertexLatencyVariance = in.readDouble();
+		meanConsumerVertexLatencyCV = in.readDouble();
 		meanConsumerVertexInterarrivalTime = in.readDouble();
-		meanConsumerVertexInterarrivalTimeVariance = in.readDouble();
+		meanConsumerVertexInterarrivalTimeCV = in.readDouble();
 	}
 }

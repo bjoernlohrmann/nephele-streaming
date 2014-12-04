@@ -521,8 +521,8 @@ public class QosModel {
 				
 				toFix.setMeanConsumerVertexLatency(succSummary
 						.getMeanVertexLatency());
-				toFix.setMeanConsumerVertexLatencyVariance(succSummary
-						.getMeanVertexLatencyVariance());
+				toFix.setMeanConsumerVertexLatencyCV(succSummary
+						.getMeanVertexLatencyCV());
 			} 
 		}
 	}
@@ -546,7 +546,7 @@ public class QosModel {
 
 		int activeVertices = 0;
 		double vertexLatencySum = 0;
-		double vertexLatencyVarianceSum = 0;
+		double vertexLatencyCASum = 0;
 
 		for (QosVertex memberVertex : groupVertex.getMembers()) {
 			VertexQosData qosData = memberVertex.getQosData();
@@ -555,7 +555,7 @@ public class QosModel {
 					inactivityThresholdTime)) {
 				activeVertices++;
 				vertexLatencySum += qosData.getLatencyInMillis(inputGateIndex);
-				vertexLatencyVarianceSum += qosData.getLatencyVarianceInMillis(inputGateIndex);
+				vertexLatencyCASum += qosData.getLatencyCV(inputGateIndex);
 			}
 		}
 
@@ -564,7 +564,7 @@ public class QosModel {
 			groupVertexSummary.setMeanVertexLatency(vertexLatencySum
 					/ activeVertices);
 			groupVertexSummary
-					.setMeanVertexLatencyVariance(vertexLatencyVarianceSum
+					.setMeanVertexLatencyCV(vertexLatencyCASum
 							/ activeVertices);
 		}
 	}
@@ -579,7 +579,7 @@ public class QosModel {
 		int activeConsumerVertices = 0;
 		double consumptionRateSum = 0;
 		double interarrivalTimeSum = 0;
-		double interarrivalTimeVarianceSum = 0;
+		double interarrivalTimeCASum = 0;
 
 		int inputGateIndex = seqElem.getInputGateIndex();
 		QosGroupVertex targetGroupVertex = qosGraph.getGroupVertexByID(seqElem
@@ -595,8 +595,8 @@ public class QosModel {
 						.getRecordsConsumedPerSec(inputGateIndex);
 				interarrivalTimeSum += qosData
 						.getInterArrivalTimeInMillis(inputGateIndex);
-				interarrivalTimeVarianceSum += qosData
-						.getInterArrivalTimeVarianceInMillis(inputGateIndex);
+				interarrivalTimeCASum += qosData
+						.getInterArrivalTimeCV(inputGateIndex);
 			}
 
 			for (QosEdge ingoingEdge : memberVertex
@@ -627,7 +627,7 @@ public class QosModel {
 					.setMeanConsumerVertexInterarrivalTime(interarrivalTimeSum
 							/ activeConsumerVertices);
 			groupEdgeSummary
-					.setMeanConsumerVertexInterarrivalTimeVariance(interarrivalTimeVarianceSum
+					.setMeanConsumerVertexInterarrivalTimeCV(interarrivalTimeCASum
 							/ activeConsumerVertices);
 			setSourceGroupVertexEmissionRate(seqElem, inactivityThresholdTime,
 					groupEdgeSummary);

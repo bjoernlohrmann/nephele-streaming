@@ -24,8 +24,8 @@ public class GG1ServerTest {
 		edge1.setActiveEmitterVertices(50);
 		edge1.setActiveConsumerVertices(50);
 		edge1.setMeanConsumerVertexLatency(0.08);
-		edge1.setMeanConsumerVertexLatencyVariance(0.0008);
-		edge1.setMeanConsumerVertexInterarrivalTimeVariance(2.42);
+		edge1.setMeanConsumerVertexLatencyCV(0.3535534);
+		edge1.setMeanConsumerVertexInterarrivalTimeCV(11.66726);
 		edge1.setTransportLatencyMean(8);
 		return edge1;
 	}
@@ -36,8 +36,8 @@ public class GG1ServerTest {
 		edge2.setActiveEmitterVertices(75);
 		edge2.setActiveConsumerVertices(50);
 		edge2.setMeanConsumerVertexLatency(0.04);
-		edge2.setMeanConsumerVertexLatencyVariance(0.01);
-		edge2.setMeanConsumerVertexInterarrivalTimeVariance(1.5);
+		edge2.setMeanConsumerVertexLatencyCV(2.5);
+		edge2.setMeanConsumerVertexInterarrivalTimeCV(13.77838);
 		edge2.setTransportLatencyMean(3);
 		return edge2;
 	}
@@ -48,8 +48,8 @@ public class GG1ServerTest {
 		edge3.setActiveEmitterVertices(60);
 		edge3.setActiveConsumerVertices(50);
 		edge3.setMeanConsumerVertexLatency(0.09);
-		edge3.setMeanConsumerVertexLatencyVariance(0.00001);
-		edge3.setMeanConsumerVertexInterarrivalTimeVariance(0.5);
+		edge3.setMeanConsumerVertexLatencyCV(0.03513642);
+		edge3.setMeanConsumerVertexInterarrivalTimeCV(6.363961);
 		edge3.setTransportLatencyMean(7);
 		return edge3;
 	}

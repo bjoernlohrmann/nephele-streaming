@@ -90,11 +90,11 @@ public class QosLogger extends AbstractQosLogger {
 				builder.append(';');
 				builder.append(this.formatDouble(ve.getMeanConsumerVertexInterarrivalTime()));
 				builder.append(';');
-				builder.append(this.formatDouble(ve.getMeanConsumerVertexInterarrivalTimeVariance()));
+				builder.append(this.formatDouble(ve.getMeanConsumerVertexInterarrivalTimeCV()));
 				builder.append(';');
 				builder.append(this.formatDouble(ve.getMeanConsumerVertexLatency()));
 				builder.append(';');
-				builder.append(this.formatDouble(ve.getMeanConsumerVertexLatencyVariance()));
+				builder.append(this.formatDouble(ve.getMeanConsumerVertexLatencyCV()));
 			}			
 			nextIsVertex = !nextIsVertex;
 		}
@@ -131,13 +131,13 @@ public class QosLogger extends AbstractQosLogger {
 				builder.append(';');
 				builder.append("edge" + edgeIndex + "Consume");
 				builder.append(';');
-				builder.append("edge" + edgeIndex +"IAMean");
+				builder.append("edge" + edgeIndex +"IA-Mean");
 				builder.append(';');
-				builder.append("edge" + edgeIndex +"IAVar");
+				builder.append("edge" + edgeIndex +"IA-CV");
 				builder.append(';');
-				builder.append("edge" + edgeIndex +"IRMean");
+				builder.append("edge" + edgeIndex +"IR-Mean");
 				builder.append(';');
-				builder.append("edge" + edgeIndex +"IRVar");
+				builder.append("edge" + edgeIndex +"IR-CV");
 				
 				edgeIndex++;
 			}

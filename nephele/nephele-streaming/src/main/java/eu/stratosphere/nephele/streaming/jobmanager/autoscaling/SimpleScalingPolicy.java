@@ -89,11 +89,11 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 				
 				if (consumerGroupVertex.hasElasticNumberOfRunningSubtasks()) {
 					
-					int minParallelism = consumerGroupVertex
-							.getMinElasticNumberOfRunningSubtasks();
+					// limit the max scale-down 
+					int minParallelism = consumerGroupVertex.getMinElasticNumberOfRunningSubtasks();
 					
 					if (!allowScaleDown) {
-						minParallelism = edgeSummary.getActiveConsumerVertices();
+						minParallelism = consumerGroupVertex.getCurrentElasticNumberOfRunningSubtasks();
 					}
 					
 					gg1Servers.add(new GG1ServerKingman(consumerGroupVertex
@@ -130,6 +130,9 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 				strBuild.append(rebParallelism.get(id));
 				strBuild.append(String.format("(%d)", rebActions.get(id)));
 			}
+			strBuild.append(String.format(" | maxQueueTime:%.2f | projectedQueueTime: %.2f", 
+					reb.getMaxTotalQueueWait() * 1000,
+					reb.getRebalancedQueueWait() * 1000));
 			
 			LOG.debug("Rebalance: " + strBuild.toString());
 			scalingActions.putAll(rebActions);

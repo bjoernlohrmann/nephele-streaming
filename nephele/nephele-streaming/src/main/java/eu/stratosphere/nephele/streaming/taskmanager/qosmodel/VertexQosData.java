@@ -37,15 +37,28 @@ public class VertexQosData {
 	 * latency.
 	 */
 	private QosStatistic[] igInterReadTime;
+	
+	/**
+	 * Statistics for the coefficient of variation (CV) of the input gate's inter-read time.
+	 */
+	private QosStatistic[] igInterReadTimeCV;
 
 	private QosStatistic[] igRecordInterArrivalTime;
+
+	/**
+	 * Statistics for the coefficient of variation (CV) of the input gate's record
+	 * inter-arrival time.
+	 */
+	private QosStatistic[] igRecordInterArrivalTimeCV;
 
 	public VertexQosData(QosVertex vertex) {
 		this.vertex = vertex;		
 		this.igRecordsConsumedPerSec = new QosStatistic[1];
 		this.ogRecordsEmittedPerSec = new QosStatistic[1];
 		this.igInterReadTime = new QosStatistic[1];
+		this.igInterReadTimeCV = new QosStatistic[1];
 		this.igRecordInterArrivalTime = new QosStatistic[1];
+		this.igRecordInterArrivalTimeCV = new QosStatistic[1];
 	}
 
 	public QosVertex getVertex() {
@@ -59,9 +72,9 @@ public class VertexQosData {
 		return -1;
 	}
 	
-	public double getLatencyVarianceInMillis(int inputGateIndex) {
-		if (igInterReadTime[inputGateIndex].hasValues()) {
-			return igInterReadTime[inputGateIndex].getVariance();
+	public double getLatencyCV(int inputGateIndex) {
+		if (igInterReadTimeCV[inputGateIndex].hasValues()) {
+			return igInterReadTimeCV[inputGateIndex].getMean();
 		}
 		return -1;
 	}
@@ -87,9 +100,9 @@ public class VertexQosData {
 		return -1;
 	}
 
-	public double getInterArrivalTimeVarianceInMillis(int inputGateIndex) {
-		if (igRecordInterArrivalTime[inputGateIndex].hasValues()) {
-			return igRecordInterArrivalTime[inputGateIndex].getVariance();
+	public double getInterArrivalTimeCV(int inputGateIndex) {
+		if (igRecordInterArrivalTimeCV[inputGateIndex].hasValues()) {
+			return igRecordInterArrivalTimeCV[inputGateIndex].getMean();
 		}
 		return -1;
 	}
@@ -106,16 +119,24 @@ public class VertexQosData {
 	public void prepareForReportsOnInputGate(int inputGateIndex) {
 		igInterReadTime = setInArray(QosStatistic.class,
 				igInterReadTime, inputGateIndex,
-				new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize(), true));
-
+				new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize()));
 		
+		igInterReadTimeCV = setInArray(QosStatistic.class,
+				igInterReadTimeCV, inputGateIndex,
+				new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize()));
+
 		igRecordsConsumedPerSec = setInArray(QosStatistic.class,
 				igRecordsConsumedPerSec, inputGateIndex,
 				new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize()));
 		
 		igRecordInterArrivalTime = setInArray(QosStatistic.class,
 				igRecordInterArrivalTime, inputGateIndex,
-				new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize(), true));
+				new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize()));
+		
+		igRecordInterArrivalTimeCV = setInArray(QosStatistic.class,
+				igRecordInterArrivalTimeCV, inputGateIndex,
+				new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize()));
+
 	} 
 
 	public void prepareForReportsOnOutputGate(int outputGateIndex) {
@@ -157,18 +178,23 @@ public class VertexQosData {
 			long timestamp, VertexStatistics measurement) {
 
 		if (inputGateIndex != -1) {
+			
 			Sample vertexLatency = measurement.getInputGateInterReadTimeMillis();
 			igInterReadTime[inputGateIndex].addValue(new QosValue(vertexLatency
-					.getMean(), vertexLatency.getVariance(), vertexLatency
-					.getNoOfSamplePoints(), timestamp));
-			
+					.getMean(), vertexLatency.getNoOfSamplePoints(), timestamp));
+			igInterReadTimeCV[inputGateIndex].addValue(new QosValue(computeCoefficientOfVariation(vertexLatency),
+					vertexLatency.getNoOfSamplePoints(), timestamp));
+
 			igRecordsConsumedPerSec[inputGateIndex]
 					.addValue(new QosValue(measurement
 							.getRecordsConsumedPerSec(), timestamp));
 
 			Sample interarrivalTime = measurement.getInterArrivalTimeMillis();
 			igRecordInterArrivalTime[inputGateIndex].addValue(new QosValue(
-					interarrivalTime.getMean(), interarrivalTime.getVariance(),
+					interarrivalTime.getMean(), interarrivalTime.getNoOfSamplePoints(),
+					timestamp));
+			igRecordInterArrivalTimeCV[inputGateIndex].addValue(new QosValue(
+					computeCoefficientOfVariation(interarrivalTime),
 					interarrivalTime.getNoOfSamplePoints(),
 					timestamp));
 		}
@@ -181,6 +207,10 @@ public class VertexQosData {
 		}
 	}
 	
+	private double computeCoefficientOfVariation(Sample sample) {
+		return Math.sqrt(sample.getVariance()) / sample.getMean();
+	}
+
 	public boolean hasNewerData(int inputGateIndex, int outputGateIndex, long thresholdTimestamp) {	
 		if (inputGateIndex != -1) {
 			return isInputGateConsumptionRateNewerThan(inputGateIndex, thresholdTimestamp);
@@ -202,6 +232,9 @@ public class VertexQosData {
 			
 			igRecordsConsumedPerSec[inputGateIndex].clear();
 			igInterReadTime[inputGateIndex].clear();
+			igInterReadTimeCV[inputGateIndex].clear();
+			igRecordInterArrivalTime[inputGateIndex].clear();
+			igRecordInterArrivalTimeCV[inputGateIndex].clear();
 		}
 
 		if (outputGateIndex != -1

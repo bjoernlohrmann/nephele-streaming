@@ -11,7 +11,7 @@ public class QosGroupVertexSummary implements QosGroupElementSummary {
 
 	private double meanVertexLatency = 0;
 
-	private double meanVertexLatencyVariance = 0;
+	private double meanVertexLatencyCV = 0;
 
 	public double getMeanVertexLatency() {
 		return meanVertexLatency;
@@ -21,12 +21,12 @@ public class QosGroupVertexSummary implements QosGroupElementSummary {
 		this.meanVertexLatency = meanVertexLatency;
 	}
 
-	public double getMeanVertexLatencyVariance() {
-		return meanVertexLatencyVariance;
+	public double getMeanVertexLatencyCV() {
+		return meanVertexLatencyCV;
 	}
 
-	public void setMeanVertexLatencyVariance(double meanVertexLatencyVariance) {
-		this.meanVertexLatencyVariance = meanVertexLatencyVariance;
+	public void setMeanVertexLatencyCV(double meanVertexLatencyCV) {
+		this.meanVertexLatencyCV = meanVertexLatencyCV;
 	}
 
 	public int getActiveVertices() {
@@ -57,13 +57,13 @@ public class QosGroupVertexSummary implements QosGroupElementSummary {
 			meanVertexLatency += toMerge.activeVertices
 					* toMerge.meanVertexLatency;
 			
-			meanVertexLatencyVariance += toMerge.activeVertices
-					* toMerge.meanVertexLatencyVariance;
+			meanVertexLatencyCV += toMerge.activeVertices
+					* toMerge.meanVertexLatencyCV;
 		}
 
 		if (activeVertices > 0) {
 			meanVertexLatency /= activeVertices;
-			meanVertexLatencyVariance /= activeVertices;
+			meanVertexLatencyCV /= activeVertices;
 		}
 	}
 
@@ -76,13 +76,13 @@ public class QosGroupVertexSummary implements QosGroupElementSummary {
 	public void write(DataOutput out) throws IOException {
 		out.writeInt(activeVertices);
 		out.writeDouble(meanVertexLatency);
-		out.writeDouble(meanVertexLatencyVariance);
+		out.writeDouble(meanVertexLatencyCV);
 	}
 
 	@Override
 	public void read(DataInput in) throws IOException {
 		activeVertices = in.readInt();
 		meanVertexLatency = in.readDouble();
-		meanVertexLatencyVariance = in.readDouble();
+		meanVertexLatencyCV = in.readDouble();
 	}
 }

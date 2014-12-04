@@ -140,16 +140,17 @@ public class RebalancerTest {
 			
 			double lambdaTotal = edgeSum.getMeanEmissionRate() * edgeSum.getActiveEmitterVertices() * rnd.nextDouble();
 			double s = edgeSum.getMeanConsumerVertexLatency() * 2 * rnd.nextDouble();
-			double varS = edgeSum.getMeanConsumerVertexLatencyVariance() * 2 * rnd.nextDouble();
-			double varA = edgeSum.getMeanConsumerVertexInterarrivalTimeVariance() * 2 * rnd.nextDouble();
+			double varS = edgeSum.getMeanConsumerVertexLatencyCV() * 2 * rnd.nextDouble();
+			double varA = edgeSum.getMeanConsumerVertexInterarrivalTimeCV() * 2 * rnd.nextDouble();
 			int maxP = 1000;
 			int p = (int) Math.ceil(lambdaTotal * (s / 1000) / serverUtil);
 			double queueWait = (1 + (9*rnd.nextDouble()));
 			
 			edgeSum.setMeanEmissionRate(lambdaTotal / edgeSum.getActiveEmitterVertices());
 			edgeSum.setMeanConsumerVertexLatency(s);
-			edgeSum.setMeanConsumerVertexLatencyVariance(varS);
-			edgeSum.setMeanConsumerVertexInterarrivalTimeVariance(varA);
+			edgeSum.setMeanConsumerVertexLatencyCV(Math.sqrt(varS) / s);
+			edgeSum.setMeanConsumerVertexInterarrivalTimeCV(Math.sqrt(varA)
+					/ (p / lambdaTotal));
 			edgeSum.setActiveConsumerVertices(p);
 			edgeSum.setTransportLatencyMean(queueWait);
 			
