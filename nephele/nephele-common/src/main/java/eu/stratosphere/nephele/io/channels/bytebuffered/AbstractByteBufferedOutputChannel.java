@@ -16,6 +16,9 @@
 package eu.stratosphere.nephele.io.channels.bytebuffered;
 
 import java.io.IOException;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -31,16 +34,46 @@ import eu.stratosphere.nephele.io.channels.SerializationBuffer;
 import eu.stratosphere.nephele.types.Record;
 
 public abstract class AbstractByteBufferedOutputChannel<T extends Record> extends AbstractOutputChannel<T> {
+	
+	private static ScheduledThreadPoolExecutor scheduledFlusherThreadPool = new ScheduledThreadPoolExecutor(2);
+	
+	private class DataBufferFlusher implements Runnable {
+		private final Buffer bufferToFlush;
+		
+		public DataBufferFlusher(Buffer bufferToFlush) {
+			this.bufferToFlush = bufferToFlush;
+		}
+
+		@Override
+		public void run() {
+			synchronized (AbstractByteBufferedOutputChannel.this) {
+				if (dataBuffer == bufferToFlush) {
+					try {
+						flushBufferUnsynchronized();
+					} catch (IOException e) {
+						LOG.error("Error in flusher thread: " + e.getMessage(),
+								e);
+					} catch (InterruptedException e) {
+						// do nothing
+					}
+				}
+			}
+		}
+	}
 
 	/**
 	 * The serialization buffer used to serialize records.
 	 */
 	private final SerializationBuffer<T> serializationBuffer = new SerializationBuffer<T>();
-
+	
 	/**
 	 * Buffer for the serialized output data.
 	 */
 	private Buffer dataBuffer = null;
+	
+	private int autoflushIntervalMillis = -1;
+	
+	private ScheduledFuture<?> currentFlusherFuture = null;
 
 	/**
 	 * Stores whether the channel is requested to be closed.
@@ -61,12 +94,6 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 	 * Stores the number of bytes transmitted through this output channel since its instantiation.
 	 */
 	private long amountOfDataTransmitted = 0L;
-
-	private long flushDeadline = -1;
-
-	private long lastFlushDeadlineMissNanos = 0;
-	
-	private int autoflushIntervalMillis = 9;
 
 	private static final Log LOG = LogFactory.getLog(AbstractByteBufferedOutputChannel.class);
 
@@ -91,17 +118,10 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 	 * {@inheritDoc}
 	 */
 	@Override
-	public boolean isClosed() throws IOException, InterruptedException {
-
-		if (this.closeRequested && this.dataBuffer == null
-			&& !this.serializationBuffer.dataLeftFromPreviousSerialization()) {
-
-			if (!this.outputChannelBroker.hasDataLeftToTransmit()) {
-				return true;
-			}
-		}
-
-		return false;
+	public synchronized boolean isClosed() throws IOException, InterruptedException {
+		return this.closeRequested && this.dataBuffer == null
+				&& !this.serializationBuffer.dataLeftFromPreviousSerialization()
+				&& !this.outputChannelBroker.hasDataLeftToTransmit();
 	}
 
 	/**
@@ -109,7 +129,6 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 	 */
 	@Override
 	public void requestClose() throws IOException, InterruptedException {
-
 		if (!this.closeRequested) {
 			this.closeRequested = true;
 			flush();
@@ -141,28 +160,11 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 	 * @throws IOException
 	 *         thrown if an I/O error occurs while waiting for the buffer
 	 */
-	private void requestWriteBufferFromBroker() throws InterruptedException, IOException {
+	private Buffer requestWriteBufferFromBroker() throws InterruptedException, IOException {
 		if (Thread.interrupted()) {
 			throw new InterruptedException();
 		}
-		this.dataBuffer = this.outputChannelBroker.requestEmptyWriteBuffer();
-	}
-
-	/**
-	 * Returns the filled buffer to the framework and triggers further processing.
-	 * 
-	 * @throws IOException
-	 *         thrown if an I/O error occurs while releasing the buffers
-	 * @throws InterruptedException
-	 *         thrown if the thread is interrupted while releasing the buffers
-	 */
-	private void releaseWriteBuffer() throws IOException, InterruptedException {
-		flushDeadline = -1;
-		this.outputChannelBroker.releaseWriteBuffer(this.dataBuffer);
-		this.dataBuffer = null;
-
-		// Notify the output gate to enable statistics collection by plugins
-		getOutputGate().outputBufferSent(getChannelIndex());
+		return this.outputChannelBroker.requestEmptyWriteBuffer();
 	}
 
 	/**
@@ -181,38 +183,63 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 		}
 
 		this.serializationBuffer.serialize(record);
-
-		flushSerializationBuffer();
 		
+		flushSerializationBuffer(false);
+	}
+	
+	/**
+	 * Returns the filled buffer to the framework and triggers further processing. This method by itself
+	 * is not thread-safe.
+	 * 
+	 * @throws IOException
+	 *         thrown if an I/O error occurs while releasing the buffers
+	 * @throws InterruptedException
+	 *         thrown if the thread is interrupted while releasing the buffers
+	 */
+	private void flushBufferUnsynchronized() throws IOException, InterruptedException {
 		if (this.dataBuffer != null) {
-			long now = System.nanoTime();
-			if (flushDeadline == -1) {
-				flushDeadline = now
-						+ autoflushIntervalMillis * 1000000
-						- lastFlushDeadlineMissNanos;
-				
-			}
-			
-			if (now >= flushDeadline) {
-				lastFlushDeadlineMissNanos = now - flushDeadline;
-				releaseWriteBuffer();
-			}
+			this.outputChannelBroker.releaseWriteBuffer(dataBuffer);
+
+			// Notify the output gate to enable statistics collection by plugins
+			getOutputGate().outputBufferSent(getChannelIndex());
+
+			this.dataBuffer = null;
+		}
+		
+		if (currentFlusherFuture != null) {
+			currentFlusherFuture.cancel(false);
+			currentFlusherFuture = null;
 		}
 	}
-
-	private void flushSerializationBuffer() throws InterruptedException, IOException {	
+	
+	private synchronized void flushSerializationBuffer(boolean releaseNonEmptyDataBuffer) throws InterruptedException, IOException {
+		boolean freshBufferAllocated = false;
+		
 		while (this.serializationBuffer.dataLeftFromPreviousSerialization()) {
 			if (this.dataBuffer == null) {
-				requestWriteBufferFromBroker();
+				this.dataBuffer = requestWriteBufferFromBroker();
+				freshBufferAllocated = true;
 			}
 			
 			this.amountOfDataTransmitted += this.serializationBuffer.read(this.dataBuffer);
 			if (this.dataBuffer.remaining() == 0) {
-				releaseWriteBuffer();
+				flushBufferUnsynchronized();				
+			}
+		}
+		
+		if (this.dataBuffer != null) {
+			if (releaseNonEmptyDataBuffer) {
+				flushBufferUnsynchronized();
+			} else if (freshBufferAllocated && autoflushIntervalMillis != -1) {
+				currentFlusherFuture = scheduledFlusherThreadPool.schedule(new DataBufferFlusher(
+						this.dataBuffer), 
+						autoflushIntervalMillis,
+						TimeUnit.MILLISECONDS);
 			}
 		}
 	}
-
+	
+	
 	/**
 	 * Sets the output channel broker this channel should contact to request and release write buffers.
 	 * 
@@ -264,29 +291,22 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 	 */
 	@Override
 	public void flush() throws IOException, InterruptedException {
-
-		flushSerializationBuffer();
-
-		// Get rid of the leased write buffer
-		if (this.dataBuffer != null) {
-			releaseWriteBuffer();
-		}
+		flushSerializationBuffer(true);
 	}
 
 	/**
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void releaseAllResources() {
+	public synchronized void releaseAllResources() {
 
 		// TODO: Reconsider release of broker's resources here
 		this.closeRequested = true;
-
+		
 		this.serializationBuffer.clear();
-
-		if (this.dataBuffer != null) {
-			this.dataBuffer.recycleBuffer();
-			this.dataBuffer = null;
+		if (dataBuffer != null) {
+			dataBuffer.recycleBuffer();
+			dataBuffer = null;
 		}
 	}
 
