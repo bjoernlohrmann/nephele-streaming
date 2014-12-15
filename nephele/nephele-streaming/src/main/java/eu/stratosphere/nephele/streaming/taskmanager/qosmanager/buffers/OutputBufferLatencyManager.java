@@ -94,9 +94,7 @@ public class OutputBufferLatencyManager {
 		double availLatPerChannel = computeAvailableChannelLatency(
 				constraint, qosSummary) / countUnchainedEdges(sequenceMembers);
 
-		int i=-1;
 		for (QosGraphMember member : sequenceMembers) {
-			i++;
 			
 			if (member.isVertex()) {
 				continue;
@@ -109,33 +107,16 @@ public class OutputBufferLatencyManager {
 				continue;
 			}
 			
-			double edgeTransportLatency = qosSummary.getMemberLatencies()[i][1];
-			int targetObl;
+			// stick to the 80-20 rule (80% of available time (minus 10% safety margin) for output buffering,
+			// 20% for queueing) and trust in the autoscaler to keep the queueing time in check.
+			int targetObl = (int) (availLatPerChannel * 0.8 * 0.9);
 			
-			if(edgeTransportLatency > 0.2 * availLatPerChannel) {
-				// queue wait is larger than 20% of available latency
-				// per channel.  in this case stick to the 80:20 rule,
-				// build in another 10% margin of safety, and
-				// trust in the autoscaler to adjust parallelism
-				// so that queue wait drops.
-				targetObl = (int) (availLatPerChannel * 0.8 * 0.9);
-			} else {
-				// queue wait is lower than 20%. in this case use
-				// the resulting "free" available channel latency
-				// for output buffering. And as always build in
-				// another 10% margin of safety.
-
-				targetObl = (int) (0.9 * (availLatPerChannel - edgeTransportLatency));
-			}
-
 			// do nothing if change is very small
 			ValueHistory<Integer> targetOblHistory = qosData.getTargetOblHistory();
 			if (targetOblHistory.hasEntries()) {
 				int oldTargetObl = targetOblHistory.getLastEntry().getValue();
 				
-				if (oldTargetObl == targetObl
-						|| (oldTargetObl != 0 && (Math.abs(oldTargetObl
-								- targetObl) / oldTargetObl) < 0.05)) {
+				if (oldTargetObl == targetObl) {
 					continue;
 				}
 			}

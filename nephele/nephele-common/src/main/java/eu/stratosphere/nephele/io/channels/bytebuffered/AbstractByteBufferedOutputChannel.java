@@ -35,7 +35,7 @@ import eu.stratosphere.nephele.types.Record;
 
 public abstract class AbstractByteBufferedOutputChannel<T extends Record> extends AbstractOutputChannel<T> {
 	
-	private static ScheduledThreadPoolExecutor scheduledFlusherThreadPool = new ScheduledThreadPoolExecutor(2);
+	private static ScheduledThreadPoolExecutor scheduledFlusherThreadPool = new ScheduledThreadPoolExecutor(20);
 	
 	private class DataBufferFlusher implements Runnable {
 		private final Buffer bufferToFlush;
@@ -174,7 +174,7 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 	public void writeRecord(T record) throws IOException, InterruptedException {
 
 		if (this.closeRequested || this.suspendRequested) {
-			throw new IOException("Channel is aready requested to be closed/suspended");
+			throw new IOException("Channel is already requested to be closed/suspended");
 		}
 
 		if (this.serializationBuffer.dataLeftFromPreviousSerialization()) {
@@ -205,11 +205,6 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 
 			this.dataBuffer = null;
 		}
-		
-		if (currentFlusherFuture != null) {
-			currentFlusherFuture.cancel(false);
-			currentFlusherFuture = null;
-		}
 	}
 	
 	private synchronized void flushSerializationBuffer(boolean releaseNonEmptyDataBuffer) throws InterruptedException, IOException {
@@ -232,7 +227,7 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 				flushBufferUnsynchronized();
 			} else if (freshBufferAllocated && autoflushIntervalMillis != -1) {
 				currentFlusherFuture = scheduledFlusherThreadPool.schedule(new DataBufferFlusher(
-						this.dataBuffer), 
+						this.dataBuffer),
 						autoflushIntervalMillis,
 						TimeUnit.MILLISECONDS);
 			}

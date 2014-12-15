@@ -1,17 +1,14 @@
 package eu.stratosphere.nephele.streaming.jobmanager.autoscaling;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import eu.stratosphere.nephele.executiongraph.ExecutionGraph;
-import eu.stratosphere.nephele.executiongraph.ExecutionGroupVertex;
-import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
-import eu.stratosphere.nephele.streaming.message.TaskCpuLoadChange;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosConstraintSummary;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Abstract superclass of scaling policies providing commonly used
@@ -34,45 +31,25 @@ public abstract class AbstractScalingPolicy {
 		this.qosConstraints = qosConstraints;
 	}
 
-	public Map<JobVertexID, Integer> getScalingActions(
-			List<QosConstraintSummary> constraintSummaries,
-			Map<ExecutionVertexID, TaskCpuLoadChange> taskCpuLoads,
-			Map<LatencyConstraintID, LatencyConstraintCpuLoadSummary> cpuLoadsSummaryAggreators)
+	public Map<JobVertexID, Integer> getParallelismChanges(List<QosConstraintSummary> constraintSummaries)
 			throws UnexpectedVertexExecutionStateException {
 
-		Map<JobVertexID, Integer> scalingActions = new HashMap<JobVertexID, Integer>();
+		Map<JobVertexID, Integer> parallelismChanges = new HashMap<JobVertexID, Integer>();
 
 		for (QosConstraintSummary constraintSummary : constraintSummaries) {
 			if (constraintSummary.hasData()) {
-
-				collectScalingActionsForConstraint(
-						qosConstraints.get(constraintSummary
-								.getLatencyConstraintID()), constraintSummary,
-						taskCpuLoads,
-						cpuLoadsSummaryAggreators.get(constraintSummary
-								.getLatencyConstraintID()), scalingActions);
+				getParallelismChangesForConstraint(qosConstraints.get(constraintSummary.getLatencyConstraintID()), constraintSummary, parallelismChanges);
 			}
 		}
 
-		return scalingActions;
+		return parallelismChanges;
 	}
 
-	protected abstract void collectScalingActionsForConstraint(
+	protected abstract void getParallelismChangesForConstraint(
 			JobGraphLatencyConstraint constraint,
 			QosConstraintSummary constraintSummary,
-			Map<ExecutionVertexID, TaskCpuLoadChange> taskCpuLoads,
-			LatencyConstraintCpuLoadSummary summarizedCpuUtilizations,
 			Map<JobVertexID, Integer> scalingActions)
 			throws UnexpectedVertexExecutionStateException;
-
-	protected int applyElasticityLimits(ExecutionGroupVertex groupVertex,
-			int newNoOfSubtasks) {
-
-		return Math.max(
-				groupVertex.getMinElasticNumberOfRunningSubtasks(),
-				Math.min(newNoOfSubtasks,
-						groupVertex.getMaxElasticNumberOfRunningSubtasks()));
-	}
 
 	protected ExecutionGraph getExecutionGraph() {
 		return execGraph;

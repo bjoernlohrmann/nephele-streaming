@@ -24,12 +24,18 @@ public class CpuLoadLogger extends AbstractCpuLoadLogger {
 		this.writeHeaders(execGraph);
 	}
 
+	private String formatDouble(double doubleValue) {
+		return String.format("%.2f", doubleValue);
+	}
+
 	@Override
 	public void logCpuLoads(Map<JobVertexID, GroupVertexCpuLoadSummary> loadSummaries) throws IOException {
 		StringBuilder sb = new StringBuilder();
 		sb.append(getLogTimestamp() / 1000);
 		for(JobVertexID id : this.groupVertices) {
 			GroupVertexCpuLoadSummary summary = loadSummaries.get(id);
+			sb.append(';');
+			sb.append(formatDouble(summary.getAvgCpuUtilization()));
 			sb.append(';');
 			sb.append(summary.getHighs());
 			sb.append(';');
@@ -52,7 +58,7 @@ public class CpuLoadLogger extends AbstractCpuLoadLogger {
 		
 		for(JobVertexID id : this.groupVertices) {
 			String name = execGraph.getExecutionGroupVertex(id).getName();
-			for(String type : new String[]{"high", "medium", "low", "unknown"}) {
+			for(String type : new String[]{"avgUtil","high", "medium", "low", "unknown"}) {
 				sb.append(';');
 				sb.append(name);
 				sb.append(':');

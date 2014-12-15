@@ -1,47 +1,36 @@
 package eu.stratosphere.nephele.streaming.jobmanager.autoscaling;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import eu.stratosphere.nephele.executiongraph.ExecutionGraph;
 import eu.stratosphere.nephele.executiongraph.ExecutionVertexID;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
-import eu.stratosphere.nephele.jobmanager.JobManager;
 import eu.stratosphere.nephele.jobmanager.web.QosStatisticsServlet;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.LatencyConstraintID;
+import eu.stratosphere.nephele.streaming.jobmanager.autoscaling.optimization.ScalingActuator;
 import eu.stratosphere.nephele.streaming.message.AbstractQosMessage;
 import eu.stratosphere.nephele.streaming.message.AbstractSerializableQosMessage;
 import eu.stratosphere.nephele.streaming.message.QosManagerConstraintSummaries;
 import eu.stratosphere.nephele.streaming.message.TaskCpuLoadChange;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosConstraintSummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosLogger;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosUtils;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraph;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGroupEdge;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGroupVertex;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosManagerID;
 import eu.stratosphere.nephele.streaming.util.StreamPluginConfig;
 import eu.stratosphere.nephele.streaming.web.QosJobWebStatistic;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import java.io.IOException;
+import java.util.*;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public class ElasticTaskQosAutoScalingThread extends Thread {
 
-	private static final Log LOG = LogFactory
-			.getLog(ElasticTaskQosAutoScalingThread.class);
+	private static final Log LOG = LogFactory.getLog(ElasticTaskQosAutoScalingThread.class);
 
 	private final JobID jobID;
 
@@ -61,17 +50,11 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 
 	private final HashMap<LatencyConstraintID, CpuLoadLogger> cpuLoadLoggers = new HashMap<LatencyConstraintID, CpuLoadLogger>();
 
+	private final ScalingActuator scalingActuator;
+
 	private final QosJobWebStatistic webStatistic;
 
-	private final HashMap<JobVertexID, Integer> vertexTopologicalScores = new HashMap<JobVertexID, Integer>();
-
 	private AbstractScalingPolicy scalingPolicy;
-	
-	private ExecutorService threadPool = Executors.newSingleThreadExecutor();
-	
-	private Future<?> ongoingScalingActions = null;
-
-	private int cooldownPeriods = 6;
 
 	public ElasticTaskQosAutoScalingThread(ExecutionGraph execGraph,
 			HashMap<LatencyConstraintID, QosGraph> qosGraphs,
@@ -87,36 +70,33 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 		HashMap<LatencyConstraintID, JobGraphLatencyConstraint> qosConstraints = new HashMap<LatencyConstraintID, JobGraphLatencyConstraint>();
 
 		for (LatencyConstraintID constraintID : qosGraphs.keySet()) {
+
 			JobGraphLatencyConstraint constraint = qosGraphs.get(constraintID)
 					.getConstraintByID(constraintID);
 
 			qosConstraints.put(constraintID, constraint);
-			aggregators.put(constraintID,
-					new QosConstraintSummaryAggregator(execGraph, constraint, qosManagers));
-			cpuLoadAggregators.put(constraintID,
-					new LatencyConstraintCpuLoadSummaryAggregator(execGraph, constraint));
+			aggregators.put(constraintID, new QosConstraintSummaryAggregator(execGraph, constraint, qosManagers));
+			cpuLoadAggregators.put(constraintID, new LatencyConstraintCpuLoadSummaryAggregator(execGraph, constraint));
 
 			try {
 				qosLoggers.put(constraintID, new QosLogger(constraint, loggingInterval));
 				cpuLoadLoggers.put(constraintID, new CpuLoadLogger(execGraph, constraint, loggingInterval));
-
 			} catch (Exception e) {
-				LOG.error("Exception while initiliazing loggers", e);
+				LOG.error("Exception while initializing loggers", e);
 			}
 		}
 
 		scalingPolicy = new SimpleScalingPolicy(execGraph, qosConstraints);
+		scalingActuator = new ScalingActuator(execGraph, getVertexTopologicalScores(qosGraphs));
 
 		webStatistic = new QosJobWebStatistic(execGraph, loggingInterval, qosConstraints);
 		QosStatisticsServlet.putStatistic(this.jobID, webStatistic);
 
-		fillVertexTopologicalScores(qosGraphs);
-
 		this.start();
 	}
 
-	private void fillVertexTopologicalScores(
-			HashMap<LatencyConstraintID, QosGraph> qosGraphs) {
+	private HashMap<JobVertexID, Integer> getVertexTopologicalScores(
+					HashMap<LatencyConstraintID, QosGraph> qosGraphs) {
 
 		QosGraph merged = new QosGraph();
 		for (QosGraph qosGraph : qosGraphs.values()) {
@@ -138,13 +118,13 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 			}
 		}
 
+		HashMap<JobVertexID, Integer> vertexTopologicalScores = new HashMap<JobVertexID, Integer>();
+
 		int nextTopoScore = 0;
 		while (!verticesWithoutPredecessor.isEmpty()) {
-			JobVertexID vertexWithoutPredecessor = verticesWithoutPredecessor
-					.removeFirst();
+			JobVertexID vertexWithoutPredecessor = verticesWithoutPredecessor.removeFirst();
 
-			vertexTopologicalScores
-					.put(vertexWithoutPredecessor, nextTopoScore);
+			vertexTopologicalScores.put(vertexWithoutPredecessor, nextTopoScore);
 			nextTopoScore++;
 
 			for (QosGroupEdge forwardEdge : merged.getGroupVertexByID(
@@ -160,6 +140,8 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 				}
 			}
 		}
+
+		return vertexTopologicalScores;
 	}
 
 		
@@ -168,7 +150,7 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 		try {
 			LOG.info("Qos Auto Scaling Thread started");
 			
-			long now = System.currentTimeMillis();
+			long now;
 
 			while (!interrupted()) {
 				processMessages();
@@ -183,26 +165,16 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 					Map<LatencyConstraintID, LatencyConstraintCpuLoadSummary> cpuLoadSummaries = summarizeCpuUtilizations(taskCpuLoads);
 					logCpuLoadSummaries(cpuLoadSummaries);
 
-					if (cooldownPeriods > 0) {
-						cooldownPeriods--;
-					} else if (ongoingScalingActions != null) {
-						if (ongoingScalingActions.isDone()) {
-							ongoingScalingActions = null;
-							cooldownPeriods = 3;
-						}
-					} else {
-						Map<JobVertexID, Integer> scalingActions = scalingPolicy
-								.getScalingActions(constraintSummaries,
-										taskCpuLoads, cpuLoadSummaries);
-						
-						if (!scalingActions.isEmpty()) {
-							ongoingScalingActions = triggerScalingActions(scalingActions);
-						}
-					}
+					Map<JobVertexID, Integer> parallelismChanges = scalingPolicy.getParallelismChanges(constraintSummaries);
+					scalingActuator.updateScalingActions(parallelismChanges);
+
+					LOG.debug(String.format("%d %s", QosUtils.alignToInterval(
+													System.currentTimeMillis(),
+													StreamPluginConfig.getAdjustmentIntervalMillis()) / 1000,
+													parallelismChanges.toString()));
 
 					timeOfLastScaling = System.currentTimeMillis();
-					timeOfNextScaling = timeOfLastScaling
-							+ StreamPluginConfig.getAdjustmentIntervalMillis();
+					timeOfNextScaling = timeOfLastScaling + StreamPluginConfig.getAdjustmentIntervalMillis();
 				}
 			}
 		} catch (InterruptedException e) {
@@ -218,51 +190,6 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 		LOG.info("Qos Auto Scaling Thread stopped.");
 	}
 
-	private Future<?> triggerScalingActions(final Map<JobVertexID, Integer> scalingActions) {
-
-		// apply scaling actions in topological order
-		final JobVertexID[] topoSortedVertexIds = scalingActions.keySet().toArray(
-				new JobVertexID[0]);
-
-		Arrays.sort(topoSortedVertexIds, new Comparator<JobVertexID>() {
-			@Override
-			public int compare(JobVertexID first, JobVertexID second) {
-				int firstTopoScore = vertexTopologicalScores.get(first);
-				int secondTopoScore = vertexTopologicalScores.get(second);
-				return Integer.compare(firstTopoScore, secondTopoScore);
-			}
-		});
-
-		final JobManager jm = JobManager.getInstance();
-
-		Runnable scaler = new Runnable() {
-			@Override
-			public void run() {
-				try {
-					for (JobVertexID vertexId : topoSortedVertexIds) {
-						int scalingAction = scalingActions.get(vertexId);
-						if (scalingAction > 0) {
-							jm.scaleUpElasticTask(jobID, vertexId,
-									scalingAction);
-						}
-					}
-
-					for (JobVertexID vertexId : topoSortedVertexIds) {
-						int scalingAction = scalingActions.get(vertexId);
-						if (scalingAction < 0) {
-							jm.scaleDownElasticTask(jobID, vertexId,
-									- scalingAction);
-
-						}
-					}
-				} catch (Exception e) {
-					LOG.error("Error during scaling action", e);
-				}
-			}
-		};
-		
-		return threadPool.submit(scaler);
-	}
 
 	private List<QosConstraintSummary> aggregateConstraintSummaries() {
 		LinkedList<QosConstraintSummary> toReturn = new LinkedList<QosConstraintSummary>();
@@ -318,7 +245,7 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 					logger.logCpuLoads(summaries.get(constraint));
 
 				} catch (IOException e) {
-					LOG.error("Error during cpu load logging", e);
+					LOG.error("Error during CPU load logging", e);
 				}
 			}
 		}
@@ -345,20 +272,10 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 		qosMessages.clear();
 		aggregators.clear();
 		taskCpuLoads.clear();
-		vertexTopologicalScores.clear();
 		scalingPolicy = null;
-
+		scalingActuator.shutdown();
 		QosStatisticsServlet.removeJob(this.jobID);
 		
-		if (ongoingScalingActions != null) {
-			threadPool.shutdown();
-			try {
-				threadPool.awaitTermination(1, TimeUnit.SECONDS);
-			} catch (InterruptedException e) {
-				threadPool.shutdownNow();
-			}
-			threadPool = null;
-		}
 	}
 
 	private boolean scalingIsDue(long now) {
@@ -366,8 +283,7 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 			return false;
 		}
 
-		for (QosConstraintSummaryAggregator summaryAggregator : aggregators
-				.values()) {
+		for (QosConstraintSummaryAggregator summaryAggregator : aggregators.values()) {
 			if (!summaryAggregator.canAggregate()) {
 				return false;
 			}

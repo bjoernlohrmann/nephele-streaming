@@ -80,6 +80,8 @@ public class QosLogger extends AbstractQosLogger {
 			} else {
 				QosGroupEdgeSummary ve = summary.getGroupEdgeSummary(i);
 				builder.append(';');
+				builder.append(ve.getActiveEmitterVertices());
+				builder.append(';');
 				builder.append(this.formatDouble(ve.getOutputBufferLatencyMean()));
 				builder.append(';');
 				builder.append(this.formatDouble(ve.getTransportLatencyMean()));
@@ -91,6 +93,8 @@ public class QosLogger extends AbstractQosLogger {
 				builder.append(this.formatDouble(ve.getMeanConsumerVertexInterarrivalTime()));
 				builder.append(';');
 				builder.append(this.formatDouble(ve.getMeanConsumerVertexInterarrivalTimeCV()));
+				builder.append(';');
+				builder.append(ve.getActiveConsumerVertices());
 				builder.append(';');
 				builder.append(this.formatDouble(ve.getMeanConsumerVertexLatency()));
 				builder.append(';');
@@ -123,6 +127,8 @@ public class QosLogger extends AbstractQosLogger {
 //				builder.append(sequenceElement.getName()+"Var");
 			} else {
 				builder.append(';');
+				builder.append("edge" + edgeIndex + "EmitterCount");
+				builder.append(';');
 				builder.append("edge" + edgeIndex + "obl");
 				builder.append(';');
 				builder.append("edge" + edgeIndex);
@@ -134,6 +140,8 @@ public class QosLogger extends AbstractQosLogger {
 				builder.append("edge" + edgeIndex +"IA-Mean");
 				builder.append(';');
 				builder.append("edge" + edgeIndex +"IA-CV");
+				builder.append(';');
+				builder.append("edge" + edgeIndex + "ConsumerCount");
 				builder.append(';');
 				builder.append("edge" + edgeIndex +"IR-Mean");
 				builder.append(';');

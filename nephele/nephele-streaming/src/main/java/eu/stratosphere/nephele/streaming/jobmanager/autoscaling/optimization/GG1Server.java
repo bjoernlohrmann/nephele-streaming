@@ -35,8 +35,16 @@ public abstract class GG1Server {
 		cS = edgeSummary.getMeanConsumerVertexLatencyCV();
 		cA = edgeSummary.getMeanConsumerVertexInterarrivalTimeCV();
 		
-		fittingFactor = (edgeSummary.getTransportLatencyMean() / 1000)
+		double theoreticalFittingFactor = (edgeSummary.getTransportLatencyMean() / 1000)
 				/ getQueueWaitUnfitted(p);
+		if(theoreticalFittingFactor < 0.8) {
+			fittingFactor = 0.8;
+		} else if (theoreticalFittingFactor > 1.2) {
+			fittingFactor = 1.2;
+		} else {
+			fittingFactor = theoreticalFittingFactor;
+		}
+
 		lowerBoundParallelism = Math.min(Math.max((int) Math.ceil(lambdaTotal * S),
 				minSubtasks), maxSubtasks);
 		upperBoundParallelism = maxSubtasks;
@@ -87,7 +95,10 @@ public abstract class GG1Server {
 	public double getMeanUtilization(int newP) {
 		return S * lambdaTotal / newP;
 	}
-
+	
+	public double getCurrentMeanUtilization() {
+		return getMeanUtilization(p);
+	}
 	
 	/**
 	 * Returns a degree of parallelism so that its queue wait gradient
@@ -98,7 +109,7 @@ public abstract class GG1Server {
 	 *            A negative floating point value indication the minimum desired
 	 *            queue wait gradient.
 	 * 
-	 * @return A value between {@link #effectiveLowerBoundParallelism} and
+	 * @return A value between {@link #lowerBoundParallelism} and
 	 *         {@link #upperBoundParallelism} (both inclusive).
 	 * 
 	 */
@@ -147,8 +158,8 @@ public abstract class GG1Server {
 	 * threshold. If no valid value can be found, the upper bound on parallelism
 	 * is returned.
 	 * 
-	 * @param queueWaitThreshold
-	 * @return A value from between {@link #effectiveLowerBoundParallelism} and
+	 * @param queueWaitThreshold Queueing wait threshold for returned parallelism.
+	 * @return A value from between {@link #lowerBoundParallelism} and
 	 *         {@link #upperBoundParallelism} (both inclusive).
 	 * 
 	 */
@@ -169,5 +180,9 @@ public abstract class GG1Server {
 		
 		return (int) Math.min(upperBoundParallelism,
 				Math.max(lowerBoundParallelism, Math.floor(x + 1)));
+	}
+	
+	public boolean isElastic() {
+		return lowerBoundParallelism != upperBoundParallelism;
 	}
 }
