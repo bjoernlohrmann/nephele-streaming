@@ -1,5 +1,18 @@
 package eu.stratosphere.nephele.streaming.taskmanager.qosreporter;
 
+import eu.stratosphere.nephele.instance.InstanceConnectionInfo;
+import eu.stratosphere.nephele.jobgraph.JobID;
+import eu.stratosphere.nephele.streaming.message.action.DeployInstanceQosRolesAction;
+import eu.stratosphere.nephele.streaming.message.action.EdgeQosReporterConfig;
+import eu.stratosphere.nephele.streaming.message.action.VertexQosReporterConfig;
+import eu.stratosphere.nephele.streaming.message.qosreport.*;
+import eu.stratosphere.nephele.streaming.taskmanager.StreamMessagingThread;
+import eu.stratosphere.nephele.streaming.taskmanager.StreamTaskManagerPlugin;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
+import eu.stratosphere.nephele.util.StringUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -9,30 +22,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
-import eu.stratosphere.nephele.instance.InstanceConnectionInfo;
-import eu.stratosphere.nephele.jobgraph.JobID;
-import eu.stratosphere.nephele.streaming.message.action.DeployInstanceQosRolesAction;
-import eu.stratosphere.nephele.streaming.message.action.EdgeQosReporterConfig;
-import eu.stratosphere.nephele.streaming.message.action.VertexQosReporterConfig;
-import eu.stratosphere.nephele.streaming.message.qosreport.AbstractQosReportRecord;
-import eu.stratosphere.nephele.streaming.message.qosreport.EdgeLatency;
-import eu.stratosphere.nephele.streaming.message.qosreport.EdgeStatistics;
-import eu.stratosphere.nephele.streaming.message.qosreport.QosReport;
-import eu.stratosphere.nephele.streaming.message.qosreport.VertexStatistics;
-import eu.stratosphere.nephele.streaming.taskmanager.StreamMessagingThread;
-import eu.stratosphere.nephele.streaming.taskmanager.StreamTaskManagerPlugin;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
-import eu.stratosphere.nephele.util.StringUtils;
-
 /**
  * This class aggregates and forwards stream QoS report data (latencies,
  * throughput, etc) of the tasks of a single job running within the same
  * manager. Each task manager has one instance of this class per job. Qos report
  * data is pre-aggregated for each QoS manager and shipped in a single message
- * to the Qos manager once every {@link #aggregationInterval}. If no QoS data
+ * to the Qos manager once every configured aggregationInterval. If no QoS data
  * for a Qos manager has been received, messages will be skipped. This class
  * starts its own thread as soon as there is at least on registered task and can
  * be shut down by invoking {@link #shutdown()}.
@@ -385,9 +380,8 @@ public class QosReportForwarderThread extends Thread {
 
 		this.reporterActivityMap.put(reporterID, Boolean.FALSE);
 
-		LOG.debug(String.format(
-				"Registered Qos reports to %d QosManagers for QosReporter %s",
-				edgeReports.size(), edgeReporter.getName()));
+		LOG.debug(String.format("Registered Qos reports to %d QosManagers for QosReporter %s (%s)",
+				edgeReports.size(), edgeReporter.getName(), reporterID.toString()));
 	}
 
 	private void registerVertexQosReporter(
@@ -403,6 +397,9 @@ public class QosReportForwarderThread extends Thread {
 			vertexReports.add(this.getOrCreateAggregatedReport(qosManager));
 		}
 		this.reporterActivityMap.put(reporterID, Boolean.FALSE);
+
+		LOG.debug(String.format("Registered Qos reports to %d QosManagers for QosReporter %s (%s)",
+						vertexReports.size(), vertexReporter.getName(), reporterID.toString()));
 	}
 
 	private Set<AggregatedReport> getOrCreateReportSet(QosReporterID reporterID) {
