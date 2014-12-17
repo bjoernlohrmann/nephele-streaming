@@ -58,7 +58,7 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 
 	public ElasticTaskQosAutoScalingThread(ExecutionGraph execGraph,
 			HashMap<LatencyConstraintID, QosGraph> qosGraphs,
-			Set<QosManagerID> qosManagers) {
+			HashMap<LatencyConstraintID, Set<QosManagerID>> qosManagers) {
 
 		this.setName("QosAutoScalingThread");
 		this.jobID = execGraph.getJobID();
@@ -75,7 +75,7 @@ public class ElasticTaskQosAutoScalingThread extends Thread {
 					.getConstraintByID(constraintID);
 
 			qosConstraints.put(constraintID, constraint);
-			aggregators.put(constraintID, new QosConstraintSummaryAggregator(execGraph, constraint, qosManagers));
+			aggregators.put(constraintID, new QosConstraintSummaryAggregator(execGraph, constraint, qosManagers.get(constraintID)));
 			cpuLoadAggregators.put(constraintID, new LatencyConstraintCpuLoadSummaryAggregator(execGraph, constraint));
 
 			try {

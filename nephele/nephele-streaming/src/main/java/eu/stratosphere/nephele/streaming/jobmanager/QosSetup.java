@@ -73,8 +73,24 @@ public class QosSetup {
 		return taskManagerQosSetups;
 	}
 
-	public Set<QosManagerID> getQosManagerIDs() {
-		return qosManagerIds;
+	public HashMap<LatencyConstraintID, Set<QosManagerID>> getQosManagerIDsByConstraint() {
+		HashMap<LatencyConstraintID, Set<QosManagerID>> ret = new HashMap<LatencyConstraintID, Set<QosManagerID>>();
+
+		for(TaskManagerQosSetup tmSetup : taskManagerQosSetups.values()) {
+			for(QosManagerRole qmRole : tmSetup.getManagerRoles()) {
+				LatencyConstraintID constraintID = qmRole.getConstraintID();
+				QosManagerID managerID = tmSetup.getQosManagerID();
+
+				Set<QosManagerID> managersForConstraint = ret.get(constraintID);
+				if(managersForConstraint == null) {
+					managersForConstraint = new HashSet<QosManagerID>();
+					ret.put(constraintID, managersForConstraint);
+				}
+				managersForConstraint.add(managerID);
+			}
+		}
+
+		return ret;
 	}
 
 
@@ -179,29 +195,39 @@ public class QosSetup {
 	 */
 	private void computeQosManagerRoles() {
 
-		for (QosGraph qosGraph : this.qosGraphs.values()) {
-			QosGroupVertex anchorVertex = this.getAnchorVertex(qosGraph);
+		// FIXME: blacklisting is a workaround to prevent qos manager threads from crashing
+		// (happens when they are assigned manager roles for multiple constraints, eg. in twitter job)
+		Set<JobVertexID> anchorVertexBlacklist = new HashSet<JobVertexID>();
 
+		for (QosGraph qosGraph : this.qosGraphs.values()) {
+			QosGroupVertex anchorVertex = this.getAnchorVertex(qosGraph, anchorVertexBlacklist);
+
+			int newQosManagerRoles = 0;
 			for (List<QosVertex> membersOnInstance : this
 					.partitionMembersByInstance(anchorVertex)) {
 				InstanceConnectionInfo instance = membersOnInstance.get(0)
 						.getExecutingInstance();
 
+				newQosManagerRoles++;
 				QosManagerRole managerRole = new QosManagerRole(qosGraph,
 						qosGraph.getConstraints().iterator().next().getID(),
 						anchorVertex, membersOnInstance);
+
 				TaskManagerQosSetup tmQosSetup = this.getOrCreateInstanceRoles(instance);
 				tmQosSetup.addManagerRole(managerRole);
 				this.qosManagerIds.add(tmQosSetup.getQosManagerID());
 			}
 
-			LOG.info(String
-					.format("Using group vertex %s to run %d QosManagers for constraint %s",
+			LOG.info(String.format("Using group vertex %s as anchor for %d QosManager roles for constraint %s (%s)",
 							anchorVertex.getName(),
-							this.taskManagerQosSetups.size(), qosGraph
-									.getConstraints().iterator().next().getID()));
+							newQosManagerRoles,
+							qosGraph.getConstraints().iterator().next().getName(),
+							qosGraph.getConstraints().iterator().next().getID()));
 
 		}
+
+		LOG.info(String.format("Running %d QosManager threads in total",
+						this.taskManagerQosSetups.size()));
 	}
 
 	private TaskManagerQosSetup getOrCreateInstanceRoles(
@@ -243,17 +269,31 @@ public class QosSetup {
 	 * lowest number of channels.
 	 *
 	 * @param qosGraph Provides the graph structure and the constraint.
+	 * @param anchorVertexBlacklist
 	 * @return The chosen anchor vertex.
 	 */
-	private QosGroupVertex getAnchorVertex(QosGraph qosGraph) {
-		Set<JobVertexID> anchorCandidates = this
-				.collectAnchorCandidates(qosGraph);
+	private QosGroupVertex getAnchorVertex(QosGraph qosGraph, Set<JobVertexID> anchorVertexBlacklist) {
+		Set<JobVertexID> anchorCandidates = this.collectAnchorCandidates(qosGraph);
 
 		this.retainCandidatesWithMaxInstanceCount(anchorCandidates, qosGraph);
 		this.retainCandidatesWithMinChannelCountOnSequence(anchorCandidates,
 				qosGraph);
 
-		return qosGraph.getGroupVertexByID(anchorCandidates.iterator().next());
+		JobVertexID notOnBlacklist = null;
+		for(JobVertexID anchorCandidate : anchorCandidates) {
+			if(!anchorVertexBlacklist.contains(anchorCandidate)) {
+				anchorVertexBlacklist.add(anchorCandidate);
+				notOnBlacklist = anchorCandidate;
+				break;
+			}
+		}
+
+		if (notOnBlacklist != null) {
+			return qosGraph.getGroupVertexByID(notOnBlacklist);
+		} else {
+			// if all are blacklisted
+			return qosGraph.getGroupVertexByID(anchorCandidates.iterator().next());
+		}
 	}
 
 	private void retainCandidatesWithMinChannelCountOnSequence(
