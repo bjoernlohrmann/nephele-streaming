@@ -15,27 +15,21 @@
 
 package eu.stratosphere.nephele.io.channels.bytebuffered;
 
-import java.io.IOException;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import eu.stratosphere.nephele.event.task.AbstractEvent;
 import eu.stratosphere.nephele.event.task.AbstractTaskEvent;
 import eu.stratosphere.nephele.io.OutputGate;
-import eu.stratosphere.nephele.io.channels.AbstractOutputChannel;
-import eu.stratosphere.nephele.io.channels.Buffer;
-import eu.stratosphere.nephele.io.channels.ChannelID;
-import eu.stratosphere.nephele.io.channels.ChannelType;
-import eu.stratosphere.nephele.io.channels.SerializationBuffer;
+import eu.stratosphere.nephele.io.channels.*;
 import eu.stratosphere.nephele.types.Record;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import java.io.IOException;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 public abstract class AbstractByteBufferedOutputChannel<T extends Record> extends AbstractOutputChannel<T> {
 	
-	private static ScheduledThreadPoolExecutor scheduledFlusherThreadPool = new ScheduledThreadPoolExecutor(20);
+	private static final ScheduledThreadPoolExecutor scheduledFlusherThreadPool = new ScheduledThreadPoolExecutor(20);
 	
 	private class DataBufferFlusher implements Runnable {
 		private final Buffer bufferToFlush;
@@ -71,9 +65,7 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 	 */
 	private Buffer dataBuffer = null;
 	
-	private int autoflushIntervalMillis = -1;
-	
-	private ScheduledFuture<?> currentFlusherFuture = null;
+	private int autoflushIntervalMillis = 0;
 
 	/**
 	 * Stores whether the channel is requested to be closed.
@@ -184,7 +176,7 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 
 		this.serializationBuffer.serialize(record);
 		
-		flushSerializationBuffer(false);
+		flushSerializationBuffer(autoflushIntervalMillis == 0);
 	}
 	
 	/**
@@ -226,10 +218,9 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 			if (releaseNonEmptyDataBuffer) {
 				flushBufferUnsynchronized();
 			} else if (freshBufferAllocated && autoflushIntervalMillis != -1) {
-				currentFlusherFuture = scheduledFlusherThreadPool.schedule(new DataBufferFlusher(
-						this.dataBuffer),
-						autoflushIntervalMillis,
-						TimeUnit.MILLISECONDS);
+				scheduledFlusherThreadPool.schedule(new DataBufferFlusher(this.dataBuffer),
+								autoflushIntervalMillis,
+								TimeUnit.MILLISECONDS);
 			}
 		}
 	}
@@ -332,9 +323,5 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 	
 	public int getAutoflushInterval() {
 		return this.autoflushIntervalMillis;
-	}
-
-	public void limitBufferSize(int newOutputBufferSize) {
-		// do nothing
 	}
 }

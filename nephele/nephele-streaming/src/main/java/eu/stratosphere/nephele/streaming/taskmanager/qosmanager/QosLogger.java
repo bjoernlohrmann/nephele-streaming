@@ -14,14 +14,14 @@
  **********************************************************************************************************************/
 package eu.stratosphere.nephele.streaming.taskmanager.qosmanager;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.IOException;
-
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.JobGraphSequence;
 import eu.stratosphere.nephele.streaming.SequenceElement;
 import eu.stratosphere.nephele.streaming.util.StreamPluginConfig;
+
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 
 /**
  * This class is used by Qos managers to log aggregated Qos report data for a
@@ -71,13 +71,7 @@ public class QosLogger extends AbstractQosLogger {
 		boolean nextIsVertex = summary.doesSequenceStartWithVertex();
 		
 		for (int i = 0; i < summary.getSequenceLength(); i++) {
-			if(nextIsVertex) {
-//				QosGroupVertexSummary vs = summary.getGroupVertexSummary(i);
-//				builder.append(';');
-//				builder.append(this.formatDouble(vs.getMeanVertexLatency()));
-//				builder.append(';');
-//				builder.append(this.formatDouble(vs.getMeanVertexLatencyVariance()));				
-			} else {
+			if(!nextIsVertex) {
 				QosGroupEdgeSummary ve = summary.getGroupEdgeSummary(i);
 				builder.append(';');
 				builder.append(ve.getActiveEmitterVertices());
@@ -105,7 +99,7 @@ public class QosLogger extends AbstractQosLogger {
 	}
 
 	private String formatDouble(double doubleValue) {
-		return String.format("%.2f", doubleValue);
+		return String.format("%.6f", doubleValue);
 	}
 
 	private void writeHeaders(JobGraphSequence jobGraphSequence) throws IOException {
@@ -120,12 +114,7 @@ public class QosLogger extends AbstractQosLogger {
 		int edgeIndex = 0;
 
 		for (SequenceElement sequenceElement : jobGraphSequence) {
-			if (sequenceElement.isVertex()) {
-//				builder.append(';');
-//				builder.append(sequenceElement.getName()+"Mean");
-//				builder.append(';');
-//				builder.append(sequenceElement.getName()+"Var");
-			} else {
+			if (sequenceElement.isEdge()) {
 				builder.append(';');
 				builder.append("edge" + edgeIndex + "EmitterCount");
 				builder.append(';');

@@ -1,13 +1,5 @@
 package eu.stratosphere.nephele.streaming.jobmanager.autoscaling;
 
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Set;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import eu.stratosphere.nephele.executiongraph.ExecutionGraph;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.SequenceElement;
@@ -16,6 +8,13 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosConstraintVio
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosGroupEdgeSummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosGroupVertexSummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosManagerID;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Set;
 
 public class QosConstraintSummaryAggregator {
 	
@@ -29,11 +28,14 @@ public class QosConstraintSummaryAggregator {
 
 	private final JobGraphLatencyConstraint constraint;
 
+	private int completeSummaries;
+
 	public QosConstraintSummaryAggregator(ExecutionGraph executionGraph, JobGraphLatencyConstraint constraint, Set<QosManagerID> managerIDs) {
 
 		this.executionGraph = executionGraph;
 		this.constraint = constraint;
 		this.requiredManagerIDs = managerIDs;
+		this.completeSummaries = 0;
 	}
 	
 	public JobGraphLatencyConstraint getConstraint() {
@@ -42,10 +44,13 @@ public class QosConstraintSummaryAggregator {
 
 	public void add(QosManagerID qosManagerID, QosConstraintSummary summary) {
 		summaries.put(qosManagerID, summary);
+		if (summary.hasData()) {
+			completeSummaries++;
+		}
 	}
 	
 	public boolean canAggregate() {
-		return this.summaries.size() == this.requiredManagerIDs.size();
+		return this.summaries.size() == this.requiredManagerIDs.size() && completeSummaries > 0;
 	}
 	
 	public QosConstraintSummary computeAggregation() {

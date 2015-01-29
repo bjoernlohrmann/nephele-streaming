@@ -40,7 +40,7 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 	                                                  Map<JobVertexID, Integer> parallelismChanges)
 					throws UnexpectedVertexExecutionStateException {
 
-		ArrayList<GG1Server> servers = createServers(constraint, constraintSummary, parallelismChanges, true);
+		ArrayList<GG1Server> servers = createServers(constraint, constraintSummary, parallelismChanges);
 		if (hasBottleneck(servers)) {
 			resolveBottleneck(parallelismChanges, servers);
 		} else {
@@ -48,22 +48,6 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 		}
 	}
 
-//	private double getMeanLatency(JobGraphLatencyConstraint constraint, QosConstraintSummary constraintSummary) {
-//		double meanSum=0;
-//		
-//		for (SequenceElement seqElem : constraint.getSequence()) {
-//			if(seqElem.isVertex()) {
-//				QosGroupVertexSummary vertexSummary = constraintSummary.getGroupVertexSummary(seqElem.getIndexInSequence());
-//				meanSum += vertexSummary.getMeanVertexLatency();
-//			} else {
-//				QosGroupEdgeSummary edgeSummary = constraintSummary.getGroupEdgeSummary(seqElem.getIndexInSequence());
-//				meanSum += edgeSummary.getOutputBufferLatencyMean();
-//				meanSum += edgeSummary.getTransportLatencyMean();
-//			}
-//		}
-//		
-//		return meanSum;
-//	}
 
 	private void rebalance(JobGraphLatencyConstraint constraint,
 	                       QosConstraintSummary constraintSummary,
@@ -92,16 +76,6 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 							reb.getRebalancedQueueWait() * 1000));
 			LOG.debug("Rebalance: " + strBuild.toString());
 		}
-
-		// "dampen" scale downs
-//		for (JobVertexID id : rebActions.keySet()) {
-//			if (rebActions.get(id) < 0) {
-//				int diff = (int) Math.floor(-rebActions.get(id) * 0.25);
-//				rebParallelism.put(id, rebParallelism.get(id) + diff);
-//				rebActions.put(id, rebActions.get(id) + diff);
-//				LOG.info(String.format("Rebalance: Limiting scale down of %s to %d", id.toString(), rebActions.get(id)));
-//			}
-//		}
 
 		// filter out minuscule changes in parallelism
 		for (GG1Server server : servers) {
@@ -139,8 +113,7 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 
 	private ArrayList<GG1Server> createServers(JobGraphLatencyConstraint constraint,
 	                                           QosConstraintSummary constraintSummary,
-	                                           Map<JobVertexID, Integer> scalingActions,
-	                                           boolean allowScaleDown) {
+	                                           Map<JobVertexID, Integer> parallelismChanges) {
 
 		ArrayList<GG1Server> gg1Servers = new ArrayList<GG1Server>();
 
@@ -159,22 +132,15 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 
 			boolean isElastic = consumerGroupVertex.hasElasticNumberOfRunningSubtasks();
 			if (isElastic) {
-				int currParallelism = consumerGroupVertex.getCurrentElasticNumberOfRunningSubtasks();
-
 				minParallelism = consumerGroupVertex.getMinElasticNumberOfRunningSubtasks();
-				if (!allowScaleDown) {
-					minParallelism = currParallelism;
-				}
 
-				if (scalingActions.get(id) != null) {
-					minParallelism = Math.max(minParallelism,
-									consumerGroupVertex.getCurrentElasticNumberOfRunningSubtasks() + scalingActions.get(id));
+				if (parallelismChanges.get(id) != null) {
+					minParallelism = Math.max(minParallelism, parallelismChanges.get(id));
 				}
 
 				maxParallelism = consumerGroupVertex.getMaxElasticNumberOfRunningSubtasks();
 			} else {
-				minParallelism = consumerGroupVertex.getCurrentNumberOfGroupMembers();
-				maxParallelism = minParallelism;
+				minParallelism = maxParallelism = consumerGroupVertex.getCurrentNumberOfGroupMembers();
 			}
 
 			gg1Servers.add(new GG1ServerKingman(id, minParallelism, maxParallelism, edgeSummary));
