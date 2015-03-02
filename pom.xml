@@ -39,32 +39,26 @@
 			<name>Bjoern Lohrmann</name>
 			<email>bjoern.lohrmann@tu-berlin.de</email>
 			<organization>TU-Berlin, CIT</organization>
-			<organizationUrl>http://www.cit.tu-berlin.de</organizationUrl>
+			<organizationUrl>http://www.cit.tu-berlin.de/</organizationUrl>
 			<roles>
 				<role>Lead Developer (Stratosphere-Streaming)</role>
 			</roles>
 		</developer>
 
 		<developer>
-			<id>mjsax</id>
-			<name>Matthias J. Sax</name>
-			<email>mjsax@informatik.hu-berlin.de</email>
-			<organization>HU-Berlin, DBIS</organization>
-			<organizationUrl>http://www.dbis.informatik.hu-berlin.de/</organizationUrl>
-			<roles>
-				<role>Lead Developer (Stratosphere-Streaming)</role>
-			</roles>
+			<id>verbit</id>
+			<name>Ilya Verbitskiy</name>
+			<email>ilya.verbitskiy@gmail.com</email>
+			<organization>TU-Berlin, CIT</organization>
+			<organizationUrl>http://www.cit.tu-berlin.de/</organizationUrl>
 		</developer>
 
 		<developer>
-			<id>fabianfier</id>
-			<name>Fabian Fier</name>
-			<email>fabian.fier@informatik.hu-berlin.de</email>
-			<organization>HU-Berlin, DBIS</organization>
-			<organizationUrl>http://www.dbis.informatik.hu-berlin.de/</organizationUrl>
-			<roles>
-				<role>Lead Developer (Stratosphere-Streaming)</role>
-			</roles>
+			<id>sascha</id>
+			<name>Sascha Wolke</name>
+			<email>sascha.wolke@campus.tu-berlin.de</email>
+            <organization>TU-Berlin, CIT</organization>
+            <organizationUrl>http://www.cit.tu-berlin.de/</organizationUrl>
 		</developer>
 	</developers>
 
@@ -76,8 +70,6 @@
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-		<hadoop-one.version>1.2.1</hadoop-one.version>
-		<hadoop-two.version>2.0.0-cdh4.2.1</hadoop-two.version>
 		<powermock.version>1.5.1</powermock.version>
 	</properties>
 
@@ -180,63 +172,7 @@
 			<type>jar</type>
 			<scope>test</scope>
 		</dependency>
-		
 	</dependencies>
-
-	<profiles>
-		<profile>
-			<id>hadoop-1</id>
-			<activation>
-				<property>
-					<!-- Please do not remove the 'hadoop1' comment. See ./tools/generate_specific_pom.sh -->
-					<!--hadoop1--><name>!hadoop.profile</name>
-				</property>
-			</activation>
-			<properties>
-				<hadoop.version>${hadoop-one.version}</hadoop.version>
-			</properties>
-			<dependencyManagement>
-				<dependencies>
-					<!-- "Old" stable Hadoop = MapReduce v1 -->
-					<dependency>
-						<groupId>org.apache.hadoop</groupId>
-						<artifactId>hadoop-core</artifactId>
-						<version>${hadoop.version}</version>
-					</dependency>
-				</dependencies>
-			</dependencyManagement>
-		</profile>
-		<profile>
-			<id>hadoop-2</id>
-			<activation>
-				<property>
-					<!-- Please do not remove the 'hadoop1' comment. See ./tools/generate_specific_pom.sh -->
-					<!--hadoop2--><name>hadoop.profile</name><value>2</value>
-				</property>
-			</activation>
-			<properties>
-				<hadoop.version>${hadoop-two.version}</hadoop.version>
-			</properties>
-			<dependencyManagement>
-				<dependencies>
-					<!-- YARN -->
-					<dependency>
-						<groupId>org.apache.hadoop</groupId>
-						<artifactId>hadoop-common</artifactId>
-						<version>${hadoop.version}</version>
-					</dependency>
-					<dependency>
-						<groupId>org.apache.hadoop</groupId>
-						<artifactId>hadoop-hdfs</artifactId>
-						<version>${hadoop.version}</version>
-					</dependency>
-				</dependencies>
-			</dependencyManagement>
-		</profile>
-	</profiles>
-
-
-
 
 	<reporting>
 		<plugins>
@@ -292,7 +228,7 @@
 					<!-- High optimization, no debugging <compilerArgument>-g:none -O</compilerArgument> -->
 				</configuration>
 			</plugin>
-			<plugin>
+<!-- <plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-javadoc-plugin</artifactId>
 				<version>2.9.1</version>
@@ -307,7 +243,7 @@
 						</goals>
 					</execution>
 				</executions>
-			</plugin>
+			</plugin> -->
 			<plugin>
 				<artifactId>maven-failsafe-plugin</artifactId>
 				<version>2.6</version>

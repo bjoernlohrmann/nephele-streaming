@@ -34,16 +34,6 @@
 		</dependency>
 		<dependency>
 			<groupId>eu.stratosphere</groupId>
-			<artifactId>nephele-hdfs</artifactId>
-			<version>${project.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>eu.stratosphere</groupId>
-			<artifactId>nephele-s3</artifactId>
-			<version>${project.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>eu.stratosphere</groupId>
 			<artifactId>nephele-management</artifactId>
 			<version>${project.version}</version>
 		</dependency>
@@ -74,38 +64,6 @@
 		</dependency>
 
 	</dependencies>
-
-	<!-- See main pom.xml for explanation of profiles -->
-	<profiles>
-		<profile>
-			<id>hadoop-1</id>
-			<activation>
-				<property>
-					<!-- Please do not remove the 'hadoop1' comment. See ./tools/generate_specific_pom.sh -->
-					<!--hadoop1--><name>!hadoop.profile</name>
-				</property>
-			</activation>
-			<dependencies>
-				<!-- No extra dependencies: pact-hbase is currently not compatible with Hadoop v1 -->
-			</dependencies>
-		</profile>
-		<profile>
-			<id>hadoop-2</id>
-			<activation>
-				<property>
-					<!-- Please do not remove the 'hadoop1' comment. See ./tools/generate_specific_pom.sh -->
-					<!--hadoop2--><name>hadoop.profile</name><value>2</value>
-				</property>
-			</activation>
-			<dependencies>
-				<dependency>
-					<groupId>eu.stratosphere</groupId>
-					<artifactId>pact-hbase</artifactId>
-					<version>${project.version}</version>
-				</dependency>
-			</dependencies>
-		</profile>
-	</profiles>
 
 	<build>
 		<plugins>

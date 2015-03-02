@@ -109,6 +109,13 @@ pact.web.rootpath: ./resources/web-docs/
 # If not specified, the system-specific Java temporary directory is taken (java.io.tmpdir property) as base.
 # pact.web.plandump: /tmp/pact-plans
 
+#=======================================================================================================================
+#                                                   MESOS INTEGRATION
+#=======================================================================================================================
+
+mesos.masterHost = localhost
+mesos.masterPort = 5050
+
 #========================================================================
 #                       Nephele Stream Processing Plugin
 #========================================================================
