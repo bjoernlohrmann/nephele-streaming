@@ -14,11 +14,11 @@
  **********************************************************************************************************************/
 package eu.stratosphere.nephele.streaming;
 
+import eu.stratosphere.nephele.io.IOReadableWritable;
+
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-
-import eu.stratosphere.nephele.io.IOReadableWritable;
 
 /**
  * This class can be used to define latency constraints on a job graph. A
@@ -38,6 +38,10 @@ import eu.stratosphere.nephele.io.IOReadableWritable;
  * 
  */
 public class JobGraphLatencyConstraint implements IOReadableWritable {
+
+	private static int nextConstraintIndex = 0;
+
+	private int index;
 
 	private LatencyConstraintID constraintID;
 
@@ -60,6 +64,11 @@ public class JobGraphLatencyConstraint implements IOReadableWritable {
 		this.sequence = sequence;
 		this.latencyConstraintInMillis = latencyConstraintInMillis;
 		this.name = name;
+
+		synchronized(JobGraphLatencyConstraint.class) {
+			this.index = nextConstraintIndex;
+			nextConstraintIndex++;
+		}
 	}
 
 	public JobGraphLatencyConstraint(JobGraphSequence sequence,
@@ -103,15 +112,24 @@ public class JobGraphLatencyConstraint implements IOReadableWritable {
 		return name;
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see
-	 * eu.stratosphere.nephele.io.IOReadableWritable#write(java.io.DataOutput)
+	/**
+	 * Returns a unique constraint index that can be used in place of the (bulky) constraintID.
+	 * @return
 	 */
+	public int getIndex() {
+		return index;
+	}
+
+	/*
+		 * (non-Javadoc)
+		 *
+		 * @see
+		 * eu.stratosphere.nephele.io.IOReadableWritable#write(java.io.DataOutput)
+		 */
 	@Override
 	public void write(DataOutput out) throws IOException {
 		this.constraintID.write(out);
+		out.writeInt(index);
 		this.sequence.write(out);
 		out.writeLong(this.latencyConstraintInMillis);
 		out.writeUTF(this.name);
@@ -127,6 +145,7 @@ public class JobGraphLatencyConstraint implements IOReadableWritable {
 	public void read(DataInput in) throws IOException {
 		this.constraintID = new LatencyConstraintID();
 		this.constraintID.read(in);
+		this.index = in.readInt();
 		this.sequence = new JobGraphSequence();
 		this.sequence.read(in);
 		this.latencyConstraintInMillis = in.readLong();

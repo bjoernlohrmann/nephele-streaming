@@ -1,14 +1,14 @@
 package eu.stratosphere.nephele.streaming.jobmanager.autoscaling;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.util.Map;
-
 import eu.stratosphere.nephele.executiongraph.ExecutionGraph;
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
 import eu.stratosphere.nephele.streaming.util.StreamPluginConfig;
+
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.Map;
 
 public class CpuLoadLogger extends AbstractCpuLoadLogger {
 	private BufferedWriter writer;
@@ -18,7 +18,7 @@ public class CpuLoadLogger extends AbstractCpuLoadLogger {
 		
 		String logFile = StreamPluginConfig.getCpuStatisticsLogfilePattern();
 		if (logFile.contains("%s")) {
-			logFile = String.format(logFile, constraint.getID().toString());
+			logFile = String.format(logFile, Integer.toString(constraint.getIndex()));
 		}
 		this.writer = new BufferedWriter(new FileWriter(logFile));
 		this.writeHeaders(execGraph);

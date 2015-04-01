@@ -39,7 +39,7 @@ public class QosLogger extends AbstractQosLogger {
 
 		String logFile = StreamPluginConfig.getQosStatisticsLogfilePattern();
 		if (logFile.contains("%s")) {
-			logFile = String.format(logFile, constraint.getID().toString());
+			logFile = String.format(logFile, Integer.toString(constraint.getIndex()));
 		}
 		this.writer = new BufferedWriter(new FileWriter(logFile));
 		this.writeHeaders(constraint.getSequence());
