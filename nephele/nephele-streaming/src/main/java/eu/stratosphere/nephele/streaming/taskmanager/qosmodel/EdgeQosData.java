@@ -27,7 +27,7 @@ public class EdgeQosData {
 
 	private boolean isInChain;
 	
-	private ValueHistory<Integer> targetOblHistory;
+	private ValueHistory<Integer> targetObltHistory;
 
 
 	public EdgeQosData(QosEdge edge) {
@@ -39,7 +39,7 @@ public class EdgeQosData {
 				StreamPluginConfig.computeQosStatisticWindowSize());
 		this.recordsPerBufferStatistic = new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize());
 		this.recordsPerSecondStatistic = new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize());
-		this.targetOblHistory = new ValueHistory<Integer>(2);
+		this.targetObltHistory = new ValueHistory<Integer>(2);
 	}
 
 	public QosEdge getEdge() {
@@ -54,18 +54,33 @@ public class EdgeQosData {
 			return -1;
 		}
 
-		return Math.min(channelLatency, oblt / 2);
+		double recordsPerBuffer = getRecordsPerBuffer();
+		if (Math.abs(recordsPerBuffer - 1) < 0.001) {
+			// pathological corner case: record emissions are very infrequent
+			return oblt;
+		} else {
+			return Math.min(channelLatency, oblt / 2);
+		}
+	}
+
+	public int proposeOutputBufferLifetimeForOutputBufferLatencyTarget(int targetObl) {
+		double recordsPerBuffer = getRecordsPerBuffer();
+		if (Math.abs(recordsPerBuffer - 1) < 0.001) {
+			return targetObl;
+		} else {
+			return targetObl * 2;
+		}
 	}
 
 	public double estimateTransportLatencyInMillis() {
 		double channelLatency = getChannelLatencyInMillis();
-		double oblt = getOutputBufferLifetimeInMillis();
+		double obl = estimateOutputBufferLatencyInMillis();
 
-		if (channelLatency == -1 || oblt == -1) {
+		if (channelLatency == -1 || obl == -1) {
 			return -1;
 		}
 
-		return Math.max(0, channelLatency - (oblt / 2));
+		return Math.max(0, channelLatency - obl);
 	}
 
 	public double getChannelLatencyInMillis() {
@@ -174,7 +189,7 @@ public class EdgeQosData {
 		}
 	}
 	
-	public ValueHistory<Integer> getTargetOblHistory() {
-		return this.targetOblHistory;
+	public ValueHistory<Integer> getTargetObltHistory() {
+		return this.targetObltHistory;
 	}
 }

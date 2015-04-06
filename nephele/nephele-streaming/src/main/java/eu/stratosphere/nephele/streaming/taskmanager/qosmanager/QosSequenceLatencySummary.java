@@ -1,15 +1,11 @@
 package eu.stratosphere.nephele.streaming.taskmanager.qosmanager;
 
-import java.util.List;
-
 import eu.stratosphere.nephele.streaming.JobGraphSequence;
 import eu.stratosphere.nephele.streaming.SequenceElement;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers.ValueHistory;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.EdgeQosData;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosEdge;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphMember;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosVertex;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.VertexQosData;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.*;
+
+import java.util.List;
 
 public class QosSequenceLatencySummary {
 	
@@ -82,7 +78,7 @@ public class QosSequenceLatencySummary {
 	private boolean hasFreshValues(QosEdge edge) {
 		EdgeQosData edgeQos = edge.getQosData();
 
-		ValueHistory<Integer> targetOblHistory = edgeQos.getTargetOblHistory();
+		ValueHistory<Integer> targetOblHistory = edgeQos.getTargetObltHistory();
 		return !targetOblHistory.hasEntries()
 				|| edgeQos.hasNewerData(targetOblHistory.getLastEntry().getTimestamp());
 	}

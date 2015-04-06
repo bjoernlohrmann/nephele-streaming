@@ -20,11 +20,7 @@ import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.profiling.ProfilingException;
 import eu.stratosphere.nephele.streaming.message.AbstractQosMessage;
 import eu.stratosphere.nephele.streaming.message.ChainUpdates;
-import eu.stratosphere.nephele.streaming.message.action.CandidateChainConfig;
-import eu.stratosphere.nephele.streaming.message.action.DeployInstanceQosManagerRoleAction;
-import eu.stratosphere.nephele.streaming.message.action.DeployInstanceQosRolesAction;
-import eu.stratosphere.nephele.streaming.message.action.LimitBufferSizeAction;
-import eu.stratosphere.nephele.streaming.message.action.SetOutputLatencyTargetAction;
+import eu.stratosphere.nephele.streaming.message.action.*;
 import eu.stratosphere.nephele.streaming.message.qosreport.QosReport;
 import eu.stratosphere.nephele.streaming.taskmanager.StreamTaskManagerPlugin;
 import eu.stratosphere.nephele.streaming.taskmanager.chaining.ChainManagerThread;
@@ -33,7 +29,6 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosManagerThread
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.StreamTaskEnvironment;
 import eu.stratosphere.nephele.streaming.util.StreamPluginConfig;
 import eu.stratosphere.nephele.taskmanager.runtime.RuntimeTask;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -167,8 +162,8 @@ public class StreamJobEnvironment {
 			this.handleChainUpdates((ChainUpdates) streamMsg);
 		} else if (streamMsg instanceof LimitBufferSizeAction) {
 			this.handleLimitBufferSizeAction((LimitBufferSizeAction) streamMsg);
-		} else if (streamMsg instanceof SetOutputLatencyTargetAction) {
-			this.handleSetOutputLatencyTargetAction((SetOutputLatencyTargetAction) streamMsg);
+		} else if (streamMsg instanceof SetOutputBufferLifetimeTargetAction) {
+			this.handleSetOutputLatencyTargetAction((SetOutputBufferLifetimeTargetAction) streamMsg);
 		} else if (streamMsg instanceof DeployInstanceQosManagerRoleAction) {
 			this.handleDeployInstanceQosManagerRoleAction((DeployInstanceQosManagerRoleAction) streamMsg);
 		} else if (streamMsg instanceof DeployInstanceQosRolesAction) {
@@ -180,7 +175,7 @@ public class StreamJobEnvironment {
 	}
 
 	private void handleSetOutputLatencyTargetAction(
-			SetOutputLatencyTargetAction action) {
+			SetOutputBufferLifetimeTargetAction action) {
 
 		StreamTaskQosCoordinator qosCoordinator = this.taskQosCoordinators
 				.get(action.getVertexID());

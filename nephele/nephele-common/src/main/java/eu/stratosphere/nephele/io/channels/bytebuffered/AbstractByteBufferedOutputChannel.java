@@ -64,8 +64,8 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 	 * Buffer for the serialized output data.
 	 */
 	private Buffer dataBuffer = null;
-	
-	private int autoflushIntervalMillis = 0;
+
+	private int flushDeadline = 0;
 
 	/**
 	 * Stores whether the channel is requested to be closed.
@@ -156,7 +156,12 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 		if (Thread.interrupted()) {
 			throw new InterruptedException();
 		}
-		return this.outputChannelBroker.requestEmptyWriteBuffer();
+
+		Buffer ret = this.outputChannelBroker.requestEmptyWriteBuffer();
+		// Notify the output gate to enable statistics collection by plugins
+		getOutputGate().outputBufferAllocated(getChannelIndex());
+
+		return ret;
 	}
 
 	/**
@@ -176,7 +181,7 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 
 		this.serializationBuffer.serialize(record);
 		
-		flushSerializationBuffer(autoflushIntervalMillis == 0);
+		flushSerializationBuffer(flushDeadline == 0);
 	}
 	
 	/**
@@ -217,9 +222,9 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 		if (this.dataBuffer != null) {
 			if (releaseNonEmptyDataBuffer) {
 				flushBufferUnsynchronized();
-			} else if (freshBufferAllocated && autoflushIntervalMillis != -1) {
+			} else if (freshBufferAllocated) {
 				scheduledFlusherThreadPool.schedule(new DataBufferFlusher(this.dataBuffer),
-								autoflushIntervalMillis,
+								flushDeadline,
 								TimeUnit.MILLISECONDS);
 			}
 		}
@@ -317,11 +322,17 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 		}
 	}
 	
-	public void setAutoflushInterval(int newAutoflushIntervalMillis) {
-		this.autoflushIntervalMillis = newAutoflushIntervalMillis;
+	public void setFlushDeadline(int flushDeadline) {
+		this.flushDeadline = flushDeadline;
 	}
 	
-	public int getAutoflushInterval() {
-		return this.autoflushIntervalMillis;
+	public int getFlushDeadline() {
+		return this.flushDeadline;
+	}
+
+	public synchronized static void ensureAutoflushThreadPoolsize(int poolsize) {
+		if (scheduledFlusherThreadPool.getCorePoolSize() != poolsize) {
+			scheduledFlusherThreadPool.setCorePoolSize(poolsize);
+		}
 	}
 }

@@ -1,21 +1,20 @@
 package eu.stratosphere.nephele.streaming.taskmanager.qosmanager.buffers;
 
-import java.util.HashMap;
-import java.util.List;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import eu.stratosphere.nephele.instance.InstanceConnectionInfo;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.streaming.JobGraphLatencyConstraint;
-import eu.stratosphere.nephele.streaming.message.action.SetOutputLatencyTargetAction;
+import eu.stratosphere.nephele.streaming.message.action.SetOutputBufferLifetimeTargetAction;
 import eu.stratosphere.nephele.streaming.taskmanager.StreamMessagingThread;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosConstraintViolationListener;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosSequenceLatencySummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.EdgeQosData;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosEdge;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphMember;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import java.util.HashMap;
+import java.util.List;
 
 /**
  * Used by the Qos manager to manage output latencies in a Qos graph. It uses a
@@ -78,8 +77,7 @@ public class OutputBufferLatencyManager {
 		for (QosEdge edge : edgesToAdjust.keySet()) {
 			int newTargetObl = edgesToAdjust.get(edge);
 
-			ValueHistory<Integer> oblHistory = edge.getQosData()
-					.getTargetOblHistory();
+			ValueHistory<Integer> oblHistory = edge.getQosData().getTargetObltHistory();
 			oblHistory.addToHistory(oblHistoryTimestamp, newTargetObl);
 
 			this.setTargetOutputBufferLatency(edge, newTargetObl);
@@ -107,25 +105,26 @@ public class OutputBufferLatencyManager {
 				continue;
 			}
 			
-			// stick to the 80-20 rule (80% of available time (minus 10% safety margin) for output buffering,
+			// stick to the 80-20 rule (80% of available time (minus 1 ms shipping time) for output buffering,
 			// 20% for queueing) and trust in the autoscaler to keep the queueing time in check.
-			int targetObl = (int) (availLatPerChannel * 0.8 * 0.9);
+			int targetObl = Math.max(0, (int) (availLatPerChannel * 0.8 - 1));
+			int targetOblt = qosData.proposeOutputBufferLifetimeForOutputBufferLatencyTarget(targetObl);
 			
 			// do nothing if change is very small
-			ValueHistory<Integer> targetOblHistory = qosData.getTargetOblHistory();
-			if (targetOblHistory.hasEntries()) {
-				int oldTargetObl = targetOblHistory.getLastEntry().getValue();
+			ValueHistory<Integer> targetObltHistory = qosData.getTargetObltHistory();
+			if (targetObltHistory.hasEntries()) {
+				int oldTargetOblt = targetObltHistory.getLastEntry().getValue();
 				
-				if (oldTargetObl == targetObl) {
+				if (oldTargetOblt == targetOblt) {
 					continue;
 				}
 			}
 
-			// do nothing target output buffer latency on this edge is already being adjusted to
+			// do nothing target output buffer lifetime on this edge is already being adjusted to
 			// a smaller value
 			if (!edgesToAdjust.containsKey(edge)
-					|| edgesToAdjust.get(edge) > targetObl) {
-				edgesToAdjust.put(qosData.getEdge(), targetObl);
+					|| edgesToAdjust.get(edge) > targetOblt) {
+				edgesToAdjust.put(qosData.getEdge(), targetOblt);
 			}
 		}
 	}
@@ -163,7 +162,7 @@ public class OutputBufferLatencyManager {
 	private void setTargetOutputBufferLatency(QosEdge edge, int targetObl)
 			throws InterruptedException {
 
-		SetOutputLatencyTargetAction action = new SetOutputLatencyTargetAction(
+		SetOutputBufferLifetimeTargetAction action = new SetOutputBufferLifetimeTargetAction(
 				this.jobID, edge.getOutputGate().getVertex().getID(), edge
 						.getOutputGate().getGateID(),
 				edge.getSourceChannelID(), targetObl);

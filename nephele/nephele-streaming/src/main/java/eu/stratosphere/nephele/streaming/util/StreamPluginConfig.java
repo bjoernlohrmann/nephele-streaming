@@ -56,13 +56,23 @@ public class StreamPluginConfig {
 
 	public static final long DEFAULT_ADJUSTMENTINTERVAL = 5000;
 
-	public static final String IN_MEMORY_LOG_ENTRIES_KEY = PluginManager
-			.prefixWithPluginNamespace("streaming.qosmanager.logging.in_memory_entries");
+	/**
+	 * Poolsize of thread pool used for flushing output channels. It is better to err on the
+	 * high side here, because setting this too low causes buffers to not get flushed in
+	 * time for their deadline.
+	 */
+	public static final String OUTPUT_CAHNNEL_FLUSHER_THREADPOOLSIZE_KEY = PluginManager
+					.prefixWithPluginNamespace("streaming.runtime.output_channel_flusher_threadpoolsize");
+
+	public static final int DEFAULT_OUTPUT_CAHNNEL_FLUSHER_THREADPOOLSIZE = 20;
 
 	/**
 	 * Keep history of last 15min by default: 15 60 /
 	 * (DEFAULT_ADJUSTMENTINTERVAL / 1000)) = 180
 	 */
+	public static final String IN_MEMORY_LOG_ENTRIES_KEY = PluginManager
+			.prefixWithPluginNamespace("streaming.qosmanager.logging.in_memory_entries");
+
 	public static final int DEFAULT_IN_MEMORY_LOG_ENTRIES = 180;
 
 	public static long getAggregationIntervalMillis() {
@@ -98,6 +108,11 @@ public class StreamPluginConfig {
 	public static int computeQosStatisticWindowSize() {
 		return (int) Math.ceil(((double) getAdjustmentIntervalMillis())
 				/ getAggregationIntervalMillis());
+	}
+
+	public static int getOutputChannelFlusherThreadpoolsize() {
+		return GlobalConfiguration.getInteger(OUTPUT_CAHNNEL_FLUSHER_THREADPOOLSIZE_KEY,
+						DEFAULT_OUTPUT_CAHNNEL_FLUSHER_THREADPOOLSIZE);
 	}
 
 }

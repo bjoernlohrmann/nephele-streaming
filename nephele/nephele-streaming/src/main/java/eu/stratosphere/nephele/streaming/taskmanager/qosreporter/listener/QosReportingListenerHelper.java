@@ -81,6 +81,11 @@ public class QosReportingListenerHelper {
 			}
 
 			@Override
+			public void outputBufferAllocated(int channelIndex) {
+				// do nothing
+			}
+
+			@Override
 			public void outputBufferSent(int outputChannelIndex,
 					long currentAmountTransmitted) {
 				// do nothing
@@ -157,6 +162,11 @@ public class QosReportingListenerHelper {
 				gateReporterManager.recordEmitted(runtimeGateChannelIndex,
 						record);
 			}
+
+			@Override
+			public void outputBufferAllocated(int channelIndex) {
+				gateReporterManager.outputBufferAllocated(channelIndex);
+			}
 		};
 
 		OutputGateQosReportingListener oldListener = outputGate
@@ -219,6 +229,12 @@ public class QosReportingListenerHelper {
 
 				first.recordEmitted(outputChannel, record);
 				second.recordEmitted(outputChannel, record);
+			}
+
+			@Override
+			public void outputBufferAllocated(int channelIndex) {
+				first.outputBufferAllocated(channelIndex);
+				second.outputBufferAllocated(channelIndex);
 			}
 		};
 	}

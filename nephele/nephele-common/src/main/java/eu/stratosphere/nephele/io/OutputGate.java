@@ -15,14 +15,14 @@
 
 package eu.stratosphere.nephele.io;
 
-import java.io.IOException;
-import java.util.List;
-
 import eu.stratosphere.nephele.io.channels.AbstractOutputChannel;
 import eu.stratosphere.nephele.io.channels.ChannelID;
 import eu.stratosphere.nephele.io.channels.bytebuffered.InMemoryOutputChannel;
 import eu.stratosphere.nephele.io.channels.bytebuffered.NetworkOutputChannel;
 import eu.stratosphere.nephele.types.Record;
+
+import java.io.IOException;
+import java.util.List;
 
 /**
  * In Nephele output gates are a specialization of general gates and connect
@@ -123,8 +123,6 @@ public interface OutputGate<T extends Record> extends Gate<T> {
 	 *        the ID of the channel
 	 * @param connectedChannelID
 	 *        the ID of the channel this channel is connected to
-	 * @param compressionLevel
-	 *        the level of compression to be used for this channel
 	 * @return the new network output channel
 	 */
 	NetworkOutputChannel<T> createNetworkOutputChannel(OutputGate<T> outputGate, ChannelID channelID,
@@ -139,8 +137,6 @@ public interface OutputGate<T extends Record> extends Gate<T> {
 	 *        the ID of the channel
 	 * @param connectedChannelID
 	 *        the ID of the channel this channel is connected to
-	 * @param compressionLevel
-	 *        the level of compression to be used for this channel
 	 * @return the new in-memory output channel
 	 */
 	InMemoryOutputChannel<T> createInMemoryOutputChannel(OutputGate<T> outputGate, ChannelID channelID,
@@ -160,4 +156,6 @@ public interface OutputGate<T extends Record> extends Gate<T> {
 	void setOutputChannelSuspended(int index, boolean isSuspended);
 
 	void notifyPendingEvent(int channelIndex);
+
+	void outputBufferAllocated(int channelIndex);
 }

@@ -17,7 +17,7 @@ package eu.stratosphere.nephele.streaming.taskmanager.qosreporter;
 import eu.stratosphere.nephele.io.channels.ChannelID;
 import eu.stratosphere.nephele.streaming.message.action.EdgeQosReporterConfig;
 import eu.stratosphere.nephele.streaming.message.action.LimitBufferSizeAction;
-import eu.stratosphere.nephele.streaming.message.action.SetOutputLatencyTargetAction;
+import eu.stratosphere.nephele.streaming.message.action.SetOutputBufferLifetimeTargetAction;
 import eu.stratosphere.nephele.streaming.message.action.VertexQosReporterConfig;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.listener.QosReportingListenerHelper;
@@ -27,7 +27,6 @@ import eu.stratosphere.nephele.streaming.taskmanager.runtime.io.StreamInputGate;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.io.StreamOutputGate;
 import eu.stratosphere.nephele.taskmanager.runtime.RuntimeTask;
 import eu.stratosphere.nephele.types.Record;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -271,7 +270,7 @@ public class StreamTaskQosCoordinator implements QosReporterConfigListener {
 	}
 	
 	public void handleSetOutputLatencyTargetAction(
-			SetOutputLatencyTargetAction action) {
+			SetOutputBufferLifetimeTargetAction action) {
 
 		if (this.isShutdown) {
 			return;
@@ -290,7 +289,7 @@ public class StreamTaskQosCoordinator implements QosReporterConfigListener {
 				LOG.debug(String
 						.format("Setting obl target for %s (%s) to %d ms",
 								sourceChannelID, edgeReporter.getName(),
-								action.getOutputBufferLatencyTarget()));
+								action.getOutputBufferLifetimeTarget()));
 				outputGate.enqueueQosAction(action);
 			}
 		}

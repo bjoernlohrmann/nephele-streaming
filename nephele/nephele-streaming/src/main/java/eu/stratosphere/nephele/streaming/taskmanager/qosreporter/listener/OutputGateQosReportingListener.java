@@ -29,4 +29,6 @@ public interface OutputGateQosReportingListener {
 	public void outputBufferSent(int channelIndex, long currentAmountTransmitted);
 
 	public void recordEmitted(int outputChannel, AbstractTaggableRecord record);
+
+	public void outputBufferAllocated(int channelIndex);
 }

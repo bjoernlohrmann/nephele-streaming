@@ -2,6 +2,7 @@ package eu.stratosphere.nephele.streaming.taskmanager.qosreporter;
 
 import eu.stratosphere.nephele.streaming.message.qosreport.EdgeStatistics;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
+import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.edge.OutputBufferLifetimeSampler;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.BernoulliSampleDesign;
 import eu.stratosphere.nephele.types.AbstractTaggableRecord;
 
@@ -60,7 +61,9 @@ public class OutputGateReporterManager {
 
 		private int recordsSinceLastTag;
 
-		public BernoulliSampleDesign bernoulliSampleDesign;
+		public final BernoulliSampleDesign recordTaggingSampleDesign;
+
+		private final OutputBufferLifetimeSampler outputBufferLifetimeSampler;
 
 		public OutputChannelChannelStatisticsReporter(
 				QosReporterID.Edge reporterID, int channelIndexInRuntimeGate) {
@@ -71,9 +74,14 @@ public class OutputGateReporterManager {
 			this.amountTransmittedAtLastReport = 0;
 			this.currentAmountTransmitted = 0;
 			this.recordsEmittedSinceLastReport = 0;
+			this.outputBuffersSentSinceLastReport = 0;
 			this.recordsSinceLastTag = 0;
-			this.bernoulliSampleDesign = new BernoulliSampleDesign(
+			this.recordTaggingSampleDesign = new BernoulliSampleDesign(
 					OutputGateReporterManager.this.reportForwarder.getConfigCenter().getSamplingProbability() / 100.0);
+
+
+			this.outputBufferLifetimeSampler = new OutputBufferLifetimeSampler(
+							OutputGateReporterManager.this.reportForwarder.getConfigCenter().getSamplingProbability() / 100.0);
 		}
 
 		/**
@@ -159,7 +167,8 @@ public class OutputGateReporterManager {
 			return now - this.timeOfLastReport > OutputGateReporterManager.this.reportForwarder
 					.getConfigCenter().getAggregationInterval()
 					&& this.recordsEmittedSinceLastReport > 0
-					&& this.outputBuffersSentSinceLastReport > 0;
+					&& this.outputBuffersSentSinceLastReport > 0
+					&& this.outputBufferLifetimeSampler.hasSample();
 		}
 
 		private void reset(long now) {
@@ -167,7 +176,8 @@ public class OutputGateReporterManager {
 			this.amountTransmittedAtLastReport = this.currentAmountTransmitted;
 			this.recordsEmittedSinceLastReport = 0;
 			this.outputBuffersSentSinceLastReport = 0;
-			this.bernoulliSampleDesign.reset();
+			this.recordTaggingSampleDesign.reset();
+			this.outputBufferLifetimeSampler.reset();
 		}
 
 		private void sendReport(long now) {
@@ -175,15 +185,14 @@ public class OutputGateReporterManager {
 			double secsPassed = (now - this.timeOfLastReport) / 1000.0;
 			double mbitPerSec = (this.currentAmountTransmitted - this.amountTransmittedAtLastReport)
 					* 8 / (1000000.0 * secsPassed);
-			long outputBufferLifetime = (now - this.timeOfLastReport)
-					/ this.outputBuffersSentSinceLastReport;
+			double meanOutputBufferLifetime = outputBufferLifetimeSampler.getMeanOutputBufferLifetimeMillis();
 			double recordsPerBuffer = (double) this.recordsEmittedSinceLastReport
 					/ this.outputBuffersSentSinceLastReport;
 			double recordsPerSecond = this.recordsEmittedSinceLastReport
 					/ secsPassed;
 
 			EdgeStatistics channelStatsMessage = new EdgeStatistics(
-					this.reporterID, mbitPerSec, outputBufferLifetime,
+					this.reporterID, mbitPerSec, meanOutputBufferLifetime,
 					recordsPerBuffer, recordsPerSecond);
 
 			OutputGateReporterManager.this.reportForwarder
@@ -195,7 +204,8 @@ public class OutputGateReporterManager {
 			this.recordsEmittedSinceLastReport++;
 			this.recordsSinceLastTag++;
 
-			if (bernoulliSampleDesign.shouldSample()) {
+			boolean shouldSample = recordTaggingSampleDesign.shouldSample();
+			if (shouldSample) {
 				this.tagRecord(record);
 				this.recordsSinceLastTag = 0;
 			} else {
@@ -207,6 +217,17 @@ public class OutputGateReporterManager {
 			TimestampTag tag = new TimestampTag();
 			tag.setTimestamp(System.currentTimeMillis());
 			record.setTag(tag);
+		}
+
+		public void outputBufferSent(long currentAmountTransmitted) {
+			this.outputBuffersSentSinceLastReport++;
+			this.currentAmountTransmitted = currentAmountTransmitted;
+			this.outputBufferLifetimeSampler.outputBufferSent();
+			sendReportIfDue(System.currentTimeMillis());
+		}
+
+		public void outputBufferAllocated() {
+			this.outputBufferLifetimeSampler.outputBufferAllocated();
 		}
 	}
 
@@ -236,10 +257,16 @@ public class OutputGateReporterManager {
 				.get(runtimeGateChannelIndex);
 
 		if (reporter != null) {
-			reporter.outputBuffersSentSinceLastReport++;
-			reporter.currentAmountTransmitted = currentAmountTransmitted;
-			// FIXME optimierung mit probing intervall
-			reporter.sendReportIfDue(System.currentTimeMillis());
+			reporter.outputBufferSent(currentAmountTransmitted);
+		}
+	}
+
+	public void outputBufferAllocated(int runtimeGateChannelIndex) {
+		OutputChannelChannelStatisticsReporter reporter = this.reportersByChannelIndexInRuntimeGate
+						.get(runtimeGateChannelIndex);
+
+		if (reporter != null) {
+			reporter.outputBufferAllocated();
 		}
 	}
 

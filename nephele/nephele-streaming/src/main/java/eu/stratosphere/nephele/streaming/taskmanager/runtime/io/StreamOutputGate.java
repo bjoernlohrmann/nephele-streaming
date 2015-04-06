@@ -15,12 +15,6 @@
 
 package eu.stratosphere.nephele.streaming.taskmanager.runtime.io;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.concurrent.LinkedBlockingQueue;
-
-import org.apache.log4j.Logger;
-
 import eu.stratosphere.nephele.io.ChannelSelector;
 import eu.stratosphere.nephele.io.OutputGate;
 import eu.stratosphere.nephele.io.channels.AbstractOutputChannel;
@@ -29,16 +23,18 @@ import eu.stratosphere.nephele.io.channels.bytebuffered.AbstractByteBufferedOutp
 import eu.stratosphere.nephele.io.channels.bytebuffered.InMemoryOutputChannel;
 import eu.stratosphere.nephele.io.channels.bytebuffered.NetworkOutputChannel;
 import eu.stratosphere.nephele.plugins.wrapper.AbstractOutputGateWrapper;
-import eu.stratosphere.nephele.streaming.message.action.DropCurrentChainAction;
-import eu.stratosphere.nephele.streaming.message.action.EstablishNewChainAction;
-import eu.stratosphere.nephele.streaming.message.action.LimitBufferSizeAction;
-import eu.stratosphere.nephele.streaming.message.action.QosAction;
-import eu.stratosphere.nephele.streaming.message.action.SetOutputLatencyTargetAction;
+import eu.stratosphere.nephele.streaming.message.action.*;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.listener.OutputGateQosReportingListener;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.chaining.RuntimeChain;
 import eu.stratosphere.nephele.streaming.taskmanager.runtime.chaining.RuntimeChainLink;
+import eu.stratosphere.nephele.streaming.util.StreamPluginConfig;
 import eu.stratosphere.nephele.types.AbstractTaggableRecord;
 import eu.stratosphere.nephele.types.Record;
+import org.apache.log4j.Logger;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * Wraps Nephele's {@link eu.stratosphere.nephele.io.RuntimeOutputGate} to
@@ -69,6 +65,7 @@ public final class StreamOutputGate<T extends Record> extends
 		this.outputChannels = new HashMap<ChannelID, AbstractOutputChannel<T>>();
 		this.streamChannelSelector = streamChannelSelector;
 		this.qosActionQueue = new LinkedBlockingQueue<QosAction>();
+		AbstractByteBufferedOutputChannel.ensureAutoflushThreadPoolsize(StreamPluginConfig.getOutputChannelFlusherThreadpoolsize());
 	}
 
 	public void setQosReportingListener(
@@ -111,8 +108,8 @@ public final class StreamOutputGate<T extends Record> extends
 		while ((action = this.qosActionQueue.poll()) != null) {
 			if (action instanceof LimitBufferSizeAction) {
 				this.limitBufferSize((LimitBufferSizeAction) action);
-			} else if (action instanceof SetOutputLatencyTargetAction) {
-				this.setOutputBufferLatencyTarget((SetOutputLatencyTargetAction) action);
+			} else if (action instanceof SetOutputBufferLifetimeTargetAction) {
+				this.setOutputBufferLatencyTarget((SetOutputBufferLifetimeTargetAction) action);
 			} else if (action instanceof EstablishNewChainAction) {
 				this.establishChain((EstablishNewChainAction) action);
 			} else if (action instanceof DropCurrentChainAction) {
@@ -121,7 +118,7 @@ public final class StreamOutputGate<T extends Record> extends
 		}
 	}
 
-	private void setOutputBufferLatencyTarget(SetOutputLatencyTargetAction action) {
+	private void setOutputBufferLatencyTarget(SetOutputBufferLifetimeTargetAction action) {
 		ChannelID channelID = action.getSourceChannelID();
 
 		AbstractByteBufferedOutputChannel<T> channel = (AbstractByteBufferedOutputChannel<T>) this.outputChannels
@@ -132,7 +129,7 @@ public final class StreamOutputGate<T extends Record> extends
 			return;
 		}
 		
-		channel.setAutoflushInterval(action.getOutputBufferLatencyTarget() * 2);		
+		channel.setFlushDeadline(action.getOutputBufferLifetimeTarget());
 	}
 
 	private void dropCurrentChain() {
@@ -193,6 +190,15 @@ public final class StreamOutputGate<T extends Record> extends
 		}
 		this.getWrappedOutputGate().outputBufferSent(channelIndex);
 	}
+
+	@Override
+	public void outputBufferAllocated(int channelIndex) {
+		if (this.qosCallback != null) {
+			this.qosCallback.outputBufferAllocated(channelIndex);
+		}
+		this.getWrappedOutputGate().outputBufferSent(channelIndex);
+	}
+
 
 	/**
 	 * {@inheritDoc}

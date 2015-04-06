@@ -15,11 +15,11 @@
 
 package eu.stratosphere.nephele.io.channels;
 
-import java.io.IOException;
-
 import eu.stratosphere.nephele.io.OutputGate;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.types.Record;
+
+import java.io.IOException;
 
 /**
  * OutputChannel is an abstract base class to all different kinds of concrete
@@ -120,7 +120,7 @@ public abstract class AbstractOutputChannel<T extends Record> extends AbstractCh
 	public abstract void processPendingEvents() throws IOException, InterruptedException;
 
 	
-	public abstract void setAutoflushInterval(int newAutoflushIntervalMillis);
+	public abstract void setFlushDeadline(int newAutoflushIntervalMillis);
 	
-	public abstract int getAutoflushInterval();
+	public abstract int getFlushDeadline();
 }

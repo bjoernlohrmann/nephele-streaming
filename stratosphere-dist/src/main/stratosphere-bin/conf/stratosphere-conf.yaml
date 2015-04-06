@@ -126,4 +126,5 @@ plugins.streaming.qosreporter.aggregationinterval: 1000
 plugins.streaming.qosmanager.adjustmentinterval: 5000
 plugins.streaming.qosmanager.logging.qos_statistics_filepattern: /tmp/qos_statistics_%s
 plugins.streaming.qosmanager.logging.cpu_statistics_filepattern: /tmp/cpu_statistics_%s
+streaming.runtime.output_channel_flusher_threadpoolsize = 20
 plugins.streaming.qosmanager.logging.in_memory_entries: 180
