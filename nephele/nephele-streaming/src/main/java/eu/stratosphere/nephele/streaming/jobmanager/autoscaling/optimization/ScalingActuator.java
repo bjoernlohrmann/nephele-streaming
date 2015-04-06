@@ -174,7 +174,7 @@ public class ScalingActuator {
 			if (action.action > 0) {
 				jm.scaleUpElasticTask(jobId, action.vertexId,
 								action.action);
-				pendingCooldown = 3;
+				pendingCooldown = 2;
 			} else {
 				jm.scaleDownElasticTask(jobId, action.vertexId,
 								-action.action);

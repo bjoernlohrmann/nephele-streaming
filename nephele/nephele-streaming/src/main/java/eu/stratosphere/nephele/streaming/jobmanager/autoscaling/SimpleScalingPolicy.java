@@ -12,6 +12,8 @@ import eu.stratosphere.nephele.streaming.jobmanager.autoscaling.optimization.Reb
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosConstraintSummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosGroupEdgeSummary;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosGroupVertexSummary;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosUtils;
+import eu.stratosphere.nephele.streaming.util.StreamPluginConfig;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -37,21 +39,44 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 
 	protected void getParallelismChangesForConstraint(JobGraphLatencyConstraint constraint,
 	                                                  QosConstraintSummary constraintSummary,
-	                                                  Map<JobVertexID, Integer> parallelismChanges)
+	                                                  Map<JobVertexID, Integer> globalParallelismChanges)
 					throws UnexpectedVertexExecutionStateException {
 
-		ArrayList<GG1Server> servers = createServers(constraint, constraintSummary, parallelismChanges);
+		ArrayList<GG1Server> servers = createServers(constraint, constraintSummary, globalParallelismChanges);
+
+		Map<JobVertexID, Integer> localParallelismChanges;
 		if (hasBottleneck(servers)) {
-			resolveBottleneck(parallelismChanges, servers);
+			localParallelismChanges = resolveBottleneck(servers);
 		} else {
-			rebalance(constraint, constraintSummary, parallelismChanges, servers);
+			localParallelismChanges = rebalance(constraint, constraintSummary, servers);
+		}
+
+		// merge with local with global parallelism changes
+		mergeLocalParallelismChangesIntoGlobal(globalParallelismChanges, servers, localParallelismChanges);
+	}
+
+	private void mergeLocalParallelismChangesIntoGlobal(Map<JobVertexID, Integer> globalParallelismChanges,
+					ArrayList<GG1Server> servers, Map<JobVertexID,
+					Integer> localParallelismChanges) {
+
+		for (GG1Server server : servers) {
+			JobVertexID id = server.getGroupVertexID();
+
+			if (!localParallelismChanges.containsKey(id)) {
+				continue;
+			}
+
+			int newP = localParallelismChanges.get(id);
+			if (globalParallelismChanges.containsKey(id)) {
+				newP = Math.max(newP, globalParallelismChanges.get(id));
+			}
+			globalParallelismChanges.put(id, newP);
 		}
 	}
 
 
-	private void rebalance(JobGraphLatencyConstraint constraint,
+	private Map<JobVertexID, Integer> rebalance(JobGraphLatencyConstraint constraint,
 	                       QosConstraintSummary constraintSummary,
-	                       Map<JobVertexID, Integer> parallelismChanges,
 	                       ArrayList<GG1Server> servers) {
 
 		double targetQueueingTimeMillis = computeTargetQueueTimeOfElasticServers(constraint,
@@ -61,46 +86,29 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 		boolean rebalanceSuccess = reb.computeRebalancedParallelism();
 
 		Map<JobVertexID, Integer> rebActions = reb.getScalingActions();
-		Map<JobVertexID, Integer> rebParallelism = reb.getRebalancedParallelism();
-
-		if (LOG.isDebugEnabled()) {
-			// print some debug output
-			StringBuilder strBuild = new StringBuilder();
-			for (JobVertexID id : rebActions.keySet()) {
-				strBuild.append(rebParallelism.get(id));
-				strBuild.append(String.format("(%d)", rebActions.get(id)));
-			}
-			strBuild.append(String.format(" | rebalanceSuccess: %s | targetQueueTime:%.2fms | projectedQueueTime: %.2fms",
+		logAction("Rebalance",
+						rebActions,
+						servers,
+						String.format("rebalanceSuccess: %s | targetQueueTime:%.2fms | projectedQueueTime: %.2fms",
 							Boolean.toString(rebalanceSuccess),
 							targetQueueingTimeMillis,
 							reb.getRebalancedQueueWait() * 1000));
-			LOG.debug("Rebalance: " + strBuild.toString());
-		}
 
-		// filter out minuscule changes in parallelism
+
+		Map<JobVertexID, Integer> newParallelism = new HashMap<JobVertexID, Integer>();
 		for (GG1Server server : servers) {
 			JobVertexID id = server.getGroupVertexID();
 
-			if (!rebParallelism.containsKey(id)) {
-				continue;
-			}
-
-			int newP = rebParallelism.get(id);
-			if (parallelismChanges.containsKey(id)) {
-				newP = Math.max(newP, parallelismChanges.get(id));
-			}
-
-			if (Math.abs(newP - server.getCurrentParallelism()) / ((double) server.getCurrentParallelism()) <= 0.04) {
-				parallelismChanges.remove(id);
-			} else {
-				parallelismChanges.put(id, newP);
+			if (rebActions.containsKey(id) && Math.abs(rebActions.get(id)) / ((double) server.getCurrentParallelism()) >= 0.04) {
+				newParallelism.put(id, server.getCurrentParallelism() + rebActions.get(id));
 			}
 		}
-	}
+
+		return newParallelism;
+}
 
 
-	private ArrayList<GG1Server> filterNonElasticServers(
-					ArrayList<GG1Server> servers) {
+	private ArrayList<GG1Server> filterNonElasticServers(ArrayList<GG1Server> servers) {
 
 		ArrayList<GG1Server> ret = new ArrayList<GG1Server>();
 		for (GG1Server server : servers) {
@@ -177,25 +185,29 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 			}
 		}
 
-		if (availableShippingDelayMillis - nonElasticShippingDelayMillis <= 0) {
-			LOG.warn("Rebalance: Could not enforce constraint by scaling due to non-elastic (already 100% scaled-out) job vertices");
-		}
-
-		if (availableShippingDelayMillis <= 0) {
+		if (availableShippingDelayMillis < 0) {
+			LOG.warn("Rebalance: Constraints is unenforcable (task latency too high)");
 			// if availableShippingDelay is negative, we cannot enforce the
 			// constraint by scaling. The only thing left to do is log a warning
 			// and do graceful degradation. for graceful degradation we allow
-			// 1ms of queueing delay at elastic servers.
+			// some queueing delay at elastic tasks.
 
-			return elasticServersCount;
+			// allow 1ms of queueing delay
+			return elasticServersCount*2;
+
 		} else {
-			// availableShippingDelay right now is the time available for output
-			// buffer latency AND queue waiting before elastic tasks. According
-			// to the 80:20 rule, output buffer latency will adapt itself
-			// to be 80% of that, so we can take the remaining 20% for queueing
-			// (minus another 10% margin of safety).
-			return (availableShippingDelayMillis - nonElasticShippingDelayMillis) * 0.2 * 0.9;
+			//LOG.warn("Rebalance: Could not enforce constraint by scaling due to non-elastic (or scaled-out) job vertices");
+			return (availableShippingDelayMillis * 0.2 * 0.9) / constraint.getSequence().getNumberOfEdges();
 		}
+
+//		else {
+//			// availableShippingDelay right now is the time available for output
+//			// buffer latency AND queue waiting before elastic tasks. According
+//			// to the 80:20 rule, output buffer latency will adapt itself
+//			// to be 80% of that, so we can take the remaining 20% for queueing
+//			// (minus another 10% margin of safety).
+//			return (availableShippingDelayMillis - nonElasticShippingDelayMillis) * 0.2 * 0.9;
+//		}
 	}
 
 	/**
@@ -204,10 +216,13 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 	 * bottlenecks at least doubles the bottlneck's degree of parallelism, in
 	 * the hope of resolving the bottleneck as fast as possible.
 	 *
-	 * @param parallelismChanges Currently planned (but not yet executed) changes in parallelism.
 	 * @param servers            List of G/G/1 servers
 	 */
-	private void resolveBottleneck(Map<JobVertexID, Integer> parallelismChanges, ArrayList<GG1Server> servers) {
+	private Map<JobVertexID, Integer> resolveBottleneck(ArrayList<GG1Server> servers) {
+
+		Map<JobVertexID, Integer> newParallelism = new HashMap<JobVertexID, Integer>();
+		Map<JobVertexID, Integer> actions = new HashMap<JobVertexID, Integer>();
+
 		for (GG1Server bottleneckServer : findBottleneckServers(servers)) {
 			int currP = bottleneckServer.getCurrentParallelism();
 			int doubleP = 2 * currP;
@@ -219,14 +234,40 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 
 			if (newP > currP) {
 				JobVertexID id = bottleneckServer.getGroupVertexID();
-				if (parallelismChanges.containsKey(id)) {
-					newP = Math.max(newP, parallelismChanges.get(id));
-				}
-				parallelismChanges.put(id, newP);
+				actions.put(id, newP - currP);
+				newParallelism.put(id, newP);
 			} else {
 				LOG.warn("ResolveBottleneck: Could not resolve bottleneck by scaling out, due to non-elastic (or already 100% scaled-out) job vertices");
 			}
 		}
+
+		logAction("ResolveBottleneck", actions, servers, null);
+		return newParallelism;
+	}
+
+	private void logAction(String operation, Map<JobVertexID, Integer> actions, ArrayList<GG1Server> servers, String msg) {
+		// print some debug output
+		StringBuilder strBuild = new StringBuilder();
+		strBuild.append(String.format("%d %s: ", QosUtils.alignToInterval(
+						System.currentTimeMillis(),
+						StreamPluginConfig.getAdjustmentIntervalMillis()) / 1000,
+						operation));
+
+
+		for(GG1Server server :servers) {
+			if (actions.containsKey(server.getGroupVertexID())) {
+				int action = actions.get(server.getGroupVertexID());
+				strBuild.append(String.format("%d(%d)",
+								server.getCurrentParallelism() + action,
+								action));
+			}
+		}
+
+		if(msg != null) {
+			strBuild.append(" | ");
+			strBuild.append(msg);
+		}
+		LOG.debug(strBuild.toString());
 	}
 
 	private boolean hasBottleneck(ArrayList<GG1Server> servers) {

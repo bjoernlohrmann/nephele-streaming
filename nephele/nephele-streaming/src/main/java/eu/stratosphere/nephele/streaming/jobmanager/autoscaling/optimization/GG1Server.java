@@ -5,6 +5,12 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosGroupEdgeSumm
 
 public abstract class GG1Server {
 
+	public static final double MAX_UTILIZATION = 0.9;
+
+	public static final double MIN_FITTING_FACTOR = 0.8;
+
+	public static final double MAX_FITTING_FACTOR = 1.2;
+
 	private final JobVertexID groupVertexID;
 
 	protected final double lambdaTotal;
@@ -37,16 +43,16 @@ public abstract class GG1Server {
 		
 		double theoreticalFittingFactor = (edgeSummary.getTransportLatencyMean() / 1000)
 				/ getQueueWaitUnfitted(p);
-		if(theoreticalFittingFactor < 0.8) {
-			fittingFactor = 0.8;
-		} else if (theoreticalFittingFactor > 1.2) {
-			fittingFactor = 1.2;
+		if(theoreticalFittingFactor < MIN_FITTING_FACTOR) {
+			fittingFactor = MIN_FITTING_FACTOR;
+		} else if (theoreticalFittingFactor > MAX_FITTING_FACTOR) {
+			fittingFactor = MAX_FITTING_FACTOR;
 		} else {
 			fittingFactor = theoreticalFittingFactor;
 		}
 
-		lowerBoundParallelism = Math.min(Math.max((int) Math.ceil(lambdaTotal * S),
-				minSubtasks), maxSubtasks);
+		int pWithMaxAllowedUtil = (int) Math.ceil(lambdaTotal * S / MAX_UTILIZATION);
+		lowerBoundParallelism = Math.min(Math.max(pWithMaxAllowedUtil, minSubtasks), maxSubtasks);
 		upperBoundParallelism = maxSubtasks;
 	}
 

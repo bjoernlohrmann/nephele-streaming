@@ -15,9 +15,6 @@
 
 package eu.stratosphere.nephele.plugins.wrapper;
 
-import java.io.IOException;
-import java.util.List;
-
 import eu.stratosphere.nephele.event.task.AbstractTaskEvent;
 import eu.stratosphere.nephele.event.task.EventListener;
 import eu.stratosphere.nephele.io.ChannelSelector;
@@ -30,6 +27,9 @@ import eu.stratosphere.nephele.io.channels.bytebuffered.InMemoryOutputChannel;
 import eu.stratosphere.nephele.io.channels.bytebuffered.NetworkOutputChannel;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.types.Record;
+
+import java.io.IOException;
+import java.util.List;
 
 /**
  * This class provides an abstract base class for an output gate wrapper. An output gate wrapper can be used by a plugin
@@ -290,6 +290,11 @@ public abstract class AbstractOutputGateWrapper<T extends Record> implements Out
 	@Override
 	public void outputBufferSent(final int channelIndex) {
 		this.wrappedOutputGate.outputBufferSent(channelIndex);
+	}
+
+	@Override
+	public void outputBufferAllocated(int channelIndex) {
+		this.wrappedOutputGate.outputBufferAllocated(channelIndex);
 	}
 
 	/**

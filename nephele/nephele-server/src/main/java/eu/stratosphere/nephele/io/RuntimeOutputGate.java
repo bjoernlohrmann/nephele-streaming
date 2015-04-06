@@ -15,13 +15,6 @@
 
 package eu.stratosphere.nephele.io;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-
 import eu.stratosphere.nephele.event.task.AbstractTaskEvent;
 import eu.stratosphere.nephele.execution.Environment;
 import eu.stratosphere.nephele.io.channels.AbstractOutputChannel;
@@ -31,6 +24,13 @@ import eu.stratosphere.nephele.io.channels.bytebuffered.InMemoryOutputChannel;
 import eu.stratosphere.nephele.io.channels.bytebuffered.NetworkOutputChannel;
 import eu.stratosphere.nephele.jobgraph.JobID;
 import eu.stratosphere.nephele.types.Record;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * In Nephele output gates are a specialization of general gates and connect
@@ -363,11 +363,10 @@ public class RuntimeOutputGate<T extends Record> extends AbstractGate<T> impleme
 		if (isSuspended != this.getOutputChannel(index).isSuspended()) {
 			if(!isSuspended) {
 				// initialize autoflush interval
-				int randomAutoflushInterval = this.getOutputChannel(
+				int randomFlushDeadline = this.getOutputChannel(
 						(int) (activeOutputChannels * Math.random()))
-						.getAutoflushInterval();
-				this.getOutputChannel(index).setAutoflushInterval(
-						randomAutoflushInterval);
+						.getFlushDeadline();
+				this.getOutputChannel(index).setFlushDeadline(randomFlushDeadline);
 			}
 			this.getOutputChannel(index).setSuspended(isSuspended);
 			
@@ -437,5 +436,10 @@ public class RuntimeOutputGate<T extends Record> extends AbstractGate<T> impleme
 	@Override
 	public void notifyPendingEvent(int channelIndex) {
 		this.channelsWithPendingEvents.add(channelIndex);
+	}
+
+	@Override
+	public void outputBufferAllocated(int channelIndex) {
+		// Nothing to do here
 	}
 }
