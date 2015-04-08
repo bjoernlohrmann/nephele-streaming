@@ -2,14 +2,11 @@ package eu.stratosphere.nephele.streaming.jobmanager.autoscaling.optimization;
 
 import eu.stratosphere.nephele.jobgraph.JobVertexID;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosGroupEdgeSummary;
+import eu.stratosphere.nephele.streaming.util.StreamPluginConfig;
 
 public abstract class GG1Server {
 
 	public static final double MAX_UTILIZATION = 0.9;
-
-	public static final double MIN_FITTING_FACTOR = 0.8;
-
-	public static final double MAX_FITTING_FACTOR = 1.2;
 
 	private final JobVertexID groupVertexID;
 
@@ -43,10 +40,11 @@ public abstract class GG1Server {
 		
 		double theoreticalFittingFactor = (edgeSummary.getTransportLatencyMean() / 1000)
 				/ getQueueWaitUnfitted(p);
-		if(theoreticalFittingFactor < MIN_FITTING_FACTOR) {
-			fittingFactor = MIN_FITTING_FACTOR;
-		} else if (theoreticalFittingFactor > MAX_FITTING_FACTOR) {
-			fittingFactor = MAX_FITTING_FACTOR;
+
+		if(theoreticalFittingFactor < StreamPluginConfig.getElasticScalingMinFittingFactor()) {
+			fittingFactor = StreamPluginConfig.getElasticScalingMinFittingFactor();
+		} else if (theoreticalFittingFactor > StreamPluginConfig.getElasticScalingMaxFittingFactor()) {
+			fittingFactor = StreamPluginConfig.getElasticScalingMaxFittingFactor();
 		} else {
 			fittingFactor = theoreticalFittingFactor;
 		}

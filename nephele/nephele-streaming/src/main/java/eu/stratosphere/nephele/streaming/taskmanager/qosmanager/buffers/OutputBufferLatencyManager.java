@@ -10,6 +10,7 @@ import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosSequenceLaten
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.EdgeQosData;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosEdge;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosGraphMember;
+import eu.stratosphere.nephele.streaming.util.StreamPluginConfig;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -36,6 +37,8 @@ public class OutputBufferLatencyManager {
 	private final HashMap<QosEdge, Integer> edgesToAdjust = new HashMap<QosEdge, Integer>();
 	
 	private int staleSequencesCounter = 0;
+
+	private final float OUTPUT_BATCHING_LATENCY_WEIGHT;
 	
 	final QosConstraintViolationListener listener = new QosConstraintViolationListener() {
 		@Override
@@ -55,6 +58,7 @@ public class OutputBufferLatencyManager {
 	public OutputBufferLatencyManager(JobID jobID) {
 		this.jobID = jobID;
 		this.messagingThread = StreamMessagingThread.getInstance();
+		this.OUTPUT_BATCHING_LATENCY_WEIGHT = StreamPluginConfig.getOutputBatchingLatencyWeight();
 	}
 
 	public void applyAndSendBufferAdjustments(long oblHistoryTimestamp) throws InterruptedException {
@@ -89,8 +93,11 @@ public class OutputBufferLatencyManager {
 			QosSequenceLatencySummary qosSummary,
 			HashMap<QosEdge, Integer> edgesToAdjust) {
 
-		double availLatPerChannel = computeAvailableChannelLatency(
-				constraint, qosSummary) / countUnchainedEdges(sequenceMembers);
+		int unchainedEdges = countUnchainedEdges(sequenceMembers);
+
+		double availLatPerChannel = computeAvailableChannelLatency(constraint, qosSummary) / unchainedEdges;
+
+		double availableChannelSlack = computeAvailableChannelSlackTime(constraint, qosSummary) / unchainedEdges;
 
 		for (QosGraphMember member : sequenceMembers) {
 			
@@ -105,10 +112,16 @@ public class OutputBufferLatencyManager {
 				continue;
 			}
 			
-			// stick to the 80-20 rule (80% of available time (minus 1 ms shipping time) for output buffering,
-			// 20% for queueing) and trust in the autoscaler to keep the queueing time in check.
-			int targetObl = Math.max(0, (int) (availLatPerChannel * 0.8 - 1));
-			int targetOblt = qosData.proposeOutputBufferLifetimeForOutputBufferLatencyTarget(targetObl);
+			// stick to the A-B rule (A% of available time for output buffering,
+			// B% for queueing) and trust in the autoscaler to keep the queueing time in check.
+			// At the end, -1 is subtracted to account for shipping delay.
+			int targetObl = Math.max(0, (int) (availLatPerChannel * OUTPUT_BATCHING_LATENCY_WEIGHT));
+
+			if (qosData.getTargetObltHistory().hasEntries()) {
+				targetObl += (int) availableChannelSlack;
+			}
+
+			int targetOblt = Math.max(0, qosData.proposeOutputBufferLifetimeForOutputBufferLatencyTarget(targetObl) - 1);
 			
 			// do nothing if change is very small
 			ValueHistory<Integer> targetObltHistory = qosData.getTargetObltHistory();
@@ -127,6 +140,12 @@ public class OutputBufferLatencyManager {
 				edgesToAdjust.put(qosData.getEdge(), targetOblt);
 			}
 		}
+	}
+
+	private double computeAvailableChannelSlackTime(JobGraphLatencyConstraint constraint,
+	                                                QosSequenceLatencySummary qosSummary) {
+
+		return Math.max(0, constraint.getLatencyConstraintInMillis() - qosSummary.getSequenceLatency()) * 0.9;
 	}
 
 	private int countUnchainedEdges(List<QosGraphMember> sequenceMembers) {

@@ -31,10 +31,13 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 
 	private static final Log LOG = LogFactory.getLog(SimpleScalingPolicy.class);
 
+	private final float QUEUEING_LATENCY_WEIGHT;
+
 	public SimpleScalingPolicy(
 					ExecutionGraph execGraph,
 					HashMap<LatencyConstraintID, JobGraphLatencyConstraint> qosConstraints) {
 		super(execGraph, qosConstraints);
+		this.QUEUEING_LATENCY_WEIGHT = 1 - StreamPluginConfig.getOutputBatchingLatencyWeight();
 	}
 
 	protected void getParallelismChangesForConstraint(JobGraphLatencyConstraint constraint,
@@ -162,19 +165,15 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 	                                                     ArrayList<GG1Server> servers) {
 
 		double availableShippingDelayMillis = constraint.getLatencyConstraintInMillis();
-		double nonElasticShippingDelayMillis = 0;
 
 		int serverIndex = 0;
-		int elasticServersCount = 0;
+		int elasticJobVertexCount = 0;
 		for (SequenceElement seqElem : constraint.getSequence()) {
 			if (seqElem.isEdge()) {
 				QosGroupEdgeSummary edgeSummary = constraintSummary.getGroupEdgeSummary(seqElem.getIndexInSequence());
 
-				if (!servers.get(serverIndex).isElastic()) {
-					nonElasticShippingDelayMillis += edgeSummary.getOutputBufferLatencyMean();
-					nonElasticShippingDelayMillis += edgeSummary.getTransportLatencyMean();
-				} else {
-					elasticServersCount++;
+				if (servers.get(serverIndex).isElastic()) {
+					elasticJobVertexCount++;
 				}
 
 				serverIndex++;
@@ -193,21 +192,15 @@ public class SimpleScalingPolicy extends AbstractScalingPolicy {
 			// some queueing delay at elastic tasks.
 
 			// allow 1ms of queueing delay
-			return elasticServersCount*2;
-
+			return elasticJobVertexCount*2;
 		} else {
-			//LOG.warn("Rebalance: Could not enforce constraint by scaling due to non-elastic (or scaled-out) job vertices");
-			return (availableShippingDelayMillis * 0.2 * 0.9) / constraint.getSequence().getNumberOfEdges();
+  		// availableShippingDelay right now is the time available for output
+			// buffer latency AND queue waiting before elastic tasks. According
+			// to the A:B rule, output buffer latency will adapt itself
+			// to be A% of that, so we can take the remaining B% for queueing
+			// (minus another 10% margin of safety).
+			return (availableShippingDelayMillis * QUEUEING_LATENCY_WEIGHT * 0.9) / constraint.getSequence().getNumberOfEdges();
 		}
-
-//		else {
-//			// availableShippingDelay right now is the time available for output
-//			// buffer latency AND queue waiting before elastic tasks. According
-//			// to the 80:20 rule, output buffer latency will adapt itself
-//			// to be 80% of that, so we can take the remaining 20% for queueing
-//			// (minus another 10% margin of safety).
-//			return (availableShippingDelayMillis - nonElasticShippingDelayMillis) * 0.2 * 0.9;
-//		}
 	}
 
 	/**

@@ -57,6 +57,30 @@ public class StreamPluginConfig {
 	public static final long DEFAULT_ADJUSTMENTINTERVAL = 5000;
 
 	/**
+	 * For constraint enforcing, the time available for each edge is split into
+	 * available output batching and queuing time in a fixed ratio. The ratio can be adjusted using
+	 * the below "outputBatchingLatencyWeight" setting, which is a float in the range (0;1). If the
+	 * outputBatchingLatencyWeight is set to 0.8, then the weight of queueing latency is (1-0.8) = 0.2
+	 */
+	public static final String QOSMANAGER_OUTPUT_BATCHING_WEIGHT_KEY = PluginManager
+					.prefixWithPluginNamespace("streaming.qosmanager.output_batching_latency_weight");
+
+	public static final float DEFAULT_QOSMANAGER_OUTPUT_BATCHING_WEIGHT = 0.8f;
+
+
+	/**
+	 * In elastic scaling, the measured queueing latency usually deviates from the one predicted
+	 * by the G/G/1 queueing model. A fitting factor is used to fit the prediction to the current
+	 * measurement point. The fitting factor should be close  to prevent under-/ overscaling.
+	 * This setting specifies the limit of allowed deviation from 1 of the fitting factor. If set to x, then
+	 * the allowed range of the fitting factor becomes (1-x;1+x).
+	 */
+	public static final String QOSMANAGER_SCALING_FITTING_FACTOR_DEVIATION_LIMIT_KEY = PluginManager
+					.prefixWithPluginNamespace("streaming.qosmanager.scaling.fitting_factor_deviation_limit");
+
+	public static final float DEFAULT_QOSMANAGER_SCALING_FITTING_FACTOR_DEVIATION_LIMIT = 0.2f;
+
+	/**
 	 * Poolsize of thread pool used for flushing output channels. It is better to err on the
 	 * high side here, because setting this too low causes buffers to not get flushed in
 	 * time for their deadline.
@@ -115,4 +139,18 @@ public class StreamPluginConfig {
 						DEFAULT_OUTPUT_CAHNNEL_FLUSHER_THREADPOOLSIZE);
 	}
 
+	public static float getOutputBatchingLatencyWeight() {
+		return GlobalConfiguration.getFloat(QOSMANAGER_OUTPUT_BATCHING_WEIGHT_KEY,
+						DEFAULT_QOSMANAGER_OUTPUT_BATCHING_WEIGHT);
+	}
+
+	public static float getElasticScalingMaxFittingFactor() {
+		return 1.0f + GlobalConfiguration.getFloat(QOSMANAGER_SCALING_FITTING_FACTOR_DEVIATION_LIMIT_KEY,
+						DEFAULT_QOSMANAGER_SCALING_FITTING_FACTOR_DEVIATION_LIMIT);
+	}
+
+	public static float getElasticScalingMinFittingFactor() {
+		return 1.0f - GlobalConfiguration.getFloat(QOSMANAGER_SCALING_FITTING_FACTOR_DEVIATION_LIMIT_KEY,
+						DEFAULT_QOSMANAGER_SCALING_FITTING_FACTOR_DEVIATION_LIMIT);
+	}
 }
