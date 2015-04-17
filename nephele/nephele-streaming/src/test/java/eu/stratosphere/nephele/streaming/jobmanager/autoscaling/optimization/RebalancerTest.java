@@ -1,18 +1,15 @@
 package eu.stratosphere.nephele.streaming.jobmanager.autoscaling.optimization;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import eu.stratosphere.nephele.jobgraph.JobVertexID;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosGroupEdgeSummary;
+import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Random;
 
-import org.junit.Test;
-
-import eu.stratosphere.nephele.jobgraph.JobVertexID;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosGroupEdgeSummary;
+import static org.junit.Assert.*;
 
 public class RebalancerTest {
 	
@@ -136,21 +133,20 @@ public class RebalancerTest {
 		for(int i=0; i< 9; i++) {
 			QosGroupEdgeSummary edgeSum = GG1ServerTest.getEdge1();
 			
-			double serverUtil = 0.2 + 0.7 * rnd.nextDouble();
+			double serverUtil = 0.2 + 0.5 * rnd.nextDouble();
 			
 			double lambdaTotal = edgeSum.getMeanEmissionRate() * edgeSum.getActiveEmitterVertices() * rnd.nextDouble();
 			double s = edgeSum.getMeanConsumerVertexLatency() * 2 * rnd.nextDouble();
-			double varS = edgeSum.getMeanConsumerVertexLatencyCV() * 2 * rnd.nextDouble();
-			double varA = edgeSum.getMeanConsumerVertexInterarrivalTimeCV() * 2 * rnd.nextDouble();
+			double cS = edgeSum.getMeanConsumerVertexLatencyCV() * 2 * rnd.nextDouble();
+			double cA = edgeSum.getMeanConsumerVertexInterarrivalTimeCV() * 2 * rnd.nextDouble();
 			int maxP = 1000;
 			int p = (int) Math.ceil(lambdaTotal * (s / 1000) / serverUtil);
 			double queueWait = (1 + (9*rnd.nextDouble()));
 			
 			edgeSum.setMeanEmissionRate(lambdaTotal / edgeSum.getActiveEmitterVertices());
 			edgeSum.setMeanConsumerVertexLatency(s);
-			edgeSum.setMeanConsumerVertexLatencyCV(Math.sqrt(varS) / s);
-			edgeSum.setMeanConsumerVertexInterarrivalTimeCV(Math.sqrt(varA)
-					/ (p / lambdaTotal));
+			edgeSum.setMeanConsumerVertexLatencyCV(cS);
+			edgeSum.setMeanConsumerVertexInterarrivalTimeCV(cA);
 			edgeSum.setActiveConsumerVertices(p);
 			edgeSum.setTransportLatencyMean(queueWait);
 			

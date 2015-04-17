@@ -1,16 +1,15 @@
 package eu.stratosphere.nephele.streaming.jobmanager.autoscaling.optimization;
 
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertEquals;
+import eu.stratosphere.nephele.jobgraph.JobVertexID;
+import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosGroupEdgeSummary;
+import org.junit.Before;
+import org.junit.Test;
 
 import java.util.Arrays;
 import java.util.List;
 
-import org.junit.Before;
-import org.junit.Test;
-
-import eu.stratosphere.nephele.jobgraph.JobVertexID;
-import eu.stratosphere.nephele.streaming.taskmanager.qosmanager.QosGroupEdgeSummary;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class GG1ServerTest {
 
@@ -65,7 +64,7 @@ public class GG1ServerTest {
 		GG1Server server = createKingmanEdge1();
 		assertClose(server.getQueueWait(edge1.getActiveConsumerVertices()),
 				edge1.getTransportLatencyMean() / 1000);
-		assertEquals(31, server.getLowerBoundParallelism());
+		assertEquals(34, server.getLowerBoundParallelism());
 		assertEquals(70, server.getUpperBoundParallelism());
 		assertClose(server.getQueueWait(40), 0.016);
 		assertClose(server.getQueueWait(70), 0.004);
@@ -78,7 +77,7 @@ public class GG1ServerTest {
 		GG1Server server = createKingmanEdge2();
 		assertClose(server.getQueueWait(edge2.getActiveConsumerVertices()),
 				edge2.getTransportLatencyMean() / 1000);
-		assertEquals(23, server.getLowerBoundParallelism());
+		assertEquals(26, server.getLowerBoundParallelism());
 		assertEquals(70, server.getUpperBoundParallelism());
 		assertClose(server.getQueueWait(40), 0.004714286);
 		assertClose(server.getQueueWait(70), 0.001736842);
