@@ -21,6 +21,7 @@ import eu.stratosphere.nephele.streaming.LatencyConstraintID;
 import eu.stratosphere.nephele.streaming.SamplingStrategy;
 import eu.stratosphere.nephele.streaming.jobmanager.QosReporterRole.ReportingAction;
 import eu.stratosphere.nephele.streaming.message.action.CandidateChainConfig;
+import eu.stratosphere.nephele.streaming.message.action.DeployInstanceQosManagerRoleAction;
 import eu.stratosphere.nephele.streaming.message.action.DeployInstanceQosRolesAction;
 import eu.stratosphere.nephele.streaming.message.action.EdgeQosReporterConfig;
 import eu.stratosphere.nephele.streaming.message.action.QosManagerConfig;
@@ -67,7 +68,7 @@ public class TaskManagerQosSetup {
 	public void addManagerRole(QosManagerRole managerRole) {
 		if (this.managerRoles.containsKey(managerRole.getConstraintID())) {
 			throw new RuntimeException(
-					"QoS Manager role for this constraint has already been defined");
+							"QoS Manager role for this constraint has already been defined");
 		}
 
 		this.managerRoles.put(managerRole.getConstraintID(), managerRole);
@@ -103,19 +104,15 @@ public class TaskManagerQosSetup {
 
 	public DeployInstanceQosRolesAction toDeploymentAction(JobID jobID) {
 		DeployInstanceQosRolesAction deploymentAction = new DeployInstanceQosRolesAction(
-				jobID, this.taskManagerConnectionInfo);
-
-		if (!this.managerRoles.isEmpty()) {
-			this.addQosManagerConfig(deploymentAction);
-		}
+						jobID, this.taskManagerConnectionInfo);
 
 		for (QosReporterRole reporterRole : this.reporterRoles.values()) {
 			if (reporterRole.getAction() == ReportingAction.REPORT_CHANNEL_STATS) {
 				deploymentAction.addEdgeQosReporter(this
-						.toEdgeQosReporterConfig(reporterRole));
+								.toEdgeQosReporterConfig(reporterRole));
 			} else {
 				deploymentAction.addVertexQosReporter(this
-						.toVertexQosReporterConfig(reporterRole));
+								.toVertexQosReporterConfig(reporterRole));
 			}
 		}
 
@@ -128,24 +125,31 @@ public class TaskManagerQosSetup {
 		return deploymentAction;
 	}
 
-	private void addQosManagerConfig(
-			DeployInstanceQosRolesAction deploymentAction) {
+	public boolean hasQosManagerRoles() {
+		return !this.managerRoles.isEmpty();
+	}
+
+	public DeployInstanceQosManagerRoleAction toManagerDeploymentAction(JobID jobID) {
+		DeployInstanceQosManagerRoleAction deploymentAction =
+						new DeployInstanceQosManagerRoleAction(jobID, this.taskManagerConnectionInfo);
 
 		QosGraph shallowQosGraph = null;
 		for (QosManagerRole managerRole : this.managerRoles.values()) {
 			if (shallowQosGraph == null) {
 				shallowQosGraph = managerRole.getQosGraph()
-						.cloneWithoutMembers();
+								.cloneWithoutMembers();
 			} else {
 				shallowQosGraph.merge(managerRole.getQosGraph()
-						.cloneWithoutMembers());
+								.cloneWithoutMembers());
 			}
 		}
+
 		deploymentAction.setQosManager(new QosManagerConfig(shallowQosGraph, this.qosManagerID));
+		return deploymentAction;
 	}
 
 	private VertexQosReporterConfig toVertexQosReporterConfig(
-			QosReporterRole reporterRole) {
+					QosReporterRole reporterRole) {
 
 		QosVertex vertex = reporterRole.getVertex();
 
@@ -154,22 +158,22 @@ public class TaskManagerQosSetup {
 		SamplingStrategy samplingStrategy = reporterRole.getSamplingStrategy();
 
 		VertexQosReporterConfig vertexReporter = new VertexQosReporterConfig(
-				vertex.getGroupVertex().getJobVertexID(), vertex.getID(),
-				vertex.getExecutingInstance(),
-				getQosManagerConnectionInfos(reporterRole), inputGateIndex,
-				inputGateIndex != -1 ? vertex.getInputGate(inputGateIndex)
-						.getGateID() : null, outputGateIndex,
-				outputGateIndex != -1 ? vertex.getOutputGate(outputGateIndex)
-						.getGateID() : null, samplingStrategy, vertex.getMemberIndex(),
-				vertex.getName());
+						vertex.getGroupVertex().getJobVertexID(), vertex.getID(),
+						vertex.getExecutingInstance(),
+						getQosManagerConnectionInfos(reporterRole), inputGateIndex,
+						inputGateIndex != -1 ? vertex.getInputGate(inputGateIndex)
+										.getGateID() : null, outputGateIndex,
+						outputGateIndex != -1 ? vertex.getOutputGate(outputGateIndex)
+										.getGateID() : null, samplingStrategy, vertex.getMemberIndex(),
+						vertex.getName());
 
 		return vertexReporter;
 	}
 
 	private InstanceConnectionInfo[] getQosManagerConnectionInfos(
-			QosReporterRole qosReporterRole) {
+					QosReporterRole qosReporterRole) {
 		InstanceConnectionInfo[] managerConnectionInfos = new InstanceConnectionInfo[qosReporterRole
-				.getTargetQosManagers().size()];
+						.getTargetQosManagers().size()];
 		int index = 0;
 		for (QosManagerRole qosManager : qosReporterRole.getTargetQosManagers()) {
 			managerConnectionInfos[index] = qosManager.getManagerInstance();
@@ -179,16 +183,16 @@ public class TaskManagerQosSetup {
 	}
 
 	private EdgeQosReporterConfig toEdgeQosReporterConfig(
-			QosReporterRole reporterRole) {
+					QosReporterRole reporterRole) {
 
 		QosEdge edge = reporterRole.getEdge();
 
 		EdgeQosReporterConfig edgeReporter = new EdgeQosReporterConfig(
-				edge.getSourceChannelID(), edge.getTargetChannelID(),
-				getQosManagerConnectionInfos(reporterRole), edge
-				.getOutputGate().getGateID(), edge.getInputGate()
-				.getGateID(), edge.getOutputGateEdgeIndex(),
-				edge.getInputGateEdgeIndex(), edge.toString());
+						edge.getSourceChannelID(), edge.getTargetChannelID(),
+						getQosManagerConnectionInfos(reporterRole), edge
+						.getOutputGate().getGateID(), edge.getInputGate()
+						.getGateID(), edge.getOutputGateEdgeIndex(),
+						edge.getInputGateEdgeIndex(), edge.toString());
 
 		return edgeReporter;
 	}

@@ -209,11 +209,6 @@ public final class StreamInputGate<T extends Record> extends
     return this.getWrappedInputGate().getRecordAvailabilityListener();
   }
 
-  @Override
-  public void notifyDataUnitConsumed(int channelIndex) {
-    this.getWrappedInputGate().notifyDataUnitConsumed(channelIndex);
-  }
-
 	public void haltTaskThreadIfNecessary() throws InterruptedException {
 		this.channelChooser.setBlockIfNoChannelAvailable(false);
 		RecordAvailabilityListener<T> listener = this
@@ -263,7 +258,8 @@ public final class StreamInputGate<T extends Record> extends
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void notifyDataUnitConsumed(int channelIndex,
+	public void
+	notifyDataUnitConsumed(int channelIndex,
 			long interarrivalTimeNanos, int recordsReadFromBuffer) {
 		if(this.qosCallback != null) {
 			qosCallback.inputBufferConsumed(channelIndex, interarrivalTimeNanos, recordsReadFromBuffer);
