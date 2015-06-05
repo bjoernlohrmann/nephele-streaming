@@ -1,10 +1,8 @@
-package eu.stratosphere.nephele.streaming.taskmanager.qosreporter.vertex;
+package eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling;
 
-import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.BernoulliSampler;
-import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.Sample;
 import eu.stratosphere.nephele.streaming.util.StreamUtil;
 
-public class InputGateInterArrivalTimeSampler {
+public class InputGateInterArrivalTimeSampler implements Sampler {
 	
 	/**
 	 * Samples records interarrival times in microseconds. These are computed
@@ -63,7 +61,7 @@ public class InputGateInterArrivalTimeSampler {
 
 	private void startSampleIfNecessary(int channelIndex) {
 		if (interarrivalTimeSampler.shouldTakeSamplePoint()) {
-			accBufferInterarrivalTimes[channelIndex] = Long.valueOf(0);
+			accBufferInterarrivalTimes[channelIndex] = 0L;
 		}
 	}
 	

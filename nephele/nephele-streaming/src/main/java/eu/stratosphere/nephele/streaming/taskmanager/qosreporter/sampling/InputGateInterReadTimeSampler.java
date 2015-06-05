@@ -1,18 +1,14 @@
-package eu.stratosphere.nephele.streaming.taskmanager.qosreporter.vertex;
-
-import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.BernoulliSampler;
-import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.Sample;
+package eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling;
 
 /**
  * Samples the elapsed time between a read on a specific input gate identified
  * and the beginning of the next attempt read on any other input gate. Elapsed time is sampled in
  * microseconds.
  */
-public class InputGateInterReadTimeSampler {
-	
+public class InputGateInterReadTimeSampler implements Sampler {
+
 	/**
-	 * Samples the elapsed time between a read on the input gate identified
-	 * {@link #inputGateIndex} and the next read on any other input gate.
+	 * Samples the elapsed time between a read on the input gate and the next read on any other input gate.
 	 * Elapsed time is sampled in microseconds.
 	 */
 	private final BernoulliSampler readReadTimeSampler;

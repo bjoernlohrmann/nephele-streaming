@@ -31,8 +31,8 @@ public class ReadWriteReporter extends AbstractVertexQosReporter {
 
 	public ReadWriteReporter(QosReportForwarderThread reportForwarder,
 			QosReporterID.Vertex reporterID, int runtimeInputGateIndex,
-			int runtimeOutputGateIndex, InputGateReceiveCounter igReceiveCounter,
-			OutputGateEmitStatistics emitCounter) {
+			int runtimeOutputGateIndex, CountingGateReporter igReceiveCounter,
+			CountingGateReporter emitCounter) {
 
 		super(reportForwarder, reporterID, 
 				new ReportTimer(reportForwarder.getConfigCenter().getAggregationInterval()),

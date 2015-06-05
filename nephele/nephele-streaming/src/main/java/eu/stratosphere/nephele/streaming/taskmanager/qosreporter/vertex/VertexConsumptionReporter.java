@@ -2,6 +2,7 @@ package eu.stratosphere.nephele.streaming.taskmanager.qosreporter.vertex;
 
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.QosReportForwarderThread;
+import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.InputGateInterReadTimeSampler;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.Sample;
 
 public class VertexConsumptionReporter extends AbstractVertexQosReporter {
@@ -10,7 +11,7 @@ public class VertexConsumptionReporter extends AbstractVertexQosReporter {
 	
 	public VertexConsumptionReporter(QosReportForwarderThread reportForwarder,
 			QosReporterID.Vertex reporterID, int runtimeInputGateIndex,
-			InputGateReceiveCounter igReceiveCounter) {
+			CountingGateReporter igReceiveCounter) {
 
 		super(reportForwarder, reporterID, new ReportTimer(reportForwarder
 				.getConfigCenter().getAggregationInterval()),
