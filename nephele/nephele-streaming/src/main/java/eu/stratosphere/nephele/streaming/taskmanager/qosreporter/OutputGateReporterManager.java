@@ -4,6 +4,8 @@ import eu.stratosphere.nephele.streaming.message.qosreport.EdgeStatistics;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.edge.OutputBufferLifetimeSampler;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.BernoulliSampleDesign;
+import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.vertex.CountingGateReporter;
+import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.vertex.ReportTimer;
 import eu.stratosphere.nephele.types.AbstractTaggableRecord;
 
 import java.util.Collections;
@@ -25,7 +27,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * @author Bjoern Lohrmann
  * 
  */
-public class OutputGateReporterManager {
+public class OutputGateReporterManager extends CountingGateReporter {
 
 	/**
 	 * No need for a thread-safe set because it is only accessed in synchronized
@@ -42,6 +44,8 @@ public class OutputGateReporterManager {
 	private CopyOnWriteArrayList<OutputChannelChannelStatisticsReporter> reportersByChannelIndexInRuntimeGate;
 
 	private QosReportForwarderThread reportForwarder;
+
+	private ReportTimer reportTimer;
 
 	public class OutputChannelChannelStatisticsReporter {
 
@@ -157,16 +161,14 @@ public class OutputGateReporterManager {
 		}
 
 		public void sendReportIfDue(long now) {
-			if (this.reportIsDue(now)) {
+			if (this.reportIsDue()) {
 				this.sendReport(now);
 				this.reset(now);
 			}
 		}
 
-		private boolean reportIsDue(long now) {
-			return now - this.timeOfLastReport > OutputGateReporterManager.this.reportForwarder
-					.getConfigCenter().getAggregationInterval()
-					&& this.recordsEmittedSinceLastReport > 0
+		private boolean reportIsDue() {
+			return this.recordsEmittedSinceLastReport > 0
 					&& this.outputBuffersSentSinceLastReport > 0
 					&& this.outputBufferLifetimeSampler.hasSample();
 		}
@@ -223,7 +225,7 @@ public class OutputGateReporterManager {
 			this.outputBuffersSentSinceLastReport++;
 			this.currentAmountTransmitted = currentAmountTransmitted;
 			this.outputBufferLifetimeSampler.outputBufferSent();
-			sendReportIfDue(System.currentTimeMillis());
+			sendReportsIfDue(System.currentTimeMillis());
 		}
 
 		public void outputBufferAllocated() {
@@ -231,14 +233,33 @@ public class OutputGateReporterManager {
 		}
 	}
 
+	public OutputGateReporterManager() {
+	}
+
 	public OutputGateReporterManager(QosReportForwarderThread qosReporter,
 			int noOfOutputChannels) {
+		initReporter(qosReporter, noOfOutputChannels);
+	}
 
+	public void initReporter(QosReportForwarderThread qosReporter, int noOfOutputChannels) {
 		this.reportForwarder = qosReporter;
 		this.reporters = new HashSet<QosReporterID>();
 		this.reportersByChannelIndexInRuntimeGate = new CopyOnWriteArrayList<OutputChannelChannelStatisticsReporter>();
 		Collections.addAll(this.reportersByChannelIndexInRuntimeGate,
 				new OutputChannelChannelStatisticsReporter[noOfOutputChannels]);
+		this.reportTimer = new ReportTimer(this.reportForwarder.getConfigCenter().getAggregationInterval());
+		setReporter(true);
+	}
+
+	public void sendReportsIfDue(long now) {
+		if (reportTimer.reportIsDue()) {
+			for (OutputChannelChannelStatisticsReporter reporter : reportersByChannelIndexInRuntimeGate) {
+				if (reporter != null) {
+					reporter.sendReportIfDue(now);
+				}
+			}
+			reportTimer.reset(now);
+		}
 	}
 
 	public void recordEmitted(int channelIndex, AbstractTaggableRecord record) {

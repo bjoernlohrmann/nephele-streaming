@@ -1,11 +1,12 @@
 package eu.stratosphere.nephele.streaming.taskmanager.qosreporter.vertex;
 
+import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.QosReportForwarderThread;
+import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.InputGateInterArrivalTimeSampler;
+import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.InputGateInterReadTimeSampler;
+import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.Sample;
+
 import java.util.ArrayList;
 import java.util.List;
-
-import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.QosReportForwarderThread;
-import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.BernoulliSampler;
-import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.Sample;
 
 /**
  * Contains a group of {@link ReadReadReporter} to do read-read latency
@@ -23,8 +24,8 @@ public class ReadReadVertexQosReporterGroup implements VertexQosReporter {
 	private final List<ReadReadReporter> reporters = new ArrayList<ReadReadReporter>();
 	
 	private final ReportTimer reportTimer;
-	
-	private final InputGateReceiveCounter igReceiveCounter;
+
+	private final CountingGateReporter igReceiveCounter;
 	private long igReceiveCounterAtLastReport;
 	
 	private final InputGateInterArrivalTimeSampler igInterArrivalTimeSampler;
@@ -35,7 +36,7 @@ public class ReadReadVertexQosReporterGroup implements VertexQosReporter {
 
 	public ReadReadVertexQosReporterGroup(
 			QosReportForwarderThread reportForwarder, int inputGateIndex,
-			InputGateReceiveCounter igReceiveCounter) {
+			CountingGateReporter igReceiveCounter) {
 
 		this.inputGateIndex = inputGateIndex;
 
@@ -46,7 +47,7 @@ public class ReadReadVertexQosReporterGroup implements VertexQosReporter {
 				.getConfigCenter().getSamplingProbability() / 100.0);
 
 		this.igReceiveCounter = igReceiveCounter;
-		this.igReceiveCounterAtLastReport = igReceiveCounter.getRecordsReceived();		
+		this.igReceiveCounterAtLastReport = igReceiveCounter.getRecordsCount();
 		
 		this.reportTimer = new ReportTimer(reportForwarder.getConfigCenter()
 				.getAggregationInterval());
@@ -80,9 +81,9 @@ public class ReadReadVertexQosReporterGroup implements VertexQosReporter {
 	private double getRecordsConsumedPerSec(double secsPassed) {
 		double recordsConsumedPerSec = -1;
 		if (igReceiveCounter != null) {
-			recordsConsumedPerSec = (igReceiveCounter.getRecordsReceived() - igReceiveCounterAtLastReport)
+			recordsConsumedPerSec = (igReceiveCounter.getRecordsCount() - igReceiveCounterAtLastReport)
 					/ secsPassed;
-			igReceiveCounterAtLastReport = igReceiveCounter.getRecordsReceived();
+			igReceiveCounterAtLastReport = igReceiveCounter.getRecordsCount();
 		}
 		return recordsConsumedPerSec;
 	}

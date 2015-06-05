@@ -17,7 +17,7 @@ package eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling;
  * @author Bjoern Lohrmann
  * 
  */
-public class BernoulliSampler {
+public class BernoulliSampler implements Sampler {
 
 	private final BernoulliSampleDesign samplingDesign;
 
