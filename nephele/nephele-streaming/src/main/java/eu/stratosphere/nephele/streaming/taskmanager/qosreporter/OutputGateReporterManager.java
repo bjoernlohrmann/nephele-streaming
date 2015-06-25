@@ -1,9 +1,12 @@
 package eu.stratosphere.nephele.streaming.taskmanager.qosreporter;
 
+import eu.stratosphere.nephele.io.channels.bytebuffered.BufferFlushReason;
 import eu.stratosphere.nephele.streaming.message.qosreport.EdgeStatistics;
 import eu.stratosphere.nephele.streaming.taskmanager.qosmodel.QosReporterID;
+import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.edge.OutputBufferLatencySampler;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.edge.OutputBufferLifetimeSampler;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.BernoulliSampleDesign;
+import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.sampling.BernoulliSampler;
 import eu.stratosphere.nephele.types.AbstractTaggableRecord;
 
 import java.util.Collections;
@@ -61,9 +64,17 @@ public class OutputGateReporterManager {
 
 		private int recordsSinceLastTag;
 
+//		private int sampledRecordsInCurrentBuffer;
+//
+//		private long sampledOblInCurrentBuffer;
+
+//		private final BernoulliSampler oblSampler;
+
 		public final BernoulliSampleDesign recordTaggingSampleDesign;
 
 		private final OutputBufferLifetimeSampler outputBufferLifetimeSampler;
+
+		private final OutputBufferLatencySampler outputBufferLatencySampler;
 
 		public OutputChannelChannelStatisticsReporter(
 				QosReporterID.Edge reporterID, int channelIndexInRuntimeGate) {
@@ -76,12 +87,11 @@ public class OutputGateReporterManager {
 			this.recordsEmittedSinceLastReport = 0;
 			this.outputBuffersSentSinceLastReport = 0;
 			this.recordsSinceLastTag = 0;
-			this.recordTaggingSampleDesign = new BernoulliSampleDesign(
-					OutputGateReporterManager.this.reportForwarder.getConfigCenter().getSamplingProbability() / 100.0);
 
-
-			this.outputBufferLifetimeSampler = new OutputBufferLifetimeSampler(
-							OutputGateReporterManager.this.reportForwarder.getConfigCenter().getSamplingProbability() / 100.0);
+			double samplingProbability = OutputGateReporterManager.this.reportForwarder.getConfigCenter().getSamplingProbability() / 100.0;
+			this.recordTaggingSampleDesign = new BernoulliSampleDesign(samplingProbability);
+			this.outputBufferLifetimeSampler = new OutputBufferLifetimeSampler(samplingProbability);
+			this.outputBufferLatencySampler = new OutputBufferLatencySampler();
 		}
 
 		/**
@@ -168,7 +178,8 @@ public class OutputGateReporterManager {
 					.getConfigCenter().getAggregationInterval()
 					&& this.recordsEmittedSinceLastReport > 0
 					&& this.outputBuffersSentSinceLastReport > 0
-					&& this.outputBufferLifetimeSampler.hasSample();
+					&& this.outputBufferLifetimeSampler.hasSample()
+					&& this.outputBufferLatencySampler.hasSample();
 		}
 
 		private void reset(long now) {
@@ -178,6 +189,7 @@ public class OutputGateReporterManager {
 			this.outputBuffersSentSinceLastReport = 0;
 			this.recordTaggingSampleDesign.reset();
 			this.outputBufferLifetimeSampler.reset();
+			this.outputBufferLatencySampler.reset();
 		}
 
 		private void sendReport(long now) {
@@ -191,8 +203,12 @@ public class OutputGateReporterManager {
 			double recordsPerSecond = this.recordsEmittedSinceLastReport
 					/ secsPassed;
 
-			EdgeStatistics channelStatsMessage = new EdgeStatistics(
-					this.reporterID, mbitPerSec, meanOutputBufferLifetime,
+			double meanOutputBufferLatency = this.outputBufferLatencySampler.getMeanOutputBufferLatencyMillis();
+
+			EdgeStatistics channelStatsMessage = new EdgeStatistics(this.reporterID,
+							mbitPerSec,
+							meanOutputBufferLifetime,
+					meanOutputBufferLatency,
 					recordsPerBuffer, recordsPerSecond);
 
 			OutputGateReporterManager.this.reportForwarder
@@ -201,6 +217,7 @@ public class OutputGateReporterManager {
 
 		public void updateStatsAndTagRecordIfNecessary(
 				AbstractTaggableRecord record) {
+
 			this.recordsEmittedSinceLastReport++;
 			this.recordsSinceLastTag++;
 
@@ -208,6 +225,7 @@ public class OutputGateReporterManager {
 			if (shouldSample) {
 				this.tagRecord(record);
 				this.recordsSinceLastTag = 0;
+				this.outputBufferLatencySampler.startSample(((TimestampTag) record.getTag()).getTimestamp());
 			} else {
 				record.setTag(null);
 			}
@@ -219,11 +237,15 @@ public class OutputGateReporterManager {
 			record.setTag(tag);
 		}
 
-		public void outputBufferSent(long currentAmountTransmitted) {
+		public void outputBufferSent(long currentAmountTransmitted, BufferFlushReason reason) {
 			this.outputBuffersSentSinceLastReport++;
 			this.currentAmountTransmitted = currentAmountTransmitted;
 			this.outputBufferLifetimeSampler.outputBufferSent();
-			sendReportIfDue(System.currentTimeMillis());
+
+			long now = System.currentTimeMillis();
+			this.outputBufferLatencySampler.outputBufferSent(reason, now);
+
+			sendReportIfDue(now);
 		}
 
 		public void outputBufferAllocated() {
@@ -251,13 +273,13 @@ public class OutputGateReporterManager {
 	}
 
 	public void outputBufferSent(int runtimeGateChannelIndex,
-			long currentAmountTransmitted) {
+	                             long currentAmountTransmitted, BufferFlushReason reason) {
 
 		OutputChannelChannelStatisticsReporter reporter = this.reportersByChannelIndexInRuntimeGate
 				.get(runtimeGateChannelIndex);
 
 		if (reporter != null) {
-			reporter.outputBufferSent(currentAmountTransmitted);
+			reporter.outputBufferSent(currentAmountTransmitted, reason);
 		}
 	}
 

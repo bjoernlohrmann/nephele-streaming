@@ -14,6 +14,7 @@
  **********************************************************************************************************************/
 package eu.stratosphere.nephele.streaming.taskmanager.qosreporter.listener;
 
+import eu.stratosphere.nephele.io.channels.bytebuffered.BufferFlushReason;
 import eu.stratosphere.nephele.types.AbstractTaggableRecord;
 
 /**
@@ -26,7 +27,7 @@ import eu.stratosphere.nephele.types.AbstractTaggableRecord;
  */
 public interface OutputGateQosReportingListener {
 
-	public void outputBufferSent(int channelIndex, long currentAmountTransmitted);
+	public void outputBufferSent(int channelIndex, long currentAmountTransmitted, BufferFlushReason reason);
 
 	public void recordEmitted(int outputChannel, AbstractTaggableRecord record);
 

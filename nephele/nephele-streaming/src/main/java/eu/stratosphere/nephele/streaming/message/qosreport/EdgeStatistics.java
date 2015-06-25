@@ -47,6 +47,11 @@ public final class EdgeStatistics extends AbstractQosReportRecord {
 	private double outputBufferLifetime;
 
 	/**
+	 * The delay records incur due to output batching on this channel.
+	 */
+	private double outputBufferLatency;
+
+	/**
 	 * The number of records that fit into an output buffer of this channel.
 	 */
 	private double recordsPerBuffer;
@@ -78,12 +83,14 @@ public final class EdgeStatistics extends AbstractQosReportRecord {
 	 *            number of records that are emitted on this channel each second
 	 */
 	public EdgeStatistics(QosReporterID.Edge reporterID, double throughput,
-			double outputBufferLifetime, double recordsPerBuffer,
+			double outputBufferLifetime, double outputBufferLatency,
+			double recordsPerBuffer,
 			double recordsPerSecond) {
 
 		this.reporterID = reporterID;
 		this.throughput = throughput;
 		this.outputBufferLifetime = outputBufferLifetime;
+		this.outputBufferLatency = outputBufferLatency;
 		this.recordsPerBuffer = recordsPerBuffer;
 		this.recordsPerSecond = recordsPerSecond;
 
@@ -107,6 +114,10 @@ public final class EdgeStatistics extends AbstractQosReportRecord {
 	 */
 	public double getOutputBufferLifetime() {
 		return this.outputBufferLifetime;
+	}
+
+	public double getOutputBufferLatency() {
+		return outputBufferLatency;
 	}
 
 	/**
@@ -142,6 +153,7 @@ public final class EdgeStatistics extends AbstractQosReportRecord {
 		return new EdgeStatistics(reporterID, 
 				(throughput + other.throughput) / 2, 
 				(outputBufferLifetime + other.outputBufferLifetime) / 2,
+				(outputBufferLatency + other.outputBufferLatency) / 2,
 				(recordsPerBuffer + other.recordsPerBuffer) / 2,
 				(recordsPerSecond + other.recordsPerSecond) / 2);
 	}
@@ -154,6 +166,7 @@ public final class EdgeStatistics extends AbstractQosReportRecord {
 		this.reporterID.write(out);
 		out.writeDouble(this.getThroughput());
 		out.writeDouble(this.getOutputBufferLifetime());
+		out.writeDouble(this.getOutputBufferLatency());
 		out.writeDouble(this.getRecordsPerBuffer());
 		out.writeDouble(this.getRecordsPerSecond());
 	}
@@ -167,6 +180,7 @@ public final class EdgeStatistics extends AbstractQosReportRecord {
 		this.reporterID.read(in);
 		this.throughput = in.readDouble();
 		this.outputBufferLifetime = in.readDouble();
+		this.outputBufferLatency = in.readDouble();
 		this.recordsPerBuffer = in.readDouble();
 		this.recordsPerSecond = in.readDouble();
 	}

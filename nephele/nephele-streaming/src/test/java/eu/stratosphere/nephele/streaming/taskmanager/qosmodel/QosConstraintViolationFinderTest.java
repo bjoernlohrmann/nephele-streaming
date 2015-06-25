@@ -68,7 +68,7 @@ public class QosConstraintViolationFinderTest {
 	public void setUp() throws Exception {
 		this.fix = new QosGraphFixture();
 		this.fauxEdgeStatistics = new EdgeStatistics(new QosReporterID.Edge(),
-				1e7, 500d, 100d, 100d);
+				1e7, 500d, 250d, 100d, 100d);
 	}
 
 	/**

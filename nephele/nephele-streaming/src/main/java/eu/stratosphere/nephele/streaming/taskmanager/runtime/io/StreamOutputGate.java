@@ -20,6 +20,7 @@ import eu.stratosphere.nephele.io.OutputGate;
 import eu.stratosphere.nephele.io.channels.AbstractOutputChannel;
 import eu.stratosphere.nephele.io.channels.ChannelID;
 import eu.stratosphere.nephele.io.channels.bytebuffered.AbstractByteBufferedOutputChannel;
+import eu.stratosphere.nephele.io.channels.bytebuffered.BufferFlushReason;
 import eu.stratosphere.nephele.io.channels.bytebuffered.InMemoryOutputChannel;
 import eu.stratosphere.nephele.io.channels.bytebuffered.NetworkOutputChannel;
 import eu.stratosphere.nephele.plugins.wrapper.AbstractOutputGateWrapper;
@@ -109,7 +110,7 @@ public final class StreamOutputGate<T extends Record> extends
 			if (action instanceof LimitBufferSizeAction) {
 				this.limitBufferSize((LimitBufferSizeAction) action);
 			} else if (action instanceof SetOutputBufferLifetimeTargetAction) {
-				this.setOutputBufferLatencyTarget((SetOutputBufferLifetimeTargetAction) action);
+				this.setOutputBufferLifetimeTarget((SetOutputBufferLifetimeTargetAction) action);
 			} else if (action instanceof EstablishNewChainAction) {
 				this.establishChain((EstablishNewChainAction) action);
 			} else if (action instanceof DropCurrentChainAction) {
@@ -118,7 +119,7 @@ public final class StreamOutputGate<T extends Record> extends
 		}
 	}
 
-	private void setOutputBufferLatencyTarget(SetOutputBufferLifetimeTargetAction action) {
+	private void setOutputBufferLifetimeTarget(SetOutputBufferLifetimeTargetAction action) {
 		ChannelID channelID = action.getSourceChannelID();
 
 		AbstractByteBufferedOutputChannel<T> channel = (AbstractByteBufferedOutputChannel<T>) this.outputChannels
@@ -182,13 +183,14 @@ public final class StreamOutputGate<T extends Record> extends
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void outputBufferSent(final int channelIndex) {		
+	public void outputBufferSent(final int channelIndex, BufferFlushReason reason) {
 		if (this.qosCallback != null) {
 			this.qosCallback.outputBufferSent(channelIndex, this
 					.getOutputChannel(channelIndex)
-					.getAmountOfDataTransmitted());
+					.getAmountOfDataTransmitted(),
+					reason);
 		}
-		this.getWrappedOutputGate().outputBufferSent(channelIndex);
+		this.getWrappedOutputGate().outputBufferSent(channelIndex, reason);
 	}
 
 	@Override
@@ -196,7 +198,7 @@ public final class StreamOutputGate<T extends Record> extends
 		if (this.qosCallback != null) {
 			this.qosCallback.outputBufferAllocated(channelIndex);
 		}
-		this.getWrappedOutputGate().outputBufferSent(channelIndex);
+		this.getWrappedOutputGate().outputBufferAllocated(channelIndex);
 	}
 
 

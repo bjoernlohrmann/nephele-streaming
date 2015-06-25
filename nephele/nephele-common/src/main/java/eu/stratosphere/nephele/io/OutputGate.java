@@ -17,6 +17,7 @@ package eu.stratosphere.nephele.io;
 
 import eu.stratosphere.nephele.io.channels.AbstractOutputChannel;
 import eu.stratosphere.nephele.io.channels.ChannelID;
+import eu.stratosphere.nephele.io.channels.bytebuffered.BufferFlushReason;
 import eu.stratosphere.nephele.io.channels.bytebuffered.InMemoryOutputChannel;
 import eu.stratosphere.nephele.io.channels.bytebuffered.NetworkOutputChannel;
 import eu.stratosphere.nephele.types.Record;
@@ -145,11 +146,12 @@ public interface OutputGate<T extends Record> extends Gate<T> {
 	/**
 	 * This method is called by one of the attached output channels to indicate that the buffer which is internally used
 	 * to store written records has been forwarded to the next step in the processing pipeline.
-	 * 
+	 *
 	 * @param channelIndex
 	 *        the index of the channel within the gate
+	 * @param reason
 	 */
-	void outputBufferSent(int channelIndex);
+	void outputBufferSent(int channelIndex, BufferFlushReason reason);
 	
 	int getNumberOfActiveOutputChannels();
 	

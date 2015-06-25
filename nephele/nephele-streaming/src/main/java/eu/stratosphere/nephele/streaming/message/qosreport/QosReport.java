@@ -216,10 +216,12 @@ public class QosReport extends AbstractSerializableQosMessage {
 			for (Entry<QosReporterID.Edge, EdgeStatistics> entry : this.edgeStatistics
 					.entrySet()) {
 				entry.getKey().write(out);
-				out.writeDouble(entry.getValue().getThroughput());
-				out.writeDouble(entry.getValue().getOutputBufferLifetime());
-				out.writeDouble(entry.getValue().getRecordsPerBuffer());
-				out.writeDouble(entry.getValue().getRecordsPerSecond());
+				EdgeStatistics stats = entry.getValue();
+				out.writeDouble(stats.getThroughput());
+				out.writeDouble(stats.getOutputBufferLifetime());
+				out.writeDouble(stats.getOutputBufferLatency());
+				out.writeDouble(stats.getRecordsPerBuffer());
+				out.writeDouble(stats.getRecordsPerSecond());
 			}
 		} else {
 			out.writeInt(0);
@@ -290,7 +292,7 @@ public class QosReport extends AbstractSerializableQosMessage {
 			reporterID.read(in);
 
 			EdgeStatistics edgeStats = new EdgeStatistics(reporterID,
-					in.readDouble(), in.readDouble(), in.readDouble(),
+					in.readDouble(), in.readDouble(), in.readDouble(), in.readDouble(),
 					in.readDouble());
 			this.getOrCreateEdgeStatisticsMap().put(reporterID, edgeStats);
 		}

@@ -64,7 +64,7 @@ public class QosSequenceLatencySummary {
 				vertexLatencySum += this.memberLatencies[index][0];
 			} else {
 				EdgeQosData edgeQos = ((QosEdge) member).getQosData();
-				this.memberLatencies[index][0] = edgeQos.estimateOutputBufferLatencyInMillis();
+				this.memberLatencies[index][0] = edgeQos.getOutputBufferLatencyInMillis();
 				this.memberLatencies[index][1] = edgeQos.estimateTransportLatencyInMillis();
 				sequenceLatency += edgeQos.getChannelLatencyInMillis();
 				transportLatencySum += this.memberLatencies[index][1];

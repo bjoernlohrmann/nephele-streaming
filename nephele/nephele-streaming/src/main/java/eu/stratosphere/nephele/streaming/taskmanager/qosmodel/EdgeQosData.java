@@ -21,6 +21,8 @@ public class EdgeQosData {
 
 	private QosStatistic outputBufferLifetimeStatistic;
 
+	private QosStatistic outputBufferLatencyStatistic;
+
 	private QosStatistic recordsPerBufferStatistic;
 
 	private QosStatistic recordsPerSecondStatistic;
@@ -35,8 +37,12 @@ public class EdgeQosData {
 		this.isInChain = false;
 		this.latencyInMillisStatistic = new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize());
 		this.throughputInMbitStatistic = new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize());
+
 		this.outputBufferLifetimeStatistic = new QosStatistic(
 				StreamPluginConfig.computeQosStatisticWindowSize());
+		this.outputBufferLatencyStatistic = new QosStatistic(
+						StreamPluginConfig.computeQosStatisticWindowSize());
+
 		this.recordsPerBufferStatistic = new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize());
 		this.recordsPerSecondStatistic = new QosStatistic(StreamPluginConfig.computeQosStatisticWindowSize());
 		this.targetObltHistory = new ValueHistory<Integer>(2);
@@ -45,36 +51,32 @@ public class EdgeQosData {
 	public QosEdge getEdge() {
 		return this.edge;
 	}
-	
-	public double estimateOutputBufferLatencyInMillis() {
-		double channelLatency = getChannelLatencyInMillis();
-		double oblt = getOutputBufferLifetimeInMillis();
 
-		if (channelLatency == -1 || oblt == -1) {
+	public double getOutputBufferLatencyInMillis() {
+		double channelLatency = getChannelLatencyInMillis();
+		if(channelLatency == -1) {
 			return -1;
 		}
 
-		double recordsPerBuffer = getRecordsPerBuffer();
-		if (Math.abs(recordsPerBuffer - 1) < 0.001) {
-			// pathological corner case: record emissions are very infrequent
-			return oblt;
-		} else {
-			return Math.min(channelLatency, oblt / 2);
+		if (outputBufferLatencyStatistic.hasValues()) {
+			return Math.min(channelLatency, outputBufferLatencyStatistic.getMean());
 		}
+
+		return -1;
 	}
 
-	public int proposeOutputBufferLifetimeForOutputBufferLatencyTarget(int targetObl) {
-		double recordsPerBuffer = getRecordsPerBuffer();
-		if (Math.abs(recordsPerBuffer - 1) < 0.001) {
-			return targetObl;
-		} else {
-			return targetObl * 2;
-		}
-	}
+//	public int proposeOutputBufferLifetimeForOutputBufferLatencyTarget(int targetObl) {
+//		double recordsPerBuffer = getRecordsPerBuffer();
+//		if (Math.abs(recordsPerBuffer - 1) < 0.001) {
+//			return targetObl;
+//		} else {
+//			return targetObl * 2;
+//		}
+//	}
 
 	public double estimateTransportLatencyInMillis() {
 		double channelLatency = getChannelLatencyInMillis();
-		double obl = estimateOutputBufferLatencyInMillis();
+		double obl = getOutputBufferLatencyInMillis();
 
 		if (channelLatency == -1 || obl == -1) {
 			return -1;
@@ -136,6 +138,10 @@ public class EdgeQosData {
 		QosValue outputBufferLifetime = new QosValue(
 				stats.getOutputBufferLifetime(), timestamp);
 		this.outputBufferLifetimeStatistic.addValue(outputBufferLifetime);
+
+		QosValue outputBufferLatency = new QosValue(
+						stats.getOutputBufferLatency(), timestamp);
+		this.outputBufferLatencyStatistic.addValue(outputBufferLatency);
 
 		QosValue recordsPerBuffer = new QosValue(stats.getRecordsPerBuffer(),
 				timestamp);

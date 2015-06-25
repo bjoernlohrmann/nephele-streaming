@@ -20,6 +20,7 @@ import eu.stratosphere.nephele.execution.Environment;
 import eu.stratosphere.nephele.io.channels.AbstractOutputChannel;
 import eu.stratosphere.nephele.io.channels.ChannelID;
 import eu.stratosphere.nephele.io.channels.ChannelType;
+import eu.stratosphere.nephele.io.channels.bytebuffered.BufferFlushReason;
 import eu.stratosphere.nephele.io.channels.bytebuffered.InMemoryOutputChannel;
 import eu.stratosphere.nephele.io.channels.bytebuffered.NetworkOutputChannel;
 import eu.stratosphere.nephele.jobgraph.JobID;
@@ -349,7 +350,7 @@ public class RuntimeOutputGate<T extends Record> extends AbstractGate<T> impleme
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void outputBufferSent(final int channelIndex) {
+	public void outputBufferSent(final int channelIndex, BufferFlushReason reason) {
 		// Nothing to do here
 	}
 

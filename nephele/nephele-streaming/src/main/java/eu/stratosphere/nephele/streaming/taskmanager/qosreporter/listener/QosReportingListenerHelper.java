@@ -14,6 +14,7 @@
  **********************************************************************************************************************/
 package eu.stratosphere.nephele.streaming.taskmanager.qosreporter.listener;
 
+import eu.stratosphere.nephele.io.channels.bytebuffered.BufferFlushReason;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.InputGateReporterManager;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.OutputGateReporterManager;
 import eu.stratosphere.nephele.streaming.taskmanager.qosreporter.TimestampTag;
@@ -87,7 +88,7 @@ public class QosReportingListenerHelper {
 
 			@Override
 			public void outputBufferSent(int outputChannelIndex,
-					long currentAmountTransmitted) {
+			                             long currentAmountTransmitted, BufferFlushReason reason) {
 				// do nothing
 			}
 		};
@@ -151,9 +152,10 @@ public class QosReportingListenerHelper {
 
 			@Override
 			public void outputBufferSent(int runtimeGateChannelIndex,
-					long currentAmountTransmitted) {
+			                             long currentAmountTransmitted, BufferFlushReason reason) {
 				gateReporterManager.outputBufferSent(runtimeGateChannelIndex,
-						currentAmountTransmitted);
+				currentAmountTransmitted,
+				reason);
 			}
 
 			@Override
@@ -218,9 +220,9 @@ public class QosReportingListenerHelper {
 
 			@Override
 			public void outputBufferSent(int channelIndex,
-					long currentAmountTransmitted) {
-				first.outputBufferSent(channelIndex, currentAmountTransmitted);
-				second.outputBufferSent(channelIndex, currentAmountTransmitted);
+			                             long currentAmountTransmitted, BufferFlushReason reason) {
+				first.outputBufferSent(channelIndex, currentAmountTransmitted, reason);
+				second.outputBufferSent(channelIndex, currentAmountTransmitted, reason);
 			}
 
 			@Override

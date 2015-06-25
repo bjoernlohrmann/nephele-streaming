@@ -43,7 +43,7 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 			synchronized (AbstractByteBufferedOutputChannel.this) {
 				if (dataBuffer == bufferToFlush) {
 					try {
-						flushBufferUnsynchronized();
+						flushBufferUnsynchronized(BufferFlushReason.AFTER_SERIALIZATION);
 					} catch (IOException e) {
 						LOG.error("Error in flusher thread: " + e.getMessage(),
 								e);
@@ -193,12 +193,12 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 	 * @throws InterruptedException
 	 *         thrown if the thread is interrupted while releasing the buffers
 	 */
-	private void flushBufferUnsynchronized() throws IOException, InterruptedException {
+	private void flushBufferUnsynchronized(BufferFlushReason reason) throws IOException, InterruptedException {
 		if (this.dataBuffer != null) {
 			this.outputChannelBroker.releaseWriteBuffer(dataBuffer);
 
 			// Notify the output gate to enable statistics collection by plugins
-			getOutputGate().outputBufferSent(getChannelIndex());
+			getOutputGate().outputBufferSent(getChannelIndex(), reason);
 
 			this.dataBuffer = null;
 		}
@@ -206,22 +206,27 @@ public abstract class AbstractByteBufferedOutputChannel<T extends Record> extend
 	
 	private synchronized void flushSerializationBuffer(boolean releaseNonEmptyDataBuffer) throws InterruptedException, IOException {
 		boolean freshBufferAllocated = false;
-		
-		while (this.serializationBuffer.dataLeftFromPreviousSerialization()) {
+
+		boolean dataLeft = serializationBuffer.dataLeftFromPreviousSerialization();
+		while (dataLeft) {
 			if (this.dataBuffer == null) {
 				this.dataBuffer = requestWriteBufferFromBroker();
 				freshBufferAllocated = true;
 			}
 			
 			this.amountOfDataTransmitted += this.serializationBuffer.read(this.dataBuffer);
+			dataLeft = serializationBuffer.dataLeftFromPreviousSerialization();
+
 			if (this.dataBuffer.remaining() == 0) {
-				flushBufferUnsynchronized();				
+				flushBufferUnsynchronized((dataLeft)
+								? BufferFlushReason.DURING_SERIALIZATION
+								: BufferFlushReason.AFTER_SERIALIZATION);
 			}
 		}
 		
 		if (this.dataBuffer != null) {
 			if (releaseNonEmptyDataBuffer) {
-				flushBufferUnsynchronized();
+				flushBufferUnsynchronized(BufferFlushReason.AFTER_SERIALIZATION);
 			} else if (freshBufferAllocated) {
 				scheduledFlusherThreadPool.schedule(new DataBufferFlusher(this.dataBuffer),
 								flushDeadline,

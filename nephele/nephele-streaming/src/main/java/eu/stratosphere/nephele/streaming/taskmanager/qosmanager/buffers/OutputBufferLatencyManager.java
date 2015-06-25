@@ -47,8 +47,12 @@ public class OutputBufferLatencyManager {
 				List<QosGraphMember> sequenceMembers,
 				QosSequenceLatencySummary qosSummary) {
 
+			final boolean adaptiveBatchingActivated = StreamPluginConfig.isAdaptiveOutputBatchingActivated();
+
 			if (qosSummary.isMemberQosDataFresh()) {
-				collectEdgesToAdjust(constraint, sequenceMembers, qosSummary, edgesToAdjust);
+				if (adaptiveBatchingActivated) {
+					collectEdgesToAdjust(constraint, sequenceMembers, qosSummary, edgesToAdjust);
+				}
 			} else {
 				staleSequencesCounter++;
 			}
@@ -117,11 +121,18 @@ public class OutputBufferLatencyManager {
 			// At the end, -1 is subtracted to account for shipping delay.
 			int targetObl = Math.max(0, (int) (availLatPerChannel * OUTPUT_BATCHING_LATENCY_WEIGHT));
 
+
+			int targetOblt;
 			if (qosData.getTargetObltHistory().hasEntries()) {
 				targetObl += (int) availableChannelSlack;
+				int currentOblt = qosData.getTargetObltHistory().getLastEntry().getValue();
+				int delta = (int) (targetObl - qosData.getOutputBufferLatencyInMillis());
+				targetOblt = Math.max(0, Math.min(2*targetObl, currentOblt + delta));
+			} else {
+				targetOblt = targetObl;
 			}
 
-			int targetOblt = Math.max(0, qosData.proposeOutputBufferLifetimeForOutputBufferLatencyTarget(targetObl) - 1);
+			// int targetOblt = Math.max(0, qosData.proposeOutputBufferLifetimeForOutputBufferLatencyTarget(targetObl) - 1);
 			
 			// do nothing if change is very small
 			ValueHistory<Integer> targetObltHistory = qosData.getTargetObltHistory();

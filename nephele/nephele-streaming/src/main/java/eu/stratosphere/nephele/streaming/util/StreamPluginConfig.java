@@ -67,6 +67,15 @@ public class StreamPluginConfig {
 
 	public static final float DEFAULT_QOSMANAGER_OUTPUT_BATCHING_WEIGHT = 0.8f;
 
+	public static final String STREAMING_DYNAMIC_TASK_CHAINING = PluginManager
+					.prefixWithPluginNamespace("streaming.dynamic_task_chaining");
+
+	public static final boolean DEFAULT_STREAMING_DYNAMIC_TASK_CHAINING = true;
+
+	private static final String STREAMING_ADAPTIVE_OUTPUT_BATCHING =  PluginManager
+					.prefixWithPluginNamespace("streaming.adaptive_output_batching");;
+
+	private static final boolean DEFAULT_STREAMING_ADAPTIVE_OUTPUT_BATCHING = true;
 
 	/**
 	 * In elastic scaling, the measured queueing latency usually deviates from the one predicted
@@ -152,5 +161,13 @@ public class StreamPluginConfig {
 	public static float getElasticScalingMinFittingFactor() {
 		return 1.0f - GlobalConfiguration.getFloat(QOSMANAGER_SCALING_FITTING_FACTOR_DEVIATION_LIMIT_KEY,
 						DEFAULT_QOSMANAGER_SCALING_FITTING_FACTOR_DEVIATION_LIMIT);
+	}
+
+	public static boolean isDynamicTaskChainingActivated() {
+		return GlobalConfiguration.getBoolean(STREAMING_DYNAMIC_TASK_CHAINING, DEFAULT_STREAMING_DYNAMIC_TASK_CHAINING);
+	}
+
+	public static boolean isAdaptiveOutputBatchingActivated() {
+		return GlobalConfiguration.getBoolean(STREAMING_ADAPTIVE_OUTPUT_BATCHING, DEFAULT_STREAMING_ADAPTIVE_OUTPUT_BATCHING);
 	}
 }

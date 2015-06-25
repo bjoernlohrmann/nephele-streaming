@@ -605,10 +605,8 @@ public class QosModel {
 
 				if (edgeQosData.hasNewerData(inactivityThresholdTime)) {
 					activeEdges++;
-					outputBufferLatencySum += edgeQosData
-							.estimateOutputBufferLatencyInMillis();
-					transportLatencySum += edgeQosData
-							.estimateTransportLatencyInMillis();
+					outputBufferLatencySum += edgeQosData.getOutputBufferLatencyInMillis();
+					transportLatencySum += edgeQosData.estimateTransportLatencyInMillis();
 				}
 			}
 		}

@@ -121,15 +121,15 @@ function prepareLatencySeries(latency) {
       if (type == "vertex") {
         s.label = latency.labels[col];
       } else if (type == "edge" && !edgeLabelAdded) {
-        s.label = "Transport";
+        s.label = "&nbsp; &nbsp; Transport";
         edgeLabelAdded = true;
       } else if (type == "edgeObl" && !edgeOblLabelAdded) {
-        s.label = "Output Buffer";
+        s.label = "&nbsp; &nbsp; Output Buffer";
         edgeOblLabelAdded = true
       } else if (type == "edge") {
-        s.tooltip = "Transport";
+        s.tooltip = "&nbsp; &nbsp; Transport";
       } else if (type == "edgeObl") {
-        s.tooltip = "Output Buffer";
+        s.tooltip = "&nbsp; &nbsp; Output Buffer";
       }
 
       series.push(s);

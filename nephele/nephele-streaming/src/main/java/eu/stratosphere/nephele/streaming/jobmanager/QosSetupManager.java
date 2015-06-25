@@ -10,6 +10,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import eu.stratosphere.nephele.streaming.util.StreamPluginConfig;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -282,7 +283,10 @@ public class QosSetupManager implements VertexAssignmentListener {
 		
 		qosSetup = new QosSetup(this.qosGraphs);
 		qosSetup.computeQosRoles();
-		qosSetup.computeCandidateChains(this.executionGraph);
+
+		if (StreamPluginConfig.isDynamicTaskChainingActivated()) {
+			qosSetup.computeCandidateChains(this.executionGraph);
+		}
 		
 		distributeQosSetup();
 	}

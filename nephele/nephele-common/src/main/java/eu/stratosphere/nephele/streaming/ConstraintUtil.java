@@ -20,6 +20,7 @@ import eu.stratosphere.nephele.jobgraph.AbstractJobOutputVertex;
 import eu.stratosphere.nephele.jobgraph.AbstractJobVertex;
 import eu.stratosphere.nephele.jobgraph.JobEdge;
 import eu.stratosphere.nephele.jobgraph.JobGraph;
+import eu.stratosphere.nephele.jobgraph.JobTaskVertex;
 import eu.stratosphere.nephele.util.SerializableArrayList;
 
 import java.io.ByteArrayInputStream;
@@ -78,7 +79,7 @@ public class ConstraintUtil {
 		Configuration jobConfig = jobGraph.getJobConfiguration();
 		SerializableArrayList<JobGraphLatencyConstraint> constraints = getConstraints(jobConfig);
 		constraints.add(constraint);
-		putConstraints(jobConfig, constraints);
+		setConstraints(jobConfig, constraints);
 	}
 
 	private static void ensurePreconditions(JobGraphSequence sequence,
@@ -404,8 +405,8 @@ public class ConstraintUtil {
 		stack.removeLast();
 	}
 
-	private static void putConstraints(Configuration jobConfiguration,
-			SerializableArrayList<JobGraphLatencyConstraint> constraints)
+	public static void setConstraints(Configuration jobConfiguration,
+	                                  SerializableArrayList<JobGraphLatencyConstraint> constraints)
 			throws IOException {
 
 		ByteArrayOutputStream byteOut = new ByteArrayOutputStream();
@@ -473,5 +474,22 @@ public class ConstraintUtil {
 		}
 
 		return generateConstraintName(beginVertex, endVertex, sequence.getFirst().isVertex());
+	}
+
+	public static void setSamplingStrategyForConstrainedVertex(JobGraph graph, JobTaskVertex vertex,
+	                                                           SamplingStrategy samplingStrategy) throws IOException {
+
+		// change sampling strategy for vertex in all constraints
+		SerializableArrayList<JobGraphLatencyConstraint> constraints = getConstraints(graph.getJobConfiguration());
+		for (JobGraphLatencyConstraint constraint : constraints) {
+			for (SequenceElement seqElem : constraint.getSequence()) {
+				if (seqElem.isVertex() && seqElem.getVertexID().equals(vertex.getID())) {
+					seqElem.setSamplingStrategy(samplingStrategy);
+				}
+			}
+		}
+
+		// replace old serialized constraints
+		setConstraints(graph.getJobConfiguration(), constraints);
 	}
 }

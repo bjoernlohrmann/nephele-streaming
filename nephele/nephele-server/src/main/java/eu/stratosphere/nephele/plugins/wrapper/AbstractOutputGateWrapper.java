@@ -23,6 +23,7 @@ import eu.stratosphere.nephele.io.OutputGate;
 import eu.stratosphere.nephele.io.channels.AbstractOutputChannel;
 import eu.stratosphere.nephele.io.channels.ChannelID;
 import eu.stratosphere.nephele.io.channels.ChannelType;
+import eu.stratosphere.nephele.io.channels.bytebuffered.BufferFlushReason;
 import eu.stratosphere.nephele.io.channels.bytebuffered.InMemoryOutputChannel;
 import eu.stratosphere.nephele.io.channels.bytebuffered.NetworkOutputChannel;
 import eu.stratosphere.nephele.jobgraph.JobID;
@@ -288,8 +289,8 @@ public abstract class AbstractOutputGateWrapper<T extends Record> implements Out
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void outputBufferSent(final int channelIndex) {
-		this.wrappedOutputGate.outputBufferSent(channelIndex);
+	public void outputBufferSent(final int channelIndex, BufferFlushReason reason) {
+		this.wrappedOutputGate.outputBufferSent(channelIndex, reason);
 	}
 
 	@Override
